@@ -1,0 +1,4752 @@
+{
+  "schemaVersion": "1",
+  "cliVersion": "0.22.1",
+  "version": "0.22.1",
+  "score": 74,
+  "label": "Needs Work",
+  "scoreable": true,
+  "coverage": {
+    "supportedFiles": 322,
+    "unsupportedFiles": 44,
+    "dominantUnsupported": "Lua",
+    "scoreable": true
+  },
+  "engines": {
+    "format": {
+      "issues": 0,
+      "skipped": false,
+      "elapsed": 6376.672962000001,
+      "missingTools": [
+        "ruff"
+      ]
+    },
+    "lint": {
+      "issues": 0,
+      "skipped": false,
+      "elapsed": 40609.988355,
+      "missingTools": [
+        "ruff",
+        "cppcheck"
+      ]
+    },
+    "code-quality": {
+      "issues": 57,
+      "skipped": false,
+      "elapsed": 6247.443836999999
+    },
+    "ai-slop": {
+      "issues": 136,
+      "skipped": false,
+      "elapsed": 5941.570518999999
+    },
+    "security": {
+      "issues": 1,
+      "skipped": false,
+      "elapsed": 1711.5684970000002
+    }
+  },
+  "engineDefinitions": {
+    "format": {
+      "label": "Formatting",
+      "description": "Whitespace, indentation, line wrapping, and import ordering"
+    },
+    "lint": {
+      "label": "Linting",
+      "description": "Static analysis for likely bugs and bad patterns"
+    },
+    "code-quality": {
+      "label": "Code Quality",
+      "description": "Complexity limits, dead code detection, and duplication checks"
+    },
+    "ai-slop": {
+      "label": "AI Slop",
+      "description": "Narrative comments, dead patterns, unsafe type casts, TODO stubs, generic names"
+    },
+    "architecture": {
+      "label": "Architecture",
+      "description": "Project-specific import and layering rules"
+    },
+    "security": {
+      "label": "Security",
+      "description": "Secret leaks, risky APIs, and dependency vulnerabilities"
+    }
+  },
+  "diagnostics": [
+    {
+      "filePath": "crates/clap/src/lib.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "1895 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/lib.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 623,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "ui · 179 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/lib.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 823,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "default · 178 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/state_bridge.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "1485 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/state_bridge.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 908,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "exported_callback_is_bounded_under_raw_midi_flood_and_lifecycle_reset · 468 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/engine/src/compile.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "3185 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/engine/src/patch_engine.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "1305 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/builtins/osc_fm6.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 279,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "process · 173 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/builtins/osc_va.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 382,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "process · 174 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/standalone/src/main.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 77,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "run · 165 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/browser.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "2773 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/browser.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 1603,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "list_column · 217 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/browser.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 2063,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "play_section · 185 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/explain.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "1323 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/filebrowser.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "1155 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/inspect.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "1365 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/kit/controls.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 175,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "ui · 145 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/lib.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "6145 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/lib.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 430,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "default · 145 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/lib.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 1672,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "toolbar · 135 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/lib.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 1852,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "rail · 196 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/lib.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 2341,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "show_rack · 399 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/main.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "3044 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/main.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 1772,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "ui · 463 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/main.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 2282,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "main · 228 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/main.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 2671,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "cc_to_callback_during_delayed_save_and_open · 156 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/pattern.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 68,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "step_grid · 143 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/perform_view.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "1983 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/rack/mod.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "1327 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/rack_editor.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "1556 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/routing.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "2306 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/style/load.rs",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 120, flagged above 132 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 324,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "clamp · 232 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/style/load.rs",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 325,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "num · 7 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/tables.rs",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 1000, flagged above 1100 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "1156 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/render.py",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 400, flagged above 441 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "1531 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/render.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 160,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "k · 7 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/render.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 165,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "sel · 7 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/revision-2/render2.py",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 400, flagged above 441 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "1370 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/revision-2/render2.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 82,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "kv · 7 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/revision-2/render2.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 323,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "two_tone_arc · 7 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/revision-2/render2.py",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 80, flagged above 88 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 619,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "drawer2 · 144 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/host-production/scripts/timing-proxy.c",
+      "engine": "code-quality",
+      "rule": "complexity/deep-nesting",
+      "severity": "warning",
+      "message": "Function nested too deeply (max: 5)",
+      "help": "Consider using early returns or extracting nested logic",
+      "line": 68,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "start · depth 6",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Deep nesting makes behavior harder to reason about and is more actionable than pure size."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/midi-timing/scripts/make_demos.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 42,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "ramp · 7 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/presets/scripts/macro_audit.py",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 400, flagged above 441 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "506 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/presets/scripts/macro_audit.py",
+      "engine": "code-quality",
+      "rule": "complexity/function-too-long",
+      "severity": "warning",
+      "message": "Function too long (limit: 80, flagged above 88 lines)",
+      "help": "Consider breaking this function into smaller pieces",
+      "line": 400,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "main · 104 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Long functions are maintainability pressure, but length alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/reaper-instrument/scripts/timing-proxy.c",
+      "engine": "code-quality",
+      "rule": "complexity/deep-nesting",
+      "severity": "warning",
+      "message": "Function nested too deeply (max: 5)",
+      "help": "Consider using early returns or extracting nested logic",
+      "line": 62,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "start · depth 6",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Deep nesting makes behavior harder to reason about and is more actionable than pure size."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/visual-polish/mockups/make_mockups.py",
+      "engine": "code-quality",
+      "rule": "complexity/file-too-large",
+      "severity": "warning",
+      "message": "File too large (limit: 400, flagged above 441 lines)",
+      "help": "Consider splitting this file into smaller modules",
+      "line": 0,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "478 lines",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Large files are reviewability pressure, but size alone is not a confirmed defect."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/visual-polish/mockups/make_mockups.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 142,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "face_bg · 7 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/visual-polish/mockups/make_mockups.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 160,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "header · 7 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/visual-polish/mockups/make_mockups.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 178,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "well · 8 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/visual-polish/mockups/make_mockups.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 196,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "grid_lines · 7 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/visual-polish/mockups/make_mockups.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 212,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "display · 8 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/visual-polish/mockups/make_mockups.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 251,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "knob · 10 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/visual-polish/mockups/make_mockups.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 276,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "seg · 9 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/visual-polish/mockups/make_mockups.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 301,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "jack · 7 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/visual-polish/mockups/make_mockups.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 314,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "tray · 8 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/visual-polish/mockups/make_mockups.py",
+      "engine": "code-quality",
+      "rule": "complexity/too-many-params",
+      "severity": "warning",
+      "message": "Function has too many parameters (max: 6)",
+      "help": "Consider using an options object parameter",
+      "line": 337,
+      "column": 0,
+      "category": "Complexity",
+      "fixable": false,
+      "detail": "drum_grid · 7 params",
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Large parameter lists hurt call-site safety but usually need intentional refactoring."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/swallowed-exception",
+      "severity": "error",
+      "message": "Bare except with pass swallows errors silently",
+      "help": "Handle errors explicitly: log with context, rethrow, or return an error value",
+      "line": 91,
+      "column": 0,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "high",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Swallowed failures hide real broken states and deserve full scoring impact."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/swallowed-exception",
+      "severity": "error",
+      "message": "Bare except with pass swallows errors silently",
+      "help": "Handle errors explicitly: log with context, rethrow, or return an error value",
+      "line": 292,
+      "column": 0,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "high",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Swallowed failures hide real broken states and deserve full scoring impact."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/composites/scripts/make-bundle.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/unused-import",
+      "severity": "warning",
+      "message": "Imported symbol 'hashlib' is never used",
+      "help": "Remove unused imports to keep the code clean",
+      "line": 3,
+      "column": 0,
+      "category": "AI Slop",
+      "fixable": true,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "mechanical",
+        "multiplier": 0.5,
+        "cap": 16,
+        "rationale": "Unused imports are mechanical cleanup."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/cue-macros/scripts/host.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/unused-import",
+      "severity": "warning",
+      "message": "Imported symbol 'uuid' is never used",
+      "help": "Remove unused imports to keep the code clean",
+      "line": 28,
+      "column": 0,
+      "category": "AI Slop",
+      "fixable": true,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "mechanical",
+        "multiplier": 0.5,
+        "cap": 16,
+        "rationale": "Unused imports are mechanical cleanup."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/factory-performance-bank/scripts/audio.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/unused-import",
+      "severity": "warning",
+      "message": "Imported symbol 'wave' is never used",
+      "help": "Remove unused imports to keep the code clean",
+      "line": 4,
+      "column": 0,
+      "category": "AI Slop",
+      "fixable": true,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "mechanical",
+        "multiplier": 0.5,
+        "cap": 16,
+        "rationale": "Unused imports are mechanical cleanup."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/grid-cues/scripts/host_cues.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/unused-import",
+      "severity": "warning",
+      "message": "Imported symbol 'uuid' is never used",
+      "help": "Remove unused imports to keep the code clean",
+      "line": 21,
+      "column": 0,
+      "category": "AI Slop",
+      "fixable": true,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "mechanical",
+        "multiplier": 0.5,
+        "cap": 16,
+        "rationale": "Unused imports are mechanical cleanup."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/host-production/scripts/make-bundle.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/unused-import",
+      "severity": "warning",
+      "message": "Imported symbol 'subprocess' is never used",
+      "help": "Remove unused imports to keep the code clean",
+      "line": 3,
+      "column": 0,
+      "category": "AI Slop",
+      "fixable": true,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "mechanical",
+        "multiplier": 0.5,
+        "cap": 16,
+        "rationale": "Unused imports are mechanical cleanup."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/midi-timing/scripts/make_demos.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/unused-import",
+      "severity": "warning",
+      "message": "Imported symbol 'math' is never used",
+      "help": "Remove unused imports to keep the code clean",
+      "line": 13,
+      "column": 0,
+      "category": "AI Slop",
+      "fixable": true,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "mechanical",
+        "multiplier": 0.5,
+        "cap": 16,
+        "rationale": "Unused imports are mechanical cleanup."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/panel-authoring/repair/flow.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/unused-import",
+      "severity": "warning",
+      "message": "Imported symbol 'shutil' is never used",
+      "help": "Remove unused imports to keep the code clean",
+      "line": 3,
+      "column": 0,
+      "category": "AI Slop",
+      "fixable": true,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "mechanical",
+        "multiplier": 0.5,
+        "cap": 16,
+        "rationale": "Unused imports are mechanical cleanup."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/panel-authoring/scripts/host-fixture.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/unused-import",
+      "severity": "warning",
+      "message": "Imported symbol 'struct' is never used",
+      "help": "Remove unused imports to keep the code clean",
+      "line": 3,
+      "column": 0,
+      "category": "AI Slop",
+      "fixable": true,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "mechanical",
+        "multiplier": 0.5,
+        "cap": 16,
+        "rationale": "Unused imports are mechanical cleanup."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/wavetable-editor/host-features.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/unused-import",
+      "severity": "warning",
+      "message": "Imported symbol 'array' is never used",
+      "help": "Remove unused imports to keep the code clean",
+      "line": 1,
+      "column": 0,
+      "category": "AI Slop",
+      "fixable": true,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "mechanical",
+        "multiplier": 0.5,
+        "cap": 16,
+        "rationale": "Unused imports are mechanical cleanup."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/embedded.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/narrative-comment",
+      "severity": "warning",
+      "message": "Narrative comment block (cross-reference commentary)",
+      "help": "Remove — narrative/decorative comments belong in PR descriptions, not source. Code should be self-explanatory.",
+      "line": 242,
+      "column": 0,
+      "category": "Comments",
+      "fixable": true,
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Narrative comments are cleanup/style findings rather than defects."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/builtins/arp.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/narrative-comment",
+      "severity": "warning",
+      "message": "Narrative comment block (cross-reference commentary)",
+      "help": "Remove — narrative/decorative comments belong in PR descriptions, not source. Code should be self-explanatory.",
+      "line": 190,
+      "column": 0,
+      "category": "Comments",
+      "fixable": true,
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Narrative comments are cleanup/style findings rather than defects."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/builtins/drums.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/narrative-comment",
+      "severity": "warning",
+      "message": "Narrative comment block (decorative separator)",
+      "help": "Remove — narrative/decorative comments belong in PR descriptions, not source. Code should be self-explanatory.",
+      "line": 93,
+      "column": 0,
+      "category": "Comments",
+      "fixable": true,
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Narrative comments are cleanup/style findings rather than defects."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/builtins/drums.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/narrative-comment",
+      "severity": "warning",
+      "message": "Narrative comment block (decorative separator)",
+      "help": "Remove — narrative/decorative comments belong in PR descriptions, not source. Code should be self-explanatory.",
+      "line": 227,
+      "column": 0,
+      "category": "Comments",
+      "fixable": true,
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Narrative comments are cleanup/style findings rather than defects."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/builtins/drums.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/narrative-comment",
+      "severity": "warning",
+      "message": "Narrative comment block (decorative separator)",
+      "help": "Remove — narrative/decorative comments belong in PR descriptions, not source. Code should be self-explanatory.",
+      "line": 466,
+      "column": 0,
+      "category": "Comments",
+      "fixable": true,
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Narrative comments are cleanup/style findings rather than defects."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/builtins/drums.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/narrative-comment",
+      "severity": "warning",
+      "message": "Narrative comment block (decorative separator)",
+      "help": "Remove — narrative/decorative comments belong in PR descriptions, not source. Code should be self-explanatory.",
+      "line": 654,
+      "column": 0,
+      "category": "Comments",
+      "fixable": true,
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Narrative comments are cleanup/style findings rather than defects."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/builtins/drums.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/narrative-comment",
+      "severity": "warning",
+      "message": "Narrative comment block (decorative separator)",
+      "help": "Remove — narrative/decorative comments belong in PR descriptions, not source. Code should be self-explanatory.",
+      "line": 825,
+      "column": 0,
+      "category": "Comments",
+      "fixable": true,
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Narrative comments are cleanup/style findings rather than defects."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/code/host.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/narrative-comment",
+      "severity": "warning",
+      "message": "Narrative comment block (cross-reference commentary)",
+      "help": "Remove — narrative/decorative comments belong in PR descriptions, not source. Code should be self-explanatory.",
+      "line": 217,
+      "column": 0,
+      "category": "Comments",
+      "fixable": true,
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Narrative comments are cleanup/style findings rather than defects."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/dsp.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/narrative-comment",
+      "severity": "warning",
+      "message": "Narrative comment block (phase/section header)",
+      "help": "Remove — narrative/decorative comments belong in PR descriptions, not source. Code should be self-explanatory.",
+      "line": 526,
+      "column": 0,
+      "category": "Comments",
+      "fixable": true,
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Narrative comments are cleanup/style findings rather than defects."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/narrative-comment",
+      "severity": "warning",
+      "message": "Narrative comment block (cross-reference commentary)",
+      "help": "Remove — narrative/decorative comments belong in PR descriptions, not source. Code should be self-explanatory.",
+      "line": 1294,
+      "column": 0,
+      "category": "Comments",
+      "fixable": true,
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Narrative comments are cleanup/style findings rather than defects."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/style/load.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/narrative-comment",
+      "severity": "warning",
+      "message": "Narrative comment block (decorative separator)",
+      "help": "Remove — narrative/decorative comments belong in PR descriptions, not source. Code should be self-explanatory.",
+      "line": 557,
+      "column": 0,
+      "category": "Comments",
+      "fixable": true,
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Narrative comments are cleanup/style findings rather than defects."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "sdk/kabl-module-sdk/src/meta.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/narrative-comment",
+      "severity": "warning",
+      "message": "Narrative comment block (decorative separator)",
+      "help": "Remove — narrative/decorative comments belong in PR descriptions, not source. Code should be self-explanatory.",
+      "line": 331,
+      "column": 0,
+      "category": "Comments",
+      "fixable": true,
+      "assessment": {
+        "kind": "style-policy",
+        "confidence": "medium",
+        "label": "style/policy"
+      },
+      "scoreImpact": {
+        "tier": "style",
+        "multiplier": 0.5,
+        "cap": 8,
+        "rationale": "Narrative comments are cleanup/style findings rather than defects."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/render.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-chained-dict-get",
+      "severity": "warning",
+      "message": "Chained `.get(..., {})` defaults hide missing-data cases.",
+      "help": "Normalize the input at the boundary, use a typed object, or split the lookup into explicit steps. Empty-dict fallback chains are a common agent shortcut that becomes brittle as schemas evolve.",
+      "line": 319,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Chained dict fallback hides shape assumptions and deserves review."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/render.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "7 repeated branches dispatch on `kind`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 417,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/render.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "6 repeated branches dispatch on `kind`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 423,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/render.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "5 repeated branches dispatch on `kind`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 429,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/render.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "4 repeated branches dispatch on `kind`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 435,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/revision-2/render2.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "5 repeated branches dispatch on `u`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 60,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/design/revision-2/render2.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "4 repeated branches dispatch on `u`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 62,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "25 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 165,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "24 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 168,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "23 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 176,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "22 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 180,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "21 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 183,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "20 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 185,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "19 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 199,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "18 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 202,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "17 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 217,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "16 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 227,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "15 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 229,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "14 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 231,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "13 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 235,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "12 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 237,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "11 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 245,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "10 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 250,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "9 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 266,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "8 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 279,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "7 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 281,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "6 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 285,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "5 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 294,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/rack-migration/drive.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "4 repeated branches dispatch on `cmd`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 296,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/visual-polish/mockups/make_mockups.py",
+      "engine": "ai-slop",
+      "rule": "ai-slop/python-repetitive-dispatch",
+      "severity": "warning",
+      "message": "4 repeated branches dispatch on `k`.",
+      "help": "Use a table, set membership, or handler map when branches share the same shape. SlopCodeBench highlights these selector ladders as code that keeps growing instead of absorbing new cases cleanly.",
+      "line": 219,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "maintainability",
+        "multiplier": 0.75,
+        "cap": 24,
+        "rationale": "Repetitive dispatch ladders create maintainability debt."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 110,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 518,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 625,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 641,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 921,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1024,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1189,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1429,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/clap/src/state_bridge.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 141,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/composite.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 171,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/composite.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 172,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/embedded.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 255,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/embedded.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 260,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/embedded.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 266,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/embedded.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 294,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/embedded.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 295,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/embedded.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 310,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/embedded.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 311,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/embedded.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 344,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/format.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 291,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/format.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 292,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/format.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 320,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/panel.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 72,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/core/src/panel.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 73,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/engine/src/compile.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1179,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/engine/src/patch_engine.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 668,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/engine/src/patch_engine.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 759,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/engine/src/patch_engine.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 838,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/engine/src/patch_engine.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 842,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/engine/src/patch_engine.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1154,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/code/budget.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 86,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/wavetable.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 184,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/modules/src/wavetable.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 312,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/browser.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 397,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/browser.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1648,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/browser.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1808,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/browser.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1814,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/browser.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1839,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/browser.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 2038,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/browser.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 2054,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/composites.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 227,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/composites.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 318,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/composites.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 501,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/composites.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 735,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/control.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 309,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/fm6.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 75,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/kit/g4.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 769,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 4754,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 4755,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 4756,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/lib.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 5628,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 947,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1039,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1044,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1244,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1249,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1528,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 1627,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 2469,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/perform_view.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 703,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/rack_editor.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 118,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/rack_editor.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 132,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "crates/ui/src/rack_editor.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 868,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/host-production/scripts/rt-framework-probe.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 25,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/host-production/scripts/rt-framework-probe.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 28,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/host-production/scripts/rt-framework-probe.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 32,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/host-production/scripts/rt-framework-probe.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 35,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/host-production/scripts/rt-framework-probe.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 41,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/host-production/scripts/rt-framework-probe.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 43,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 70,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 71,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 72,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 74,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 75,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 76,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 84,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 94,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 133,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 157,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 165,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 215,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 217,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/product-research/d11/src/main.rs",
+      "engine": "ai-slop",
+      "rule": "ai-slop/rust-non-test-unwrap",
+      "severity": "warning",
+      "message": "`.unwrap()` in non-test code panics on None/Err. Surfaces as a hard crash for the caller.",
+      "help": "Use `?` to propagate, `.expect(\"context\")` if you really mean it (and the message names the invariant), or pattern-match the variant you care about. Reserve raw `.unwrap()` for tests and prototypes.",
+      "line": 243,
+      "column": 1,
+      "category": "AI Slop",
+      "fixable": false,
+      "assessment": {
+        "kind": "ai-slop-indicator",
+        "confidence": "medium",
+        "label": "AI-slop indicators"
+      },
+      "scoreImpact": {
+        "tier": "strict",
+        "multiplier": 1,
+        "rationale": "Production unwrap can panic instead of handling expected failure."
+      },
+      "forceFixable": false
+    },
+    {
+      "filePath": "docs/grid-cues/scripts/clips.py",
+      "engine": "security",
+      "rule": "security/python-exec",
+      "severity": "error",
+      "message": "Use of exec() can execute arbitrary code",
+      "help": "Avoid exec — use safer alternatives",
+      "line": 18,
+      "column": 0,
+      "category": "Security",
+      "fixable": false,
+      "assessment": {
+        "kind": "conservative-security",
+        "confidence": "high",
+        "label": "conservative security"
+      },
+      "scoreImpact": {
+        "tier": "standard",
+        "multiplier": 1,
+        "rationale": "Unclassified external rule uses standard impact."
+      },
+      "forceFixable": false
+    }
+  ],
+  "findingAssessment": {
+    "rows": [
+      {
+        "kind": "ai-slop-indicator",
+        "label": "AI-slop indicators",
+        "count": 124,
+        "errors": 2,
+        "warnings": 122,
+        "info": 0,
+        "fixable": 9
+      },
+      {
+        "kind": "style-policy",
+        "label": "style/policy",
+        "count": 69,
+        "errors": 0,
+        "warnings": 69,
+        "info": 0,
+        "fixable": 12
+      },
+      {
+        "kind": "conservative-security",
+        "label": "conservative security",
+        "count": 1,
+        "errors": 1,
+        "warnings": 0,
+        "info": 0,
+        "fixable": 0
+      }
+    ],
+    "byKind": {
+      "confirmed-defect": 0,
+      "conservative-security": 1,
+      "style-policy": 69,
+      "ai-slop-indicator": 124
+    },
+    "byConfidence": {
+      "high": 3,
+      "medium": 191,
+      "low": 0
+    }
+  },
+  "summary": {
+    "errors": 3,
+    "warnings": 191,
+    "fixable": 21,
+    "files": 322,
+    "elapsed": "40.7s"
+  }
+}
