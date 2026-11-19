@@ -1,5 +1,6 @@
 import "./style.css";
 import { Rope, reducedMotion, svgPoint } from "./rope.js";
+import { Voice } from "./voice.js";
 
 const NS = "http://www.w3.org/2000/svg";
 const el = (tag, attrs = {}) => {
@@ -305,6 +306,8 @@ const families = [
   const scope = root.querySelector(".fc-scope");
   const ctx = scope.getContext("2d");
   const play = root.querySelector(".fc-play");
+  const soundBtn = root.querySelector(".fc-sound");
+  const voice = new Voice();
   const input = (n) => root.querySelector(`input[name=${n}]`);
   const out = (n) => root.querySelector(`output[data-for=${n}]`);
   const N = 16;
@@ -360,6 +363,7 @@ const families = [
     const lv = (1 - m) * +pat.a[step] + m * +pat.b[step];
     const passed = Math.random() * 100 < val.chance;
     target = passed ? lv : 0;
+    voice.step(step, target, val.glide);
     if (lv > 0) {
       const d = el("circle", { class: passed ? "dot" : "dot dropped", r: 5 + 6 * lv });
       d.style.opacity = String(0.35 + 0.65 * lv);
@@ -429,10 +433,22 @@ const families = [
     playing = on;
     play.setAttribute("aria-pressed", String(on));
     play.textContent = on ? "Pause" : "Play";
-    if (!on) for (const k of ["a", "b"]) cells[k].forEach((c) => c.classList.remove("now"));
+    if (!on) {
+      for (const k of ["a", "b"]) cells[k].forEach((c) => c.classList.remove("now"));
+      voice.silence();
+    }
     wake();
   };
   play.addEventListener("click", () => setPlaying(!playing));
+  const setSound = async (on) => {
+    if (on) { await voice.start(); setPlaying(true); } else await voice.stop();
+    soundBtn.setAttribute("aria-pressed", String(voice.on));
+    soundBtn.textContent = voice.on ? "Sound on" : "Sound off";
+  };
+  soundBtn.addEventListener("click", () => setSound(!voice.on));
+  // Never keep sounding off screen or in a background tab.
+  new IntersectionObserver(([e]) => { if (!e.isIntersecting && voice.on) setSound(false); }).observe(root);
+  document.addEventListener("visibilitychange", () => { if (document.hidden && voice.on) setSound(false); });
   // Starts by itself the first time it scrolls into view, unless motion is reduced.
   if (!RM) {
     const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setPlaying(true); io.disconnect(); } }, { threshold: 0.4 });
