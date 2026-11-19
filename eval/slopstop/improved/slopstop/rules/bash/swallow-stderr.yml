@@ -1,0 +1,8 @@
+id: sh-swallow-stderr
+language: bash
+severity: warning
+message: "stderr discarded with 2>/dev/null"
+note: errors disappear; keep stderr unless the output is truly noise
+rule:
+  kind: file_redirect
+  regex: "^2>\\s*/dev/null$"

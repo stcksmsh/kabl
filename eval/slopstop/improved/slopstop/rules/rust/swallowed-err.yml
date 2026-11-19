@@ -1,0 +1,11 @@
+id: rs-swallowed-err
+language: rust
+severity: error
+message: Error swallowed (Err arm does nothing)
+note: propagate with `?`, log it, or handle it explicitly
+rule:
+  any:
+    - pattern: "Err(_) => {}"
+    - pattern: "Err(_) => ()"
+    - pattern: "Err($E) => {}"
+    - pattern: "if let Err(_) = $X {}"

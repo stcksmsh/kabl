@@ -1,0 +1,10 @@
+id: js-empty-catch-javascript
+language: javascript
+severity: error
+message: Empty catch block swallows the error
+note: handle, rethrow, or log with context
+rule:
+  kind: catch_clause
+  has:
+    field: body
+    regex: "^\\{\\s*\\}$"

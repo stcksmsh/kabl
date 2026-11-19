@@ -1,0 +1,12 @@
+id: rs-test-no-assert
+language: rust
+severity: warning
+message: Test without any assertion
+note: assert the behaviour; a test that only runs code proves little
+rule:
+  kind: function_item
+  follows:
+    kind: attribute_item
+    regex: "^#\\[(tokio::)?test"
+  not:
+    regex: "assert|panic!|should_panic|\\.unwrap\\(|\\.expect\\(|\\?;"

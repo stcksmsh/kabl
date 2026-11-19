@@ -1,0 +1,10 @@
+id: lua-pcall-discard
+language: lua
+severity: warning
+message: pcall result discarded; errors are silently ignored
+note: check the status return value
+rule:
+  kind: function_call
+  regex: "^pcall\\("
+  inside:
+    kind: chunk

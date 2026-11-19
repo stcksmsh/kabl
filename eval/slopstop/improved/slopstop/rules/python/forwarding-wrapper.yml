@@ -1,0 +1,9 @@
+id: py-forwarding-wrapper
+language: python
+severity: warning
+message: Function only forwards its arguments to another call
+note: call the target directly
+rule:
+  pattern: |
+    def $F($$$A):
+        return $G($$$A)

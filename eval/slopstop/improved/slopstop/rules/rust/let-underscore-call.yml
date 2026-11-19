@@ -1,0 +1,16 @@
+id: rs-let-underscore-call
+language: rust
+severity: warning
+message: Return value (possibly a Result) discarded with `let _ =`
+note: handle the error, or document why ignoring it is correct
+rule:
+  any:
+    - pattern: let _ = $C($$$);
+    - pattern: let _ = $R.$M($$$);
+constraints:
+  C:
+    not:
+      regex: '(remove_dir_all|remove_dir|remove_file|into_raw|forget|drop)$'
+  M:
+    not:
+      regex: '^(join|end_pass|take_\w+|remove_dir_all|remove_file|into_raw|clone)$'

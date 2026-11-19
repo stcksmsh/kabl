@@ -1,0 +1,25 @@
+id: py-stub-body
+language: python
+severity: warning
+message: Function body is only `pass`/`...`
+note: implement it or remove it (fine for Protocols/abstract methods)
+rule:
+  kind: function_definition
+  has:
+    field: body
+    kind: block
+    regex: "^(pass|\\.\\.\\.)$"
+  not:
+    any:
+      - follows:
+          kind: decorator
+          regex: "abstract|overload"
+      - inside:
+          kind: decorated_definition
+          has:
+            kind: decorator
+            regex: "abstract|overload"
+      - inside:
+          kind: class_definition
+          regex: "Protocol"
+          stopBy: end

@@ -1,0 +1,12 @@
+id: py-test-no-assert
+language: python
+severity: warning
+message: Test without any assertion
+note: assert the behaviour
+rule:
+  kind: function_definition
+  has:
+    field: name
+    regex: "^test_"
+  not:
+    regex: "assert|raises|\\.fail\\(|expect|mock_.*\\.assert|verify|check"

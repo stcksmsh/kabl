@@ -1,0 +1,44 @@
+"""Held-out python seeds."""
+import json
+import os
+
+
+def read_config(path):
+    """Reads the config."""
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def total(values):
+    # Initialize the total to zero
+    acc = 0
+    for v in values:
+        acc += v  # add v to the total
+    return acc
+
+
+def load_data(path):
+    return _load_data(path)
+
+
+def _load_data(path):
+    with open(path) as f:
+        return f.read()
+
+
+def render(x):
+    return x * 2
+
+
+def render_v2(x):
+    return x * 2
+
+
+def stub(x):
+    raise NotImplementedError
+
+
+# TODO: remove this

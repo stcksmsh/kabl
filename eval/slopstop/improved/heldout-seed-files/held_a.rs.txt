@@ -1,0 +1,47 @@
+use std::collections::HashSet;
+use std::time::Duration;
+
+pub struct Meter {
+    level: f32,
+    peak: f32,
+}
+
+impl Meter {
+    /// Creates a new meter.
+    pub fn new() -> Self {
+        Meter { level: 0.0, peak: 0.0 }
+    }
+
+    /// Returns the level.
+    pub fn level(&self) -> f32 {
+        self.level
+    }
+
+    /// Resets the peak.
+    pub fn reset_peak(&mut self) {
+        self.peak = 0.0;
+    }
+
+    pub fn push(&mut self, samples: &[f32]) {
+        // Loop through the samples
+        for s in samples {
+            // Reset the level to zero
+            self.level = 0.0;
+            self.level += s.abs();
+            if self.level > self.peak {
+                self.peak = self.level; // update the peak
+            }
+        }
+    }
+
+    pub fn flush(&mut self) {}
+
+    pub fn calibrate(&mut self, _target: f32) {
+        unimplemented!()
+    }
+}
+
+// TODO: handle stereo
+pub fn stereo_level(l: f32, r: f32) -> f32 {
+    l.max(r)
+}

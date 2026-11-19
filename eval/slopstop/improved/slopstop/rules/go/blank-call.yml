@@ -1,0 +1,7 @@
+id: go-blank-call
+language: go
+severity: warning
+message: Return value discarded with `_ =`
+note: check the error
+rule:
+  pattern: _ = $F($$$)

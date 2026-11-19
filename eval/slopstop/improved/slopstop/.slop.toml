@@ -1,0 +1,3 @@
+[slop]
+# the kit's own fixtures are deliberately sloppy
+exclude = ["selftest.py", "__pycache__/**"]

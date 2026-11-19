@@ -1,0 +1,9 @@
+id: cpp-empty-catch
+language: cpp
+severity: error
+message: Empty catch block swallows the exception
+rule:
+  kind: catch_clause
+  has:
+    field: body
+    regex: "^\\{\\s*\\}$"
