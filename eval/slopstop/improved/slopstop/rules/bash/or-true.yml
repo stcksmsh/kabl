@@ -1,0 +1,8 @@
+id: sh-or-true
+language: bash
+severity: warning
+message: "`|| true` hides command failure"
+note: handle the failure or document why it's safe
+rule:
+  kind: list
+  regex: "\\|\\|\\s*(true|:)\\s*$"

@@ -1,0 +1,9 @@
+id: kt-runcatching-swallow
+language: kotlin
+severity: warning
+message: runCatching result discarded or defaulted silently
+note: handle the failure explicitly
+rule:
+  any:
+    - pattern: runCatching { $$$ }.getOrNull()
+    - pattern: runCatching { $$$ }.getOrDefault($D)

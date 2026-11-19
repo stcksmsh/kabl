@@ -1,0 +1,45 @@
+const MAX_SPRITE_BYTES: usize = 128 * 1024;
+
+pub fn check_sprite(label: &str, raw: &[u8]) -> Result<(), String> {
+    if label.is_empty()
+        || label.len() > 80
+        || label == "."
+        || label == ".."
+        || !label
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"-_.".contains(&c))
+    {
+        return Err("Sprite name must be a simple local filename; paths are forbidden".into());
+    }
+    if raw.len() < 33
+        || raw.len() > MAX_SPRITE_BYTES
+        || &raw[..8] != b"\x89PNG\r\n\x1a\n"
+        || &raw[12..16] != b"IHDR"
+    {
+        return Err("Sprite must be PNG, at most 128 KiB".into());
+    }
+    let wd = u32::from_be_bytes(raw[16..20].try_into().unwrap());
+    let ht = u32::from_be_bytes(raw[20..24].try_into().unwrap());
+    if wd == 0 || ht == 0 || wd > 2048 || ht > 2048 || u64::from(wd) * u64::from(ht) > 1_048_576 {
+        return Err("Sprite dimensions: max 2048 per edge, 1 megapixel total".into());
+    }
+    Ok(())
+}
+
+pub fn pick(x: i32) -> i32 {
+    if x > 3 {
+        return 3;
+        let doubled = x * 2;
+        println!("{doubled}");
+    }
+    x
+}
+
+pub fn halve(x: f32) -> f32 {
+    // Now uses the improved approach as requested
+    x * 0.5
+}
+
+pub fn settle() {
+    // for now just wait
+}

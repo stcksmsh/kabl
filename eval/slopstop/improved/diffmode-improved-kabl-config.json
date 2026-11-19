@@ -1,0 +1,101 @@
+[
+ {
+  "rule": "duplicate-code",
+  "file": "crates/ui/tests/accesskit.rs",
+  "line": 12,
+  "msg": "26 lines duplicate tools/examples/support/mockup.rs:8",
+  "sev": "block",
+  "tool": "jscpd",
+  "hint": "reuse or extract the existing code"
+ },
+ {
+  "rule": "duplicate-code",
+  "file": "crates/ui/tests/accesskit.rs",
+  "line": 56,
+  "msg": "9 lines duplicate crates/ui/tests/perform_style.rs:19",
+  "sev": "block",
+  "tool": "jscpd",
+  "hint": "reuse or extract the existing code"
+ },
+ {
+  "rule": "near-duplicate-code",
+  "file": "tools/examples/accesskit_capture.rs",
+  "line": 95,
+  "msg": "23 lines match tools/examples/chrome_capture.rs:770 after renaming identifiers",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "reuse or extract the existing code instead of copying it with renamed variables"
+ },
+ {
+  "rule": "duplicate-code",
+  "file": "tools/examples/accesskit_capture.rs",
+  "line": 98,
+  "msg": "7 lines duplicate tools/examples/face_capture.rs:68",
+  "sev": "block",
+  "tool": "jscpd",
+  "hint": "reuse or extract the existing code"
+ },
+ {
+  "rule": "duplicate-code",
+  "file": "tools/examples/accesskit_capture.rs",
+  "line": 113,
+  "msg": "8 lines duplicate crates/ui/tests/perform_style.rs:21",
+  "sev": "block",
+  "tool": "jscpd",
+  "hint": "reuse or extract the existing code"
+ },
+ {
+  "rule": "duplicate-code",
+  "file": "tools/examples/accesskit_capture.rs",
+  "line": 130,
+  "msg": "12 lines duplicate tools/examples/g4_parts.rs:267",
+  "sev": "block",
+  "tool": "jscpd",
+  "hint": "reuse or extract the existing code"
+ },
+ {
+  "rule": "file-too-large",
+  "file": "crates/ui/src/lib.rs",
+  "line": 1820,
+  "msg": "file is 6144 lines and still growing",
+  "sev": "warn",
+  "tool": "slop",
+  "hint": "put new code in a new module"
+ },
+ {
+  "rule": "file-too-large",
+  "file": "crates/ui/src/routing.rs",
+  "line": 879,
+  "msg": "file is 2305 lines and still growing",
+  "sev": "warn",
+  "tool": "slop",
+  "hint": "put new code in a new module"
+ },
+ {
+  "rule": "file-too-large",
+  "file": "tools/examples/presets_bass_lead.rs",
+  "line": 206,
+  "msg": "file is 2916 lines and still growing",
+  "sev": "warn",
+  "tool": "slop",
+  "hint": "put new code in a new module"
+ },
+ {
+  "rule": "file-too-large",
+  "file": "tools/examples/presets_groove.rs",
+  "line": 763,
+  "msg": "file is 3438 lines and still growing",
+  "sev": "warn",
+  "tool": "slop",
+  "hint": "put new code in a new module"
+ },
+ {
+  "rule": "file-too-large",
+  "file": "tools/examples/presets_pad.rs",
+  "line": 206,
+  "msg": "file is 2037 lines and still growing",
+  "sev": "warn",
+  "tool": "slop",
+  "hint": "put new code in a new module"
+ }
+]

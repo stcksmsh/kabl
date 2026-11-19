@@ -1,0 +1,9 @@
+id: rs-ok-discard
+language: rust
+severity: warning
+message: Result converted with `.ok()` and dropped
+note: handle the error instead of silently discarding it
+rule:
+  kind: expression_statement
+  has:
+    pattern: $X.ok()

@@ -1,0 +1,10 @@
+id: js-catch-fallback-javascript
+language: javascript
+severity: warning
+message: Error turned into a silent default value
+note: rethrow or handle explicitly
+rule:
+  kind: catch_clause
+  has:
+    field: body
+    regex: "^\\{\\s*return( null| undefined| \\[\\]| \\{\\}| ''| \"\"| 0| false)?;?\\s*\\}$"

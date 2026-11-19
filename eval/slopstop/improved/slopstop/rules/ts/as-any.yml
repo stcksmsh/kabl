@@ -1,0 +1,7 @@
+id: ts-as-any
+language: typescript
+severity: warning
+message: "`as any` cast hides a type error"
+note: fix the type instead
+rule:
+  pattern: $X as any

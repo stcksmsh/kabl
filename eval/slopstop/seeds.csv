@@ -1,0 +1,35 @@
+file,line,category,detected_by_slopstop_rules,detected_incl_clippy,rules
+crates/core/src/seed_a.rs,8,narrating comment,N,N,
+crates/core/src/seed_a.rs,10,narrating comment,N,N,
+crates/core/src/seed_a.rs,12,narrating comment,N,N,
+crates/ui/src/seed_d.rs,8,narrating comment,N,N,
+crates/core/src/seed_a.rs,4,docstring restates signature,N,N,
+crates/core/src/seed_a.rs,19,docstring restates signature,N,N,
+crates/ui/src/seed_d.rs,6,docstring restates signature,N,N,
+crates/core/src/seed_a.rs,25,todo!/unimplemented!,Y,Y,stub-added
+crates/core/src/seed_a.rs,29,todo!/unimplemented!,Y,Y,stub-added
+crates/core/src/seed_a.rs,32,empty fn stub,N,N,
+crates/cables/src/seed_e.rs,15,empty fn stub,N,N,
+crates/modules/src/seed_b.rs,4,silent fallback,N,N,
+crates/modules/src/seed_b.rs,10,silent fallback,N,Y,clippy:manual_unwrap_or
+crates/cables/src/seed_e.rs,4,silent fallback,N,N,
+crates/cables/src/seed_e.rs,20,silent fallback,N,N,
+crates/modules/src/seed_b.rs,16,let _ = swallowed,N,N,
+crates/modules/src/seed_b.rs,20,let _ = swallowed,Y,Y,rs-let-underscore-call
+crates/modules/src/seed_b.rs,25,thin wrapper,N,N,
+crates/modules/src/seed_b.rs,37,single-impl trait,N,N,
+crates/engine/src/seed_c.rs,10,_v2/enhanced_/_new naming,Y,Y,versioned-name
+crates/engine/src/seed_c.rs,16,_v2/enhanced_/_new naming,Y,Y,versioned-name
+crates/engine/src/seed_c.rs,20,_v2/enhanced_/_new naming,N,N,
+crates/engine/src/seed_c.rs,33,copy-pasted 30-line block,Y,Y,duplicate-code
+crates/ui/src/seed_d.rs,28,copy-pasted 30-line block,N,N,
+crates/core/src/seed_a.rs,1,unused import,N,Y,clippy:unused_imports
+crates/core/src/seed_a.rs,2,unused import,N,Y,clippy:unused_imports
+crates/engine/src/seed_c.rs,1,unused import,N,Y,clippy:unused_imports
+crates/engine/src/seed_c.rs,2,unused import,N,Y,clippy:unused_imports
+crates/engine/src/seed_c.rs,27,dead code after return,N,N,
+crates/engine/src/seed_c.rs,30,dead code after return,N,Y,clippy:unreachable_code
+crates/ui/src/seed_d.rs,12,meta/TODO comment,Y,Y,todo-added
+crates/ui/src/seed_d.rs,17,meta/TODO comment,N,N,
+crates/ui/src/seed_d.rs,22,meta/TODO comment,N,N,
+crates/cables/src/seed_e.rs,8,unwrap in prod code (bonus),N,N,

@@ -1,0 +1,19 @@
+id: py-except-fallback
+language: python
+severity: warning
+message: Exception turned into a silent default value
+note: let it raise, or handle the specific exception and log it
+rule:
+  kind: except_clause
+  has:
+    kind: block
+    all:
+      - has:
+          kind: return_statement
+          regex: "^return( None| \\[\\]| \\{\\}| \"\"| ''| 0| False| -1)?$"
+      - not:
+          has:
+            any:
+              - kind: expression_statement
+                regex: "log|warn|print|raise"
+              - kind: raise_statement

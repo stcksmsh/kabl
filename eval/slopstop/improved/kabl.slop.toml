@@ -1,0 +1,5 @@
+[slop]
+# kabl-specific tuning (reported separately from the defaults in REPORT-IMPROVED.md)
+allow_suppress = ["clippy::too_many_arguments"]   # house pattern in preset builders and egui helpers
+exclude = ["docs/**"]                             # scratch/probe scripts and design mockups, not product code
+warn = ["file-too-large", "single-impl-trait"]

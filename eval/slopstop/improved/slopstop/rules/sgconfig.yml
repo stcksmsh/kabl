@@ -1,0 +1,10 @@
+ruleDirs:
+  - rust
+  - python
+  - kotlin
+  - java
+  - ts
+  - go
+  - cpp
+  - lua
+  - bash

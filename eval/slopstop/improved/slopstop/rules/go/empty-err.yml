@@ -1,0 +1,7 @@
+id: go-empty-err-check
+language: go
+severity: error
+message: "`if err != nil {}` swallows the error"
+note: return or handle the error
+rule:
+  pattern: if err != nil {}

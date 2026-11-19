@@ -1,0 +1,8 @@
+id: kt-catch-print-only
+language: kotlin
+severity: warning
+message: catch block only prints the stack trace
+note: handle, propagate, or log with context
+rule:
+  kind: catch_block
+  regex: "\\{\\s*\\w+\\.printStackTrace\\(\\)\\s*\\}$"

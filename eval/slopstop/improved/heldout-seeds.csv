@@ -1,0 +1,37 @@
+file,line,category,slopstop(orig):own,slopstop(orig):incl_tools,slopstop(orig):rules,slopstop(improved):own,slopstop(improved):incl_tools,slopstop(improved):rules,aislop:own,aislop:incl_tools,aislop:rules
+crates/core/src/held_a.rs,26,narrating comment,N,N,,Y,Y,narrating-comment,Y,Y,ai-slop/trivial-comment
+crates/core/src/held_a.rs,28,narrating comment,N,N,,Y,Y,narrating-comment,N,N,
+crates/core/src/held_a.rs,32,narrating comment,N,N,,Y,Y,narrating-comment,N,N,
+docs/held/held_e.py,16,narrating comment,N,N,,N,N,,N,N,
+docs/held/held_e.py,19,narrating comment,N,N,,N,N,,N,N,
+crates/core/src/held_a.rs,10,docstring restates signature,N,N,,Y,Y,doc-restates-sig,N,N,
+crates/core/src/held_a.rs,15,docstring restates signature,N,N,,Y,Y,doc-restates-sig,N,N,
+crates/core/src/held_a.rs,20,docstring restates signature,N,N,,Y,Y,doc-restates-sig,N,N,
+docs/held/held_e.py,6,docstring restates signature,N,N,,Y,Y,doc-restates-sig,N,N,
+crates/core/src/held_a.rs,40,todo!/unimplemented!/NotImplemented,Y,Y,stub-added,Y,Y,stub-added,Y,Y,ai-slop/rust-todo-stub
+docs/held/held_e.py,41,todo!/unimplemented!/NotImplemented,Y,Y,stub-added,Y,Y,stub-added,N,N,
+crates/core/src/held_a.rs,44,TODO comment,Y,Y,todo-added,Y,Y,todo-added,Y,Y,ai-slop/todo-stub
+docs/held/held_e.py,44,TODO comment,Y,Y,todo-added,Y,Y,todo-added,Y,Y,ai-slop/todo-stub
+crates/engine/src/held_c.rs,39,chat/hedge comment,Y,Y,chat-residue,Y,Y,chat-residue,N,N,
+crates/engine/src/held_c.rs,44,chat/hedge comment,Y,Y,hedge-comment,Y,Y,hedge-comment,N,N,
+crates/core/src/held_a.rs,37,empty fn stub,N,N,,Y,Y,rs-empty-fn,N,N,
+crates/modules/src/held_b.rs,6,silent fallback,N,N,,Y,Y,silent-fallback,N,N,
+crates/modules/src/held_b.rs,11,silent fallback,N,N,,Y,Y,silent-fallback,N,N,
+crates/modules/src/held_b.rs,15,silent fallback,N,N,,Y,Y,silent-fallback,N,N,
+docs/held/held_e.py,11,silent fallback,Y,Y,py-except-fallback;ruff:BLE001,Y,Y,py-except-fallback;ruff:BLE001;silent-fallback,N,N,
+crates/modules/src/held_b.rs,19,let _ = swallowed,Y,Y,rs-let-underscore-call,Y,Y,rs-let-underscore-call,N,N,
+crates/modules/src/held_b.rs,24,let _ = swallowed,N,N,,Y,Y,let-underscore-var,N,N,
+crates/modules/src/held_b.rs,33,thin wrapper used once,N,N,,Y,Y,thin-wrapper,N,N,
+docs/held/held_e.py,23,thin wrapper used once,Y,Y,py-forwarding-wrapper,Y,Y,py-forwarding-wrapper;thin-wrapper,Y,Y,ai-slop/thin-wrapper
+crates/modules/src/held_b.rs,57,single-impl trait,N,N,,Y,Y,single-impl-trait,N,N,
+crates/modules/src/held_b.rs,41,_v2/_new/enhanced_ naming,Y,Y,versioned-name,Y,Y,variant-of-existing;versioned-name,N,N,
+crates/modules/src/held_b.rs,49,_v2/_new/enhanced_ naming,N,N,,Y,Y,variant-of-existing,N,N,
+crates/modules/src/held_b.rs,53,_v2/_new/enhanced_ naming,Y,Y,versioned-name,Y,Y,versioned-name,N,N,
+docs/held/held_e.py,36,_v2/_new/enhanced_ naming,Y,Y,versioned-name,Y,Y,variant-of-existing;versioned-name,N,N,
+crates/modules/src/held_b.rs,69,unjustified #[allow],Y,Y,suppression-added,Y,Y,suppression-added,N,N,
+crates/modules/src/held_b.rs,75,justified #[allow] (advisory ok),Y,Y,suppression-added,Y,Y,suppression-added,N,N,
+crates/engine/src/held_c.rs,3,copy-paste w/ renamed vars,N,N,,Y,Y,near-duplicate-code,N,N,
+crates/core/src/held_a.rs,1,unused import,N,Y,clippy:unused_imports,N,Y,clippy:unused_imports,N,Y,clippy/unused_imports
+crates/core/src/held_a.rs,2,unused import,N,Y,clippy:unused_imports,N,Y,clippy:unused_imports,N,Y,clippy/unused_imports
+docs/held/held_e.py,3,unused import,N,Y,ruff:F401,N,Y,ruff:F401,Y,Y,ai-slop/unused-import
+crates/engine/src/held_c.rs,32,dead code after return,N,Y,clippy:unreachable_code,N,Y,clippy:unreachable_code,N,Y,clippy/unreachable_code

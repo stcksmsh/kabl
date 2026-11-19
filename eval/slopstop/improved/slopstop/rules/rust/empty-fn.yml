@@ -1,0 +1,25 @@
+id: rs-empty-fn
+language: rust
+severity: warning
+message: Function with empty or comment-only body
+note: implement it, or remove it if nothing calls it
+rule:
+  kind: function_item
+  has:
+    field: body
+    kind: block
+    regex: '^\{\s*((//[^\n]*|/\*(.|\n)*?\*/)\s*)*\}$'
+  not:
+    any:
+      - has:
+          kind: function_modifiers
+          regex: extern
+      - inside:
+          kind: impl_item
+          has:
+            field: trait
+            regex: "."
+          stopBy: end
+      - inside:
+          kind: trait_item
+          stopBy: end
