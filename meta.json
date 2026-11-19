@@ -6,6 +6,6 @@
   "stack": ["Rust", "egui", "CLAP"],
   "repo": "https://github.com/stcksmsh/kabl",
   "accent": [0.8, 0.15, 85],
-  "featured": false,
+  "featured": true,
   "order": 7
 }
