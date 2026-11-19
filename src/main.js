@@ -407,11 +407,16 @@ const families = [
     const sc = stepChance(step);
     const passed = Math.random() < sc * (val.chance / 100);
     target = passed ? 1 : 0;
-    voice.step(step, target, val.glide);
+    // Credit the pulse to A and B by how much each contributed to its chance, so a
+    // step only in B sounds like B and a shared step blends the two voices.
+    const m = val.morph / 100;
+    const shareB = sc > 0 ? (m * +pat.b[step]) / sc : 0;
+    voice.step(step, passed ? 1 - shareB : 0, passed ? shareB : 0, val.glide);
     if (sc > 0) mixCells[step].classList.add(passed ? "hit" : "miss");
     setTimeout(() => mixCells[step].classList.remove("hit", "miss"), 110);
     if (sc > 0) {
       const d = el("circle", { class: passed ? "dot" : "dot dropped", r: 9 });
+      if (passed) d.style.fill = `color-mix(in oklab, #7fb6f0 ${Math.round(shareB * 100)}%, #ffe08a)`;
       dotsG.append(d);
       dots.push({ el: d, t: 0, passed, lv: 1 });
     }
