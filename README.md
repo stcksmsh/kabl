@@ -1,6 +1,6 @@
 # kabl — website branch
 
-The source of kabl's website, <https://stcksmsh.github.io/kabl/>. This is an orphan branch:
+The source of kabl's website, <https://kostavukicevic.com/kabl/>. This is an orphan branch:
 it shares no history with `master` and holds only the site.
 
 - Plain Vite, no framework, one dev dependency. `npm install && npm run dev` to work on it,
