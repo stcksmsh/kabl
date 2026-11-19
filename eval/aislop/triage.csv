@@ -1,0 +1,101 @@
+file,line,rule,label,reason
+crates/core/src/embedded.rs,242,ai-slop/narrative-comment,FP,"section divider, not narration"
+crates/modules/src/builtins/arp.rs,190,ai-slop/narrative-comment,FP,comment states intent (latching semantics)
+crates/modules/src/builtins/drums.rs,654,ai-slop/narrative-comment,MEH,decorative separator; harmless house style
+crates/modules/src/builtins/drums.rs,825,ai-slop/narrative-comment,MEH,decorative separator; harmless house style
+crates/ui/src/style/load.rs,557,ai-slop/narrative-comment,MEH,decorative separator; harmless house style
+docs/design/render.py,319,ai-slop/python-chained-dict-get,FP,intentional default in docs render script
+docs/design/render.py,423,ai-slop/python-repetitive-dispatch,MEH,small ladder in docs script
+docs/design/revision-2/render2.py,62,ai-slop/python-repetitive-dispatch,MEH,small ladder in docs script
+docs/rack-migration/drive.py,165,ai-slop/python-repetitive-dispatch,MEH,"25-branch command ladder in docs driver; legit smell, not blocking"
+docs/rack-migration/drive.py,168,ai-slop/python-repetitive-dispatch,FP,same ladder re-reported once per branch (duplicate finding)
+docs/rack-migration/drive.py,183,ai-slop/python-repetitive-dispatch,FP,same ladder re-reported once per branch (duplicate finding)
+docs/rack-migration/drive.py,185,ai-slop/python-repetitive-dispatch,FP,same ladder re-reported once per branch (duplicate finding)
+docs/rack-migration/drive.py,199,ai-slop/python-repetitive-dispatch,FP,same ladder re-reported once per branch (duplicate finding)
+docs/rack-migration/drive.py,217,ai-slop/python-repetitive-dispatch,FP,same ladder re-reported once per branch (duplicate finding)
+docs/rack-migration/drive.py,231,ai-slop/python-repetitive-dispatch,FP,same ladder re-reported once per branch (duplicate finding)
+docs/rack-migration/drive.py,235,ai-slop/python-repetitive-dispatch,FP,same ladder re-reported once per branch (duplicate finding)
+docs/rack-migration/drive.py,237,ai-slop/python-repetitive-dispatch,FP,same ladder re-reported once per branch (duplicate finding)
+docs/rack-migration/drive.py,245,ai-slop/python-repetitive-dispatch,FP,same ladder re-reported once per branch (duplicate finding)
+docs/rack-migration/drive.py,250,ai-slop/python-repetitive-dispatch,FP,same ladder re-reported once per branch (duplicate finding)
+docs/rack-migration/drive.py,266,ai-slop/python-repetitive-dispatch,FP,same ladder re-reported once per branch (duplicate finding)
+docs/rack-migration/drive.py,296,ai-slop/python-repetitive-dispatch,FP,same ladder re-reported once per branch (duplicate finding)
+docs/visual-polish/mockups/make_mockups.py,219,ai-slop/python-repetitive-dispatch,FP,"4-branch ladder, readable"
+crates/clap/src/lib.rs,518,ai-slop/rust-non-test-unwrap,MEH,Mutex lock().unwrap() is idiomatic poison handling; not RT path
+crates/clap/src/lib.rs,625,ai-slop/rust-non-test-unwrap,MEH,Mutex lock().unwrap() is idiomatic poison handling; not RT path
+crates/clap/src/lib.rs,641,ai-slop/rust-non-test-unwrap,MEH,Mutex lock().unwrap() is idiomatic poison handling; not RT path
+crates/clap/src/lib.rs,1429,ai-slop/rust-non-test-unwrap,MEH,Mutex lock().unwrap() is idiomatic poison handling; not RT path
+crates/clap/src/state_bridge.rs,141,ai-slop/rust-non-test-unwrap,MEH,CLAP host fn pointer is Option in FFI; spec guarantees non-null
+crates/core/src/composite.rs,171,ai-slop/rust-non-test-unwrap,FP,try_into on fixed-size slice is infallible
+crates/core/src/composite.rs,172,ai-slop/rust-non-test-unwrap,FP,try_into on fixed-size slice is infallible
+crates/core/src/embedded.rs,260,ai-slop/rust-non-test-unwrap,FP,try_into on fixed-size slice is infallible
+crates/core/src/embedded.rs,266,ai-slop/rust-non-test-unwrap,FP,try_into on fixed-size slice is infallible
+crates/core/src/format.rs,320,ai-slop/rust-non-test-unwrap,FP,try_into on fixed-size slice is infallible
+crates/core/src/panel.rs,73,ai-slop/rust-non-test-unwrap,FP,try_into on fixed-size slice is infallible
+crates/engine/src/patch_engine.rs,668,ai-slop/rust-non-test-unwrap,MEH,unwrap right after an is_some/guard check; if-let would be cleaner
+crates/engine/src/patch_engine.rs,842,ai-slop/rust-non-test-unwrap,MEH,unwrap right after an is_some/guard check; if-let would be cleaner
+crates/engine/src/patch_engine.rs,1154,ai-slop/rust-non-test-unwrap,MEH,unwrap right after an is_some/guard check; if-let would be cleaner
+crates/modules/src/code/budget.rs,86,ai-slop/rust-non-test-unwrap,MEH,"partial_cmp unwrap; total_cmp better, offline budget tool"
+crates/ui/src/browser.rs,397,ai-slop/rust-non-test-unwrap,MEH,unwrap right after an is_some/guard check; if-let would be cleaner
+crates/ui/src/browser.rs,2054,ai-slop/rust-non-test-unwrap,MEH,unwrap right after an is_some/guard check; if-let would be cleaner
+crates/ui/src/composites.rs,318,ai-slop/rust-non-test-unwrap,MEH,unwrap on lookup of key just inserted/known present
+crates/ui/src/composites.rs,501,ai-slop/rust-non-test-unwrap,MEH,unwrap on lookup of key just inserted/known present
+crates/ui/src/composites.rs,735,ai-slop/rust-non-test-unwrap,MEH,unwrap on lookup of key just inserted/known present
+crates/ui/src/control.rs,309,ai-slop/rust-non-test-unwrap,MEH,unwrap right after an is_some/guard check; if-let would be cleaner
+crates/ui/src/fm6.rs,75,ai-slop/rust-non-test-unwrap,MEH,unwrap on lookup of key just inserted/known present
+crates/ui/src/kit/g4.rs,769,ai-slop/rust-non-test-unwrap,MEH,unwrap right after an is_some/guard check; if-let would be cleaner
+crates/ui/src/lib.rs,4754,ai-slop/rust-non-test-unwrap,MEH,split_once unwrap on internally built key
+crates/ui/src/lib.rs,4755,ai-slop/rust-non-test-unwrap,MEH,split_once unwrap on internally built key
+crates/ui/src/main.rs,947,ai-slop/rust-non-test-unwrap,MEH,unwrap right after an is_some/guard check; if-let would be cleaner
+crates/ui/src/main.rs,1627,ai-slop/rust-non-test-unwrap,MEH,unwrap right after an is_some/guard check; if-let would be cleaner
+crates/ui/src/rack_editor.rs,118,ai-slop/rust-non-test-unwrap,MEH,partial_cmp unwrap on f32 layout coords; NaN not expected
+crates/ui/src/rack_editor.rs,132,ai-slop/rust-non-test-unwrap,MEH,unwrap on lookup of key just inserted/known present
+crates/ui/src/rack_editor.rs,868,ai-slop/rust-non-test-unwrap,MEH,unwrap on lookup of key just inserted/known present
+docs/host-production/scripts/rt-framework-probe.rs,25,ai-slop/rust-non-test-unwrap,FP,"scratch/probe/research script under docs/, assertion-style unwraps"
+docs/host-production/scripts/rt-framework-probe.rs,32,ai-slop/rust-non-test-unwrap,FP,"scratch/probe/research script under docs/, assertion-style unwraps"
+docs/host-production/scripts/rt-framework-probe.rs,35,ai-slop/rust-non-test-unwrap,FP,"scratch/probe/research script under docs/, assertion-style unwraps"
+docs/product-research/d11/src/main.rs,75,ai-slop/rust-non-test-unwrap,FP,"scratch/probe/research script under docs/, assertion-style unwraps"
+docs/product-research/d11/src/main.rs,76,ai-slop/rust-non-test-unwrap,FP,"scratch/probe/research script under docs/, assertion-style unwraps"
+docs/product-research/d11/src/main.rs,94,ai-slop/rust-non-test-unwrap,FP,"scratch/probe/research script under docs/, assertion-style unwraps"
+docs/product-research/d11/src/main.rs,217,ai-slop/rust-non-test-unwrap,FP,"scratch/probe/research script under docs/, assertion-style unwraps"
+docs/rack-migration/drive.py,91,ai-slop/swallowed-exception,FP,"intentional ignore, justified by comment"
+docs/cue-macros/scripts/host.py,28,ai-slop/unused-import,TP,genuinely unused import
+docs/factory-performance-bank/scripts/audio.py,4,ai-slop/unused-import,TP,genuinely unused import
+docs/midi-timing/scripts/make_demos.py,13,ai-slop/unused-import,TP,genuinely unused import
+docs/panel-authoring/scripts/host-fixture.py,3,ai-slop/unused-import,TP,genuinely unused import
+docs/host-production/scripts/timing-proxy.c,68,complexity/deep-nesting,MEH,C timing proxy in docs scripts
+docs/reaper-instrument/scripts/timing-proxy.c,62,complexity/deep-nesting,MEH,C timing proxy in docs scripts
+crates/clap/src/lib.rs,0,complexity/file-too-large,TP,very large file hurts reviewability
+crates/engine/src/compile.rs,0,complexity/file-too-large,TP,very large file hurts reviewability
+crates/engine/src/patch_engine.rs,0,complexity/file-too-large,TP,very large file hurts reviewability
+crates/ui/src/browser.rs,0,complexity/file-too-large,TP,very large file hurts reviewability
+crates/ui/src/lib.rs,0,complexity/file-too-large,TP,very large file hurts reviewability
+crates/ui/src/main.rs,0,complexity/file-too-large,TP,very large file hurts reviewability
+crates/ui/src/rack/mod.rs,0,complexity/file-too-large,MEH,large but cohesive; size alone not a defect
+crates/ui/src/rack_editor.rs,0,complexity/file-too-large,MEH,large but cohesive; size alone not a defect
+crates/ui/src/routing.rs,0,complexity/file-too-large,MEH,large but cohesive; size alone not a defect
+docs/design/render.py,0,complexity/file-too-large,MEH,docs render script
+crates/clap/src/lib.rs,623,complexity/function-too-long,MEH,egui/immediate-mode or script fn; length alone
+crates/clap/src/state_bridge.rs,908,complexity/function-too-long,MEH,test function
+crates/modules/src/builtins/osc_fm6.rs,279,complexity/function-too-long,FP,DSP process() is legitimately one long fn
+crates/standalone/src/main.rs,77,complexity/function-too-long,MEH,egui/immediate-mode or script fn; length alone
+crates/ui/src/browser.rs,1603,complexity/function-too-long,MEH,egui/immediate-mode or script fn; length alone
+crates/ui/src/browser.rs,2063,complexity/function-too-long,MEH,egui/immediate-mode or script fn; length alone
+crates/ui/src/lib.rs,1672,complexity/function-too-long,MEH,egui/immediate-mode or script fn; length alone
+crates/ui/src/lib.rs,2341,complexity/function-too-long,TP,"399-line show_rack, real extraction candidate"
+crates/ui/src/main.rs,2671,complexity/function-too-long,MEH,test function
+crates/ui/src/pattern.rs,68,complexity/function-too-long,MEH,egui/immediate-mode or script fn; length alone
+crates/ui/src/style/load.rs,324,complexity/function-too-long,MEH,egui/immediate-mode or script fn; length alone
+docs/design/revision-2/render2.py,619,complexity/function-too-long,MEH,egui/immediate-mode or script fn; length alone
+docs/presets/scripts/macro_audit.py,400,complexity/function-too-long,MEH,egui/immediate-mode or script fn; length alone
+crates/ui/src/style/load.rs,325,complexity/too-many-params,MEH,7 params in style helper
+docs/design/render.py,160,complexity/too-many-params,MEH,geometry/drawing helper args in docs mockup script
+docs/design/render.py,165,complexity/too-many-params,MEH,geometry/drawing helper args in docs mockup script
+docs/design/revision-2/render2.py,323,complexity/too-many-params,MEH,geometry/drawing helper args in docs mockup script
+docs/midi-timing/scripts/make_demos.py,42,complexity/too-many-params,MEH,geometry/drawing helper args in docs mockup script
+docs/visual-polish/mockups/make_mockups.py,142,complexity/too-many-params,MEH,geometry/drawing helper args in docs mockup script
+docs/visual-polish/mockups/make_mockups.py,160,complexity/too-many-params,MEH,geometry/drawing helper args in docs mockup script
+docs/visual-polish/mockups/make_mockups.py,251,complexity/too-many-params,MEH,geometry/drawing helper args in docs mockup script
+docs/visual-polish/mockups/make_mockups.py,276,complexity/too-many-params,MEH,geometry/drawing helper args in docs mockup script
+docs/visual-polish/mockups/make_mockups.py,314,complexity/too-many-params,MEH,geometry/drawing helper args in docs mockup script
+docs/grid-cues/scripts/clips.py,18,security/python-exec,MEH,exec of repo-controlled source in docs script
