@@ -7,6 +7,6 @@ tags = [
     "brass",
     "pop",
 ]
-description = "A brassy analog pad: detuned saws with a slow filter envelope that swells every chord. Play open triads and hold them. Cutoff sets the filter, Swell sets how far each chord opens, Chorus widens the sound, Space adds the echo and the room."
+description = "A brassy analog pad: detuned saws with a slow filter envelope that swells every chord. Play open triads and hold them. Swell sets how far and how slowly each chord opens, Section loosens one tight horn into a section, Octave brings in a second section an octave up, Chorus widens the sound."
 keys = true
 sequence = false

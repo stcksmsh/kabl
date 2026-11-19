@@ -8,6 +8,6 @@ tags = [
     "french touch",
     "signature",
 ]
-description = "A thick, saturated pad for French touch: saws and an octave down driven hard into a compressor, with a bitcrusher on request. Play fat, held chords. Weight sets the amount of drive, Cutoff opens the filter, Crush brings in the bitcrusher, Room adds the echo and the room."
+description = "A thick, saturated pad for French touch: saws and an octave down driven hard into a compressor, with a bitcrusher on request. Play fat, held chords. Weight sets the drive and the octave down, Squash clamps the compressor from a loose hold to a flat slab, Crush brings in the bitcrusher, Tail turns a cut note into a slow swell."
 keys = true
 sequence = false

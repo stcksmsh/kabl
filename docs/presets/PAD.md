@@ -17,7 +17,7 @@ Signature share: 4 of 14 (about a quarter). Space defaults follow the brief: amb
 | Deep Field | cinematic | sub-heavy swell that opens over seconds, octave-up air | Swell, Sub, Shimmer, Space | no | 1 |
 | Cotton Mill | pop, analog | pulse and saw with pulse-width motion and chorus | Cutoff, Motion, Chorus, Space | no | 1 |
 | Picture Window | pop | bright seven-voice saw stack, clean and wide | Cutoff, Spread, Sparkle, Space | no | 1 |
-| Drive-In | synthwave | lush detuned saws, slow vibrato, wide chorus, long echo | Cutoff, Wobble, Chorus, Space | no | 1 |
+| Waiting Room (was Drive-In) | synthwave | lush detuned saws, slow vibrato, wide chorus, long echo | Cutoff, Wobble, Chorus, Space | no | 1 |
 | Dry Cleaner | French touch | phased chords, compressed, close and dry, a DJ filter sweep | Sweep, Phase, Grit, Room | yes | 1 |
 | Concrete Cloud | French touch | thick saturated pad: drive into a hard compressor, bitcrusher on request | Weight, Cutoff, Crush, Room | yes | 1 |
 | Static Garden | evolving, textured | triangle bed with noise, ring mod and a random filter walk | Texture, Motion, Metal, Space | no | 1 |
@@ -39,7 +39,7 @@ Clips in `docs/presets/clips/pad/group1/` (`<slug>.flac` and `<slug>.mp3` at 320
 | Deep Field | Swell, Sub, Shimmer, Space | The filter opening over several seconds on every held chord; Swell at 0 stays dark, Sub and Shimmer add an octave below and above. |
 | Cotton Mill | Cutoff, Motion, Chorus, Space | The pulse width breathing inside held chords; Chorus at 0 is dry and narrow. |
 | Picture Window | Cutoff, Spread, Sparkle, Space | A clean, bright stack that widens with Spread; Sparkle adds airy octave-up saws. |
-| Drive-In | Cutoff, Wobble, Chorus, Space | Wide chorused saws with a slow pitch sway; Chorus at 0 is a plain stack. |
+| Waiting Room (was Drive-In) | Cutoff, Wobble, Chorus, Space | Wide chorused saws with a slow pitch sway; Chorus at 0 is a plain stack. |
 | Dry Cleaner | Sweep, Phase, Grit, Room | Phaser sweeping through short, compressed chord stabs; Phase at 0 is a plain saw chord, Sweep works like a DJ filter. |
 | Concrete Cloud | Weight, Cutoff, Crush, Room | A heavy, squashed chord that stays dense while held; Crush up for lo-fi grit, Weight up for more saturation. |
 | Static Garden | Texture, Motion, Metal, Space | Hiss and grain around the chord (Texture), bell-like inharmonic overtones (Metal), a filter that wanders by itself (Motion). |
@@ -47,7 +47,7 @@ Clips in `docs/presets/clips/pad/group1/` (`<slug>.flac` and `<slug>.mp3` at 320
 ### Checks (group 1)
 
 - `every_preset_keeps_to_the_brief`, the library tests and `factory_levels_hold_the_target` pass.
-- Levels as `factory_bank::level_table` measures them (peak / loudness dBFS): Fog Bank -7.1 / -21.0, Deep Field -7.3 / -22.1, Cotton Mill -4.0 / -19.2, Picture Window -3.6 / -19.9, Drive-In -4.6 / -19.9, Dry Cleaner -3.9 / -20.7, Concrete Cloud -8.3 / -20.7, Static Garden -4.2 / -20.1. The generator's own `levels` command plays the same chord at the same times but reads a few dB differently for the slow pads; the test's number is the one that counts.
+- Levels as `factory_bank::level_table` measures them (peak / loudness dBFS): Fog Bank -7.1 / -21.0, Deep Field -7.3 / -22.1, Cotton Mill -4.0 / -19.2, Picture Window -3.6 / -19.9, Waiting Room -4.6 / -19.9, Dry Cleaner -3.9 / -20.7, Concrete Cloud -8.3 / -20.7, Static Garden -4.2 / -20.1. The generator's own `levels` command plays the same chord at the same times but reads a few dB differently for the slow pads; the test's number is the one that counts.
 - Macros (`presets_pad macros patches 1`): every macro moves the render. Weakest: Static Garden Texture (-13 dB under the render, after raising the noise level and the route; the first version was -29 dB), Concrete Cloud Crush (-17 dB). Several, such as Deep Field Swell or Fog Bank Space, move the render as much as the signal itself.
 - Clicks: the first scan (energy above 3 kHz in 5 ms windows) found nothing, and was wrong for dark material, see Round two. With the second-difference test below, all eight clips have no flagged window (Concrete Cloud's one window at 0.25 s is the note starting from silence). Highest high-frequency share of any window: Dry Cleaner -3 dB (its short stabs), Concrete Cloud -9 dB; the rest under -6.5 dB.
 - clips: 320 kbps mp3 against the float render, all eight pass (SNR 36 to 73 dB below 16 kHz, peaks within 0.1 dB).

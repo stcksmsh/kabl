@@ -1,0 +1,13 @@
+name = "Waiting Room"
+category = "Pad"
+tags = [
+    "poly",
+    "supersaw",
+    "chorus",
+    "dreamy",
+    "liminal",
+    "hazy",
+]
+description = "A dreamy, liminal pad: soft detuned saws over a square, a slow breath of sway, a hazy wide chorus and a long, empty-room echo. Play slow minor chords and let them hang. Sway sets the depth of the slow pitch sway, Chorus brings in a wide, lush chorus, Weight brings the square an octave down forward, Pulse chops the pad into a tempo-synced gate (press Run)."
+keys = true
+sequence = true

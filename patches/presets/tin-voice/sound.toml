@@ -8,6 +8,6 @@ tags = [
     "french touch",
     "signature",
 ]
-description = "Robot vowel chords for French touch: saws and a pulse driven into a formant filter, close and dry. Play held chords and move the mod wheel. Vowel sweeps the mouth shape, Grit pushes the drive, Shift moves the formants up or down, Room adds a short echo and a small room."
+description = "Robot vowel chords for French touch: saws and a pulse driven into a formant filter, close and dry. Play held chords and move the mod wheel. Vowel sweeps the mouth shape, Chatter makes the mouth jump to random vowels, Shift moves the formants up or down, Grit drives and crushes the voice."
 keys = true
 sequence = false

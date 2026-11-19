@@ -7,6 +7,6 @@ tags = [
     "chorus",
     "pop",
 ]
-description = "An analog-style pad for pop: a pulse with moving width and two detuned saws, soft chorus and a mid-sized room. Play open chords. Cutoff opens the filter, Motion sets how far the pulse width moves, Chorus brings in the chorus, Space adds the echo and the room."
+description = "An analog-style pad for pop: a pulse with moving width and two detuned saws, soft chorus and a mid-sized room. Play open chords. Motion makes the pulse width move faster and wider, Chorus brings in a deep wash, Warmth opens the filter from dark to glassy, Beat lets the two saws drift into a slow beating."
 keys = true
 sequence = false
