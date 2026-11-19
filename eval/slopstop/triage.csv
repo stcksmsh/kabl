@@ -1,0 +1,101 @@
+file,line,rule,severity,label,reason
+crates/core/tests/log_unit.rs,267,duplicate-code,block,MEH,test fixture boilerplate repeated across test files
+crates/engine/tests/drums.rs,5,duplicate-code,block,MEH,test fixture boilerplate repeated across test files
+crates/engine/tests/functional_cables.rs,77,duplicate-code,block,MEH,test fixture boilerplate repeated across test files
+crates/engine/tests/legacy_patches.rs,12,duplicate-code,block,MEH,test fixture boilerplate repeated across test files
+crates/engine/tests/sound_engines.rs,162,duplicate-code,block,MEH,test fixture boilerplate repeated across test files
+crates/engine/tests/timeline.rs,313,duplicate-code,block,MEH,test fixture boilerplate repeated across test files
+crates/engine/tests/utilities.rs,20,duplicate-code,block,MEH,test fixture boilerplate repeated across test files
+crates/engine/tests/utilities.rs,28,duplicate-code,block,MEH,test fixture boilerplate repeated across test files
+crates/engine/tests/voice_allocator.rs,131,duplicate-code,block,MEH,test fixture boilerplate repeated across test files
+crates/modules/src/builtins/bitcrusher.rs,97,duplicate-code,block,FP,"repeated const PortInfo/ParamInfo declaration tables, not logic"
+crates/modules/src/builtins/drum_grid.rs,31,duplicate-code,block,FP,"repeated const PortInfo/ParamInfo declaration tables, not logic"
+crates/modules/src/builtins/filter_formant.rs,26,duplicate-code,block,FP,"repeated const PortInfo/ParamInfo declaration tables, not logic"
+crates/modules/src/builtins/filter_ladder.rs,40,duplicate-code,block,FP,"repeated const PortInfo/ParamInfo declaration tables, not logic"
+crates/modules/src/builtins/filter_svf.rs,185,duplicate-code,block,FP,"repeated const PortInfo/ParamInfo declaration tables, not logic"
+crates/modules/src/builtins/lfo.rs,29,duplicate-code,block,FP,"repeated const PortInfo/ParamInfo declaration tables, not logic"
+crates/modules/src/builtins/midi_note.rs,17,duplicate-code,block,FP,"repeated const PortInfo/ParamInfo declaration tables, not logic"
+crates/modules/src/builtins/osc_fm.rs,257,duplicate-code,block,FP,"repeated const PortInfo/ParamInfo declaration tables, not logic"
+crates/modules/src/builtins/osc_wt.rs,13,duplicate-code,block,FP,"repeated const PortInfo/ParamInfo declaration tables, not logic"
+crates/modules/src/builtins/sample_hold.rs,17,duplicate-code,block,FP,"repeated const PortInfo/ParamInfo declaration tables, not logic"
+crates/modules/src/builtins/seq.rs,80,duplicate-code,block,FP,"repeated const PortInfo/ParamInfo declaration tables, not logic"
+crates/modules/tests/drums.rs,40,duplicate-code,block,MEH,test setup copy
+crates/modules/tests/mixer_out_midi_in.rs,37,duplicate-code,block,MEH,test setup copy
+crates/ui/src/style/builtin.rs,123,duplicate-code,block,FP,repeated entries inside a constants table
+crates/ui/tests/cable_life.rs,9,duplicate-code,block,MEH,ui test harness boilerplate
+crates/ui/tests/cable_life.rs,68,duplicate-code,block,MEH,ui test harness boilerplate
+crates/ui/tests/cable_life.rs,173,duplicate-code,block,MEH,ui test harness boilerplate
+crates/ui/tests/cues_editor.rs,71,duplicate-code,block,MEH,ui test harness boilerplate
+crates/ui/tests/perform.rs,536,duplicate-code,block,MEH,ui test harness boilerplate
+crates/ui/tests/perform_style.rs,19,duplicate-code,block,MEH,ui test harness boilerplate
+crates/ui/tests/seq_editor.rs,37,duplicate-code,block,MEH,ui test harness boilerplate
+docs/effects-filters/scripts/face_patches.py,14,duplicate-code,block,MEH,small clone between throwaway docs scripts
+docs/macros/scripts/host.py,76,duplicate-code,block,MEH,small clone between throwaway docs scripts
+docs/presets/scripts/host_glide.py,37,duplicate-code,block,TP,32/78-line copy of host.py inside same scripts dir
+docs/presets/scripts/host_glide.py,69,duplicate-code,block,TP,32/78-line copy of host.py inside same scripts dir
+docs/reaper-instrument/scripts/run-measurements.py,24,duplicate-code,block,MEH,small clone between throwaway docs scripts
+docs/reaper-instrument/scripts/timing-proxy.c,40,duplicate-code,block,MEH,timing-proxy.c copied between docs dirs
+docs/reaper-instrument/scripts/timing-proxy.c,80,duplicate-code,block,MEH,timing-proxy.c copied between docs dirs
+docs/signal-inspection/record-walkthrough.sh,19,duplicate-code,block,MEH,small clone between throwaway docs scripts
+docs/sound-engines/scripts/host.lua,9,duplicate-code,block,MEH,small clone between throwaway docs scripts
+docs/sound-engines/scripts/host_rhythm.py,269,duplicate-code,block,MEH,small clone between throwaway docs scripts
+docs/sound-engines/scripts/host_util.py,130,duplicate-code,block,MEH,small clone between throwaway docs scripts
+docs/sound-engines/scripts/host_util.py,141,duplicate-code,block,MEH,small clone between throwaway docs scripts
+docs/sound-engines/scripts/host_util.py,183,duplicate-code,block,MEH,small clone between throwaway docs scripts
+docs/unison/scripts/capture.py,45,duplicate-code,block,MEH,small clone between throwaway docs scripts
+tools/examples/cable_capture.rs,213,duplicate-code,block,MEH,tools/examples capture harness clones
+tools/examples/g4_parts.rs,265,duplicate-code,block,MEH,tools/examples capture harness clones
+tools/examples/transitions_clip.rs,79,duplicate-code,block,MEH,tools/examples capture harness clones
+docs/design/render.py,1,file-too-large,warn,MEH,docs render script size
+crates/cargo-kabl/src/pack.rs,92,rs-let-underscore-call,warn,FP,best-effort remove_dir_all of a temp dir; ignoring is idiomatic
+crates/clap/src/lib.rs,1130,rs-let-underscore-call,warn,MEH,realtime report queue full -> drop is deliberate but undocumented
+crates/clap/src/lib.rs,1442,rs-let-underscore-call,warn,MEH,worker.join() in Drop; panic payload ignored
+crates/clap/src/state_bridge.rs,174,rs-let-underscore-call,warn,FP,"Arc::into_raw is not a Result; intentional leak, commented"
+crates/engine/tests/probe.rs,284,rs-let-underscore-call,warn,FP,take_probe_report() is not a Result
+crates/ui/src/main.rs,2128,rs-let-underscore-call,warn,MEH,debug dump file write; failure ignorable
+crates/ui/src/main.rs,2135,rs-let-underscore-call,warn,MEH,debug dump file write; failure ignorable
+crates/ui/src/module_install.rs,151,rs-let-underscore-call,warn,FP,best-effort remove_dir_all of a temp dir; ignoring is idiomatic
+crates/ui/src/module_install.rs,190,rs-let-underscore-call,warn,FP,best-effort remove_dir_all of a temp dir; ignoring is idiomatic
+crates/ui/src/record.rs,237,rs-let-underscore-call,warn,MEH,compare_exchange result intentionally ignored
+crates/ui/src/record.rs,249,rs-let-underscore-call,warn,MEH,compare_exchange result intentionally ignored
+crates/ui/tests/cues_editor.rs,64,rs-let-underscore-call,warn,FP,"end_pass() returns output, not a Result"
+crates/ui/tests/face_width.rs,38,rs-let-underscore-call,warn,FP,"end_pass() returns output, not a Result"
+docs/product-research/d11/src/main.rs,68,rs-let-underscore-call,warn,FP,"intentional, commented"
+crates/engine/tests/timeline.rs,392,rs-test-no-assert,warn,FP,assertions live in helper check(); rule only looks for assert! in the body
+docs/design/render.py,208,ruff:C408,warn,MEH,dict() style nit in docs script
+docs/design/render.py,247,ruff:C408,warn,MEH,dict() style nit in docs script
+docs/effect-displays/scripts/make_patch.py,43,ruff:C408,warn,MEH,dict() style nit in docs script
+docs/visual-polish/mockups/make_mockups.py,85,ruff:C408,warn,MEH,dict() style nit in docs script
+docs/composites/scripts/workflow.py,1,ruff:EXE001,warn,FP,"shebang without exec bit, irrelevant"
+docs/design/redesign/g4/tools/sheet.py,1,ruff:EXE001,warn,FP,"shebang without exec bit, irrelevant"
+docs/host-production/scripts/run-measurements.py,1,ruff:EXE001,warn,FP,"shebang without exec bit, irrelevant"
+docs/reaper-instrument/scripts/run-render-diagnostic.py,1,ruff:EXE001,warn,FP,"shebang without exec bit, irrelevant"
+docs/unison/scripts/host.py,1,ruff:EXE001,warn,FP,"shebang without exec bit, irrelevant"
+docs/visual-polish/mockups/make_mockups.py,338,ruff:F841,block,TP,"unused local variable, rule is blocking and correct"
+docs/panel-authoring/repair/host-fixture.py,18,ruff:FURB167,warn,MEH,import/regex style in docs script
+docs/composites/scripts/workflow.py,3,ruff:I001,warn,MEH,import/regex style in docs script
+docs/presets/scripts/test_audio_defects.py,3,ruff:I001,warn,MEH,import/regex style in docs script
+docs/visual-polish/scripts/capture_scenes.py,9,ruff:I001,warn,MEH,import/regex style in docs script
+docs/panel-authoring/scripts/check-bundle.py,14,ruff:PLW1510,warn,MEH,subprocess.run without check in docs script
+docs/reaper-instrument/scripts/run-render-diagnostic.py,24,ruff:PLW1510,warn,MEH,subprocess.run without check in docs script
+docs/panel-authoring/scripts/check-bundle.py,8,ruff:SIM115,warn,MEH,unclosed file handle in short-lived docs script
+docs/unison/scripts/host.py,97,ruff:SIM115,warn,MEH,unclosed file handle in short-lived docs script
+docs/wavetable-editor/host-features.py,4,ruff:SIM115,warn,MEH,unclosed file handle in short-lived docs script
+crates/modules/assets/wavetables/build.py,135,ruff:T201,warn,FP,print in a CLI/report script is the point
+docs/find-play-save/scripts/audio_timeline.py,46,ruff:T201,warn,FP,print in a CLI/report script is the point
+docs/grid-cues/scripts/record.py,105,ruff:T201,warn,FP,print in a CLI/report script is the point
+docs/midi-timing/scripts/onsets.py,56,ruff:T201,warn,FP,print in a CLI/report script is the point
+docs/presets/scripts/clips_keys_pluck.py,87,ruff:T201,warn,FP,print in a CLI/report script is the point
+docs/presets/scripts/macro_audit.py,501,ruff:T201,warn,FP,print in a CLI/report script is the point
+docs/signal-inspection/scripts/gaps.py,50,ruff:T201,warn,FP,print in a CLI/report script is the point
+packaging/linux/install.sh,31,sh-or-true,warn,FP,|| true on optional update-desktop-database is correct
+docs/format/train_dict.sh,37,sh-swallow-stderr,warn,MEH,stderr discarded on zstd train
+docs/modulation-slice/record-clips.sh,37,sh-swallow-stderr,warn,FP,"|| true after wait on a killed job, commented pattern"
+packaging/linux/install.sh,39,sh-swallow-stderr,warn,FP,commented intent: rmdir only if empty
+crates/engine/src/patch_engine.rs,176,suppression-added,block,MEH,"existing justified/benign suppression; reported as ""added"" because --all treats every line as new"
+crates/modules/tests/effects.rs,815,suppression-added,block,MEH,"existing justified/benign suppression; reported as ""added"" because --all treats every line as new"
+crates/ui/src/kit/recipes.rs,336,suppression-added,block,MEH,"existing justified/benign suppression; reported as ""added"" because --all treats every line as new"
+crates/ui/src/rack_editor.rs,403,suppression-added,block,MEH,"existing justified/benign suppression; reported as ""added"" because --all treats every line as new"
+crates/ui/src/style/builtin.rs,19,suppression-added,block,MEH,"existing justified/benign suppression; reported as ""added"" because --all treats every line as new"
+sdk/kabl-module-sdk/src/lib.rs,179,suppression-added,block,MEH,"existing justified/benign suppression; reported as ""added"" because --all treats every line as new"
+tools/examples/presets_pad.rs,103,suppression-added,block,MEH,"existing justified/benign suppression; reported as ""added"" because --all treats every line as new"

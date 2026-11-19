@@ -1,0 +1,36 @@
+file,line,rule,severity,label,reason
+crates/ui/tests/accesskit.rs,12,duplicate-code,block,TP,26-line copy between a ui test and tools/examples/support/mockup.rs
+crates/ui/tests/accesskit.rs,56,duplicate-code,block,MEH,7-12 line clone between test/capture harness files
+docs/presets/scripts/macro_tour_ab.py,36,duplicate-code,block,MEH,7-12 line clone between test/capture harness files
+tools/examples/accesskit_capture.rs,98,duplicate-code,block,MEH,7-12 line clone between test/capture harness files
+tools/examples/accesskit_capture.rs,113,duplicate-code,block,MEH,7-12 line clone between test/capture harness files
+tools/examples/accesskit_capture.rs,130,duplicate-code,block,MEH,7-12 line clone between test/capture harness files
+crates/ui/src/lib.rs,1820,file-too-large,warn,MEH,"ui/src/lib.rs already 6144 lines; PR added a11y lines, size is pre-existing"
+crates/ui/src/routing.rs,879,file-too-large,warn,MEH,"large file, edit only grew it; generator/example code"
+tools/examples/presets_bass_lead.rs,206,file-too-large,warn,MEH,"large file, edit only grew it; generator/example code"
+tools/examples/presets_groove.rs,763,file-too-large,warn,MEH,"large file, edit only grew it; generator/example code"
+tools/examples/presets_pad.rs,206,file-too-large,warn,MEH,"large file, edit only grew it; generator/example code"
+docs/presets/scripts/macro_audit.py,366,ruff:B905,warn,MEH,style/complexity nit in docs script
+docs/presets/scripts/macro_audit.py,297,ruff:C401,warn,MEH,style/complexity nit in docs script
+docs/presets/scripts/macro_audit.py,216,ruff:C901,warn,MEH,style/complexity nit in docs script
+docs/presets/scripts/macro_audit.py,288,ruff:C901,warn,MEH,style/complexity nit in docs script
+docs/presets/scripts/macro_tour_ab.py,1,ruff:EXE001,warn,FP,shebang without exec bit
+docs/presets/scripts/macro_tour_ab.py,16,ruff:I001,warn,MEH,style/complexity nit in docs script
+docs/presets/scripts/macro_tour_ab.py,105,ruff:T201,warn,FP,print in a CLI script is the point
+docs/presets/scripts/macro_tour_ab.py,107,ruff:T201,warn,FP,print in a CLI script is the point
+tools/examples/presets_bass_lead.rs,781,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_bass_lead.rs,903,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_bass_lead.rs,919,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_bass_lead.rs,957,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_groove.rs,825,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_groove.rs,849,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_groove.rs,1483,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_keys_pluck.rs,119,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_keys_pluck.rs,144,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_keys_pluck.rs,166,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_pad.rs,662,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_pad.rs,678,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_pad.rs,718,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_pad.rs,750,suppression-added,block,MEH,"new #[allow(clippy::too_many_arguments)] on preset-builder helper; rule is correct but rated blocking for a benign, long-standing house pattern"
+tools/examples/presets_bass_lead.rs,1751,versioned-name,block,FP,"""fixed"" means constant vibrato, not a patched/versioned name"
+tools/examples/presets_pad.rs,791,versioned-name,block,FP,"""fixed"" means constant vibrato, not a patched/versioned name"

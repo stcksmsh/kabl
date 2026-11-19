@@ -1,0 +1,3017 @@
+[
+ {
+  "rule": "duplicate-code",
+  "file": "crates/ui/tests/accesskit.rs",
+  "line": 12,
+  "msg": "26 lines duplicate tools/examples/support/mockup.rs:8",
+  "sev": "block",
+  "tool": "jscpd",
+  "hint": "reuse or extract the existing code"
+ },
+ {
+  "rule": "duplicate-code",
+  "file": "crates/ui/tests/accesskit.rs",
+  "line": 56,
+  "msg": "9 lines duplicate crates/ui/tests/perform_style.rs:19",
+  "sev": "block",
+  "tool": "jscpd",
+  "hint": "reuse or extract the existing code"
+ },
+ {
+  "rule": "duplicate-code",
+  "file": "docs/presets/scripts/macro_tour_ab.py",
+  "line": 36,
+  "msg": "8 lines duplicate docs/presets/scripts/macro_audit.py:382",
+  "sev": "block",
+  "tool": "jscpd",
+  "hint": "reuse or extract the existing code"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 87,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::large_enum_v",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 258,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 267,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::large_enum_v",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 285,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::large_enum_v",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 690,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 861,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 1293,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::large_enum_v",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 1590,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 1725,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 2643,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::manual_clamp",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 3705,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::large_const_",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 3714,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::large_const_",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 3723,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::large_const_",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 3732,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::large_const_",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 3741,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::large_const_",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 3912,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::needless_ran",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4137,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #![allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4281,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4326,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4344,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4731,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4758,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4767,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4794,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4803,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4812,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4821,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4839,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4866,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4884,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4902,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4929,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4956,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4974,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4983,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 4992,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5001,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5010,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5019,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5028,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5046,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5055,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5064,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5073,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5082,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5181,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5190,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5199,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5208,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5217,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5226,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5235,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5244,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5271,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5298,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5343,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5352,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5361,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5370,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5379,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5388,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5397,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5406,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5415,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5424,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5433,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5442,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5451,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5478,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5487,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5496,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5505,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5514,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5523,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5532,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5541,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5550,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5559,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5568,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5595,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5604,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5613,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5622,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5631,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5685,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5829,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 5865,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6153,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6243,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6423,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6459,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6468,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6504,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6513,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6576,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6765,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_lin",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6774,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6783,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6792,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6801,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6828,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 6846,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 7089,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 7224,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::type_complex",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 7233,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 7242,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 7251,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 7260,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 7269,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 7278,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 7413,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[ignore]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 7674,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: import render as R  # noqa: ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 7890,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: from make_demos import Patch",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 8340,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: = help: to override `-D warn",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 9123,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(deprecated)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10176,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: import make_vocoder_demos as",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10185,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: from make_demos import Patch",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10230,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::approx_const",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10239,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10248,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10257,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10266,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10275,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10284,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10293,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10302,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10365,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10752,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10761,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10770,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10779,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10788,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10797,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10815,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #![allow(dead_code)]\",",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10824,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10833,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10842,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10851,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10860,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10878,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10887,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10896,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10905,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10923,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10986,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 10995,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 11004,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 11013,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 11022,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 11031,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 11040,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/baseline.json",
+  "line": 11058,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: #[allow(clippy::too_many_arg",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 69,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 78,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 87,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 96,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 105,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 114,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 123,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 132,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 141,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 150,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 159,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 168,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 177,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 186,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 195,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 204,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 213,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 222,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 231,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 240,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 249,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 258,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 267,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 276,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 285,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 294,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 303,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 312,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 321,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 330,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 339,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 348,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 357,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 366,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 375,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 384,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 393,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 402,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 411,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 420,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 429,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 438,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 447,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 456,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 465,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 474,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 483,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 492,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 501,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 510,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 519,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 528,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 537,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 546,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 555,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 564,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 573,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 582,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 591,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 600,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 609,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 618,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 627,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 636,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 645,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 654,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 663,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 672,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 681,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 690,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 699,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 708,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 717,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 726,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 735,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 744,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 753,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 762,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 771,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 780,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 789,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 798,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 807,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 816,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 825,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 834,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 843,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 852,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 861,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 870,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 879,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 888,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 897,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 906,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 915,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 924,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 933,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 942,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 951,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 960,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 969,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 978,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 987,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 996,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1005,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1014,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1023,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1032,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1041,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1050,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1059,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1068,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1095,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1122,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1131,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1140,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1149,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1158,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1167,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1176,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1185,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1194,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1203,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1212,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1221,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1230,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1239,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1248,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1257,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1266,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1275,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1284,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1293,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1302,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1311,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1320,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1329,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1338,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1347,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1356,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1365,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1374,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1383,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1392,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1401,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1410,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1419,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "eval/slopstop/seeded.json",
+  "line": 1428,
+  "msg": "suppression/skip added: \"msg\": \"suppression/skip added: \\\"msg\\\": \\\"suppression/skip ",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "duplicate-code",
+  "file": "tools/examples/accesskit_capture.rs",
+  "line": 98,
+  "msg": "7 lines duplicate tools/examples/face_capture.rs:68",
+  "sev": "block",
+  "tool": "jscpd",
+  "hint": "reuse or extract the existing code"
+ },
+ {
+  "rule": "duplicate-code",
+  "file": "tools/examples/accesskit_capture.rs",
+  "line": 113,
+  "msg": "8 lines duplicate crates/ui/tests/perform_style.rs:21",
+  "sev": "block",
+  "tool": "jscpd",
+  "hint": "reuse or extract the existing code"
+ },
+ {
+  "rule": "duplicate-code",
+  "file": "tools/examples/accesskit_capture.rs",
+  "line": 130,
+  "msg": "12 lines duplicate tools/examples/g4_parts.rs:267",
+  "sev": "block",
+  "tool": "jscpd",
+  "hint": "reuse or extract the existing code"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_bass_lead.rs",
+  "line": 781,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_bass_lead.rs",
+  "line": 903,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_bass_lead.rs",
+  "line": 919,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_bass_lead.rs",
+  "line": 957,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "versioned-name",
+  "file": "tools/examples/presets_bass_lead.rs",
+  "line": 1751,
+  "msg": "versioned/hedged name `fixed_vibrato`",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "replace the original instead of adding a variant"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_groove.rs",
+  "line": 825,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_groove.rs",
+  "line": 849,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_groove.rs",
+  "line": 1483,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_keys_pluck.rs",
+  "line": 119,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_keys_pluck.rs",
+  "line": 144,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_keys_pluck.rs",
+  "line": 166,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_pad.rs",
+  "line": 662,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_pad.rs",
+  "line": 678,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_pad.rs",
+  "line": 718,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "suppression-added",
+  "file": "tools/examples/presets_pad.rs",
+  "line": 750,
+  "msg": "suppression/skip added: #[allow(clippy::too_many_arguments)]",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "fix the underlying issue; suppressions need human approval"
+ },
+ {
+  "rule": "versioned-name",
+  "file": "tools/examples/presets_pad.rs",
+  "line": 791,
+  "msg": "versioned/hedged name `fixed_vibrato`",
+  "sev": "block",
+  "tool": "slop",
+  "hint": "replace the original instead of adding a variant"
+ },
+ {
+  "rule": "file-too-large",
+  "file": "crates/ui/src/lib.rs",
+  "line": 1820,
+  "msg": "file is 6144 lines and still growing",
+  "sev": "warn",
+  "tool": "slop",
+  "hint": "put new code in a new module"
+ },
+ {
+  "rule": "file-too-large",
+  "file": "crates/ui/src/routing.rs",
+  "line": 879,
+  "msg": "file is 2305 lines and still growing",
+  "sev": "warn",
+  "tool": "slop",
+  "hint": "put new code in a new module"
+ },
+ {
+  "rule": "ruff:C901",
+  "file": "docs/presets/scripts/macro_audit.py",
+  "line": 216,
+  "msg": "`audit_macro` is too complex (13 > 10)",
+  "sev": "warn",
+  "tool": "ruff",
+  "hint": ""
+ },
+ {
+  "rule": "ruff:C901",
+  "file": "docs/presets/scripts/macro_audit.py",
+  "line": 288,
+  "msg": "`combination` is too complex (18 > 10)",
+  "sev": "warn",
+  "tool": "ruff",
+  "hint": ""
+ },
+ {
+  "rule": "ruff:C401",
+  "file": "docs/presets/scripts/macro_audit.py",
+  "line": 297,
+  "msg": "Unnecessary generator (rewrite as a set comprehension)",
+  "sev": "warn",
+  "tool": "ruff",
+  "hint": ""
+ },
+ {
+  "rule": "ruff:B905",
+  "file": "docs/presets/scripts/macro_audit.py",
+  "line": 366,
+  "msg": "`zip()` without an explicit `strict=` parameter",
+  "sev": "warn",
+  "tool": "ruff",
+  "hint": ""
+ },
+ {
+  "rule": "ruff:EXE001",
+  "file": "docs/presets/scripts/macro_tour_ab.py",
+  "line": 1,
+  "msg": "Shebang is present but file is not executable",
+  "sev": "warn",
+  "tool": "ruff",
+  "hint": ""
+ },
+ {
+  "rule": "ruff:I001",
+  "file": "docs/presets/scripts/macro_tour_ab.py",
+  "line": 16,
+  "msg": "Import block is un-sorted or un-formatted",
+  "sev": "warn",
+  "tool": "ruff",
+  "hint": ""
+ },
+ {
+  "rule": "ruff:T201",
+  "file": "docs/presets/scripts/macro_tour_ab.py",
+  "line": 105,
+  "msg": "`print` found",
+  "sev": "warn",
+  "tool": "ruff",
+  "hint": ""
+ },
+ {
+  "rule": "ruff:T201",
+  "file": "docs/presets/scripts/macro_tour_ab.py",
+  "line": 107,
+  "msg": "`print` found",
+  "sev": "warn",
+  "tool": "ruff",
+  "hint": ""
+ },
+ {
+  "rule": "file-too-large",
+  "file": "tools/examples/presets_bass_lead.rs",
+  "line": 206,
+  "msg": "file is 2916 lines and still growing",
+  "sev": "warn",
+  "tool": "slop",
+  "hint": "put new code in a new module"
+ },
+ {
+  "rule": "file-too-large",
+  "file": "tools/examples/presets_groove.rs",
+  "line": 763,
+  "msg": "file is 3438 lines and still growing",
+  "sev": "warn",
+  "tool": "slop",
+  "hint": "put new code in a new module"
+ },
+ {
+  "rule": "file-too-large",
+  "file": "tools/examples/presets_pad.rs",
+  "line": 206,
+  "msg": "file is 2037 lines and still growing",
+  "sev": "warn",
+  "tool": "slop",
+  "hint": "put new code in a new module"
+ }
+]
