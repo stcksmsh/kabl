@@ -20,6 +20,7 @@
     <header class="panel hero">
       <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
       <img class="lockup" src="/media/kabl-lockup.svg" alt="kabl" width="272" height="100" />
+      <div class="hero-cable" id="hero-cable" aria-hidden="true"></div>
       <p class="lede">A legible modular synthesizer, written in Rust. Cables are instruments, patches explain themselves, and the sound you hear can be traced back through the patch.</p>
       <ul class="modes">
         <li><span class="jack" aria-hidden="true"></span><strong>Standalone</strong> <span>kabl-ui: sound browser, rack, performance view</span></li>
@@ -55,26 +56,35 @@
       <section class="panel" aria-labelledby="cab-h">
         <h2 id="cab-h" class="label"><span>03</span> Functional cables</h2>
         <p>A cable is more than a wire. It can carry a step pattern, a pass probability, an A/B morph and glide, all locked to the patch clock, and macros can drive cable parameters.</p>
-        <div class="cablefig" aria-hidden="true">
-          <svg viewBox="0 0 800 120" preserveAspectRatio="xMidYMid meet">
-            <path class="wire" d="M40 40 C 220 140, 580 140, 760 40" />
-            <path class="wire pulse" d="M40 40 C 220 140, 580 140, 760 40" />
-            <circle class="plug" cx="40" cy="40" r="12" /><circle class="plug" cx="760" cy="40" r="12" />
-          </svg>
+        <div class="fc" id="fc">
+          <div class="fc-stage">
+            <svg class="fc-svg" viewBox="0 0 800 170" aria-hidden="true"></svg>
+            <canvas class="fc-scope" width="320" height="120" aria-hidden="true"></canvas>
+          </div>
+          <div class="fc-controls mono">
+            <div class="fc-row" role="group" aria-label="Pattern A, 16 steps">
+              <span class="fc-name">A</span><div class="fc-steps" data-pattern="a"></div>
+            </div>
+            <div class="fc-row" role="group" aria-label="Pattern B, 16 steps">
+              <span class="fc-name">B</span><div class="fc-steps" data-pattern="b"></div>
+            </div>
+            <div class="fc-knobs">
+              <label>Chance <output data-for="chance">80 %</output><input type="range" name="chance" min="0" max="100" value="80" /></label>
+              <label>Morph A→B <output data-for="morph">0.00</output><input type="range" name="morph" min="0" max="100" value="0" /></label>
+              <label>Glide <output data-for="glide">0 ms</output><input type="range" name="glide" min="0" max="400" value="0" step="10" /></label>
+              <button type="button" class="fc-play" aria-pressed="false">Play</button>
+            </div>
+          </div>
+          <p class="note mono fc-cap">A diagram of the idea, not kabl's audio engine. Each pulse of the clock (a 16th note) moves one step: the pulse passes with the cable's chance, its level is the A step blended toward the B step by Morph, and Glide slews between levels. In kabl each step also has its own level and chance; here a step is simply on or off.</p>
         </div>
-        <ul class="inserts mono">
-          <li><b>Step pattern</b><span>up to 16 steps, each with a level and a chance, advancing on the patch clock</span></li>
-          <li><b>Probability</b><span>a chance for the whole cable</span></li>
-          <li><b>A/B morph</b><span>blend between a pattern A and a pattern B</span></li>
-          <li><b>Glide</b><span>slew the level between steps</span></li>
-        </ul>
         <p class="note mono">Clock-locked. Macro-addressable. Details: <a href="https://github.com/stcksmsh/kabl/blob/master/docs/functional-cables/README.md">docs/functional-cables</a></p>
       </section>
 
       <section class="panel" aria-labelledby="sig-h">
         <h2 id="sig-h" class="label"><span>04</span> Signal path of the source</h2>
-        <p>The workspace, patched like a rack: each cable is a direct dependency between crates (transitive ones left out). Hover or tab to a crate.</p>
+        <p>The workspace, patched like a rack: each cable is a direct dependency between crates (transitive ones left out). Drag the crates around; hover or tab to one to read what it is (arrow keys move a focused crate).</p>
         <div class="graph" id="graph"></div>
+        <button type="button" class="mini mono" id="graph-reset">Reset layout</button>
         <p class="readout mono" id="readout" aria-live="polite">core · engine · modules · cables · standalone · ui · clap</p>
         <p class="note mono">Real-time safe audio path: no allocation or locking in the callback, enforced by the tests (<code>assert_no_alloc</code>).</p>
       </section>
@@ -106,6 +116,11 @@ cd kabl-*-linux-*
         <p>Source code: GPL-3.0-or-later. The name “kabl” and the logo are reserved; a fork needs its own name. Music you make with kabl is yours, with no conditions. Details in the repository’s <a href="https://github.com/stcksmsh/kabl/blob/master/COPYRIGHT">COPYRIGHT</a>, <a href="https://github.com/stcksmsh/kabl/blob/master/TRADEMARKS.md">TRADEMARKS.md</a> and <a href="https://github.com/stcksmsh/kabl/blob/master/ASSET-LICENSES.md">ASSET-LICENSES.md</a>.</p>
       </section>
     </main>
+
+    <dialog class="lightbox" id="lightbox" aria-label="Screenshot">
+      <form method="dialog"><button class="mono" aria-label="Close">Close ✕</button></form>
+      <img alt="" />
+    </dialog>
 
     <footer class="foot mono">
       <span>kabl by Kosta Vukićević</span>

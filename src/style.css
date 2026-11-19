@@ -71,16 +71,6 @@ h3 { font: 700 18px/1.2 var(--cond); margin: 0 0 8px; }
 .family li:first-child { border-top: 0; }
 .idx { color: #6d6c66; font-size: 12px; padding-top: 3px; }
 
-/* Functional cable figure */
-.cablefig svg { width: 100%; height: auto; max-height: 140px; display: block; }
-.wire { fill: none; stroke: var(--red); stroke-width: 9; stroke-linecap: round; }
-.wire.pulse { stroke: #ffd9a8; stroke-width: 3; stroke-dasharray: 2 60; animation: flow 2.4s linear infinite; }
-.plug { fill: #0c0c0d; stroke: #77766f; stroke-width: 5; }
-.inserts { list-style: none; padding: 0; margin: 4px 0 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 10px; }
-.inserts li { border-left: 4px solid var(--red); background: #1f2023; padding: 8px 12px; border-radius: 0 6px 6px 0; display: grid; font-size: 13px; }
-.inserts b { color: var(--ink); font-size: 14px; }
-.inserts span { color: var(--dim); }
-
 /* Crate graph */
 .graph svg { width: 100%; height: auto; display: block; max-height: 640px; }
 .cable .sheath { fill: none; stroke: #0b0b0c; stroke-width: 9; stroke-linecap: round; }
@@ -89,7 +79,9 @@ h3 { font: 700 18px/1.2 var(--cond); margin: 0 0 8px; }
 .cable .end { fill: #0c0c0d; stroke: #77766f; stroke-width: 3; }
 .crate rect { fill: #1f2023; stroke: #55575c; stroke-width: 1.5; }
 .crate text { fill: var(--ink); font-family: var(--mono); font-weight: 600; pointer-events: none; }
-.crate { cursor: default; outline: none; }
+.crate { cursor: grab; outline: none; touch-action: none; }
+.crate.held { cursor: grabbing; }
+.crate.held rect { fill: #3a3520; }
 .crate.on rect, .crate:focus-visible rect { stroke: var(--yellow); stroke-width: 3; fill: #2c2a1c; }
 svg.focus .cable:not(.on) { opacity: .18; }
 .readout { min-height: 3em; background: #111213; border: 1px solid var(--edge); border-radius: 6px; padding: 10px 14px; color: #9fe39f; font-size: 14px; margin: 14px 0; }
@@ -99,6 +91,69 @@ svg.focus .cable:not(.on) { opacity: .18; }
 .small { font-size: 15px; }
 
 .foot { max-width: 1100px; margin: 0 auto; padding: 18px 4px 36px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--dim); }
+
+/* Hero cables */
+.hero-cable { position: absolute; top: 0; right: 0; width: 46%; height: 100%; }
+.hero-cable svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.hero > :not(.hero-cable):not(.screw) { position: relative; max-width: 54%; }
+.jack-s { fill: #0c0c0d; stroke: #77766f; stroke-width: 4; }
+.hc .sheath { fill: none; stroke: #0b0b0c; stroke-width: 11; stroke-linecap: round; }
+.hc .core { fill: none; stroke: var(--c); stroke-width: 7; stroke-linecap: round; }
+.hc .plug { fill: var(--c); stroke: #0b0b0c; stroke-width: 3; cursor: grab; touch-action: none; }
+.hc.held .plug { cursor: grabbing; r: 14; }
+@media (max-width: 760px) {
+  .hero-cable { position: relative; width: 100%; height: 170px; margin: 8px 0 -8px; }
+  .hero > :not(.hero-cable):not(.screw) { max-width: none; }
+}
+
+/* Functional cable explainer */
+.fc-stage { display: grid; grid-template-columns: 1fr minmax(180px, 30%); gap: 16px; align-items: center; }
+.fc-svg { width: 100%; height: auto; display: block; overflow: visible; }
+.fc-svg .sheath { fill: none; stroke: #0b0b0c; stroke-width: 13; stroke-linecap: round; }
+.fc-svg .core { fill: none; stroke: var(--red); stroke-width: 9; stroke-linecap: round; }
+.fc-svg .plug { fill: #0c0c0d; stroke: #77766f; stroke-width: 5; }
+.dot { fill: #ffe08a; filter: drop-shadow(0 0 6px #ffc93c); }
+.dot.dropped { fill: var(--red); filter: none; }
+.fc-scope { width: 100%; height: 120px; background: #111213; border: 1px solid var(--edge); border-radius: 6px; }
+.fc-controls { margin-top: 14px; display: grid; gap: 10px; }
+.fc-row { display: flex; align-items: center; gap: 10px; }
+.fc-name { width: 1.2em; color: var(--dim); font-weight: 600; }
+.fc-steps { flex: 1; max-width: 640px; display: grid; grid-template-columns: repeat(16, 1fr); gap: 4px; }
+.step { aspect-ratio: 1; min-width: 0; padding: 0; border: 1px solid #55575c; border-radius: 4px; background: #1c1d1f; cursor: pointer; }
+.step:nth-child(4n + 1) { border-color: #77766f; }
+.step[aria-pressed="true"] { background: var(--yellow); border-color: var(--yellow); }
+.fc-steps[data-pattern="b"] .step[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); }
+.step.now { box-shadow: 0 0 0 2px #fff; }
+.fc-knobs { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; font-size: 13px; color: var(--dim); }
+.fc-knobs label { display: grid; gap: 2px; min-width: 150px; flex: 1 1 150px; }
+.fc-knobs output { color: var(--ink); float: right; }
+.fc-knobs input { accent-color: var(--yellow); width: 100%; }
+.fc-play, .mini { font: 600 14px var(--mono); background: var(--yellow); color: #111; border: 0; border-radius: 6px; padding: 9px 18px; cursor: pointer; }
+.fc-play[aria-pressed="true"] { background: #3a3b3e; color: var(--ink); }
+.mini { background: #202124; color: var(--ink); border: 1px solid #55575c; font-size: 12px; padding: 5px 10px; margin-top: 8px; }
+.fc-cap { margin-top: 14px; max-width: 80ch; }
+@media (max-width: 760px) {
+  .fc-stage { grid-template-columns: 1fr; }
+  .fc-steps { gap: 2px; }
+}
+
+/* Module LEDs */
+.led { width: 7px; height: 7px; border-radius: 50%; background: #3a2a14; margin-top: 9px; flex: none; transition: background .2s, box-shadow .2s; }
+.led.lit { background: #ffb43c; box-shadow: 0 0 6px #ffb43c; }
+
+/* Scroll reveal */
+.reveal-on main .panel { transition: opacity .6s ease, transform .6s cubic-bezier(.2, .8, .2, 1); }
+.reveal-on main .panel:not(.in) { opacity: 0; transform: translateY(32px); }
+
+/* Lightbox */
+.zoom { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.zoom img { transition: transform .3s ease; }
+.zoom:hover img { transform: scale(1.01); }
+.lightbox { border: 0; padding: 0; background: transparent; max-width: 96vw; max-height: 96vh; }
+.lightbox::backdrop { background: rgb(0 0 0 / .85); }
+.lightbox img { max-width: 96vw; max-height: 90vh; display: block; border-radius: 6px; }
+.lightbox form { text-align: right; margin-bottom: 6px; }
+.lightbox button { background: #202124; color: var(--ink); border: 1px solid #55575c; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
 
 @keyframes flow { to { stroke-dashoffset: -62; } }
 @media (prefers-reduced-motion: reduce) {
