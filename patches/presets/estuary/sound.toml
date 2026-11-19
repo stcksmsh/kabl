@@ -1,0 +1,13 @@
+name = "Estuary"
+category = "Piece"
+tags = [
+    "sequenced",
+    "cues",
+    "polymeter",
+    "probability",
+    "ambient",
+    "60bpm",
+]
+description = "A self-playing ambient piece at 60 BPM, with no drums: slow pads that change chord every bar, three bells that cycle in 5, 7 and 11 steps against it with some notes played by chance, a sine drone and a sea of noise. Press Run, then launch the four cues with the pads or CC 40-43: Low Tide, Rising, High Tide, Ebb. Tide opens the pads and lets the sea in, Glitter brings the bells up and lets them ring, Depth raises the drone from below, Wash sets the echo and the long room. High Tide is louder than Low Tide."
+keys = true
+sequence = true

@@ -1,0 +1,13 @@
+name = "Gantry"
+category = "Piece"
+tags = [
+    "sequenced",
+    "cues",
+    "drums",
+    "drop",
+    "techno",
+    "132bpm",
+]
+description = "A self-playing techno build and drop at 132 BPM: a four-on-the-floor kick with a clap, closed and open hats, a low-passed rumble between the kicks, an acid stab line and a slow pad, ducking to the kick. Press Run, then launch the five cues with the pads or CC 40-44: Intro, Build, Drop, Break, Peak. Climb opens the master filter and brings in a noise riser, Rumble brings the off-beat bass up and lengthens it, Acid makes the stab line squeal and ring longer, Pump sets how hard the kick ducks the music."
+keys = true
+sequence = true

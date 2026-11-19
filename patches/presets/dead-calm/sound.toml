@@ -1,0 +1,13 @@
+name = "Dead Calm"
+category = "Piece"
+tags = [
+    "sequenced",
+    "cues",
+    "cinematic",
+    "drone",
+    "swell",
+    "66bpm",
+]
+description = "A self-playing cinematic piece at 66 BPM: a minor drone and pad that change chord every bar pair, a dissonant cluster waiting underneath, a sparse high bell that plays half its notes by chance, and a low impact with a heartbeat of toms every two bars. Press Run, then launch the four cues with the pads or CC 40-43: Hush, Swell, Impact, Aftermath. Swell opens the filter and fades in a noise riser, Dread brings in a dissonant cluster, Pulse brings in the low impact and heartbeat, Hall sets the echo and the long room."
+keys = true
+sequence = true

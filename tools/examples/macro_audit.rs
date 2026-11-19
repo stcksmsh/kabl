@@ -70,6 +70,16 @@ fn secs() -> f32 {
     }
 }
 
+/// Whole bars rendered and thrown away before a tour starts (`MACRO_TOUR_PREROLL_BARS`, default 0),
+/// for pieces whose first bars are an intro: the 20 s then hold one steady state.
+fn preroll() -> f32 {
+    let bars: f32 = std::env::var("MACRO_TOUR_PREROLL_BARS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0.0);
+    tour_bpm().map_or(0.0, |bpm| bars * 4.0 * 60.0 / bpm)
+}
+
 /// The macro value at `t` while it is swept: 0, up over `LEG`, down over `LEG`, 0.
 fn sweep(t: f32) -> f32 {
     if tour_bpm().is_some() {
@@ -108,7 +118,7 @@ fn render(
         .collect();
     let (mut left, mut right) = (Vec::new(), Vec::new());
     let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
-    for b in 0..(secs() * SR) as usize / BLOCK {
+    for b in 0..((secs() + preroll()) * SR) as usize / BLOCK {
         let t0 = (b * BLOCK) as f32 / SR;
         let t1 = t0 + BLOCK as f32 / SR;
         if b == 0 {
@@ -128,7 +138,7 @@ fn render(
                     kind: "macro",
                     index,
                 },
-                sweep(t0),
+                sweep(t0 - preroll()),
                 true,
             );
         }
@@ -145,7 +155,8 @@ fn render(
         left.extend_from_slice(&l);
         right.extend_from_slice(&r);
     }
-    (left, right)
+    let skip = (preroll() * SR) as usize / BLOCK * BLOCK;
+    (left.split_off(skip), right.split_off(skip))
 }
 
 fn param_info(kind: &str, name: &str) -> Option<kabl_modules::ParamInfo> {
@@ -298,9 +309,9 @@ fn main() {
                 let period = (((last - first) / bar - 0.03).ceil().max(1.0)) * bar;
                 (0..)
                     .map(|n| n as f32 * period)
-                    .take_while(|o| *o < secs())
+                    .take_while(|o| *o < secs() + preroll())
                     .flat_map(|o| hits.iter().map(move |h| Hit(h.0 + o, h.1, h.2)))
-                    .filter(|h| h.0 < secs())
+                    .filter(|h| h.0 < secs() + preroll())
                     .collect()
             }
             None => hits,

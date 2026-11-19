@@ -1,0 +1,13 @@
+name = "Balcony"
+category = "Piece"
+tags = [
+    "sequenced",
+    "cues",
+    "drums",
+    "chords",
+    "pop",
+    "104bpm",
+]
+description = "A self-playing pop loop at 104 BPM: a four-chord progression in C, a round bass, a kick and snare, a triangle arpeggio hiding under the chords and a chorus. Press Run, then launch the five cues with the pads or CC 40-44: Verse, Pre, Chorus, Bridge, Last Chorus. Lift opens the filter and widens the chords, Sparkle brings the arpeggio up, Bounce sets how hard the kick ducks the chords, Room adds echo and a small room."
+keys = true
+sequence = true
