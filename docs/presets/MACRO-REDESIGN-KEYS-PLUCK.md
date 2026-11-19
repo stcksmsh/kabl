@@ -1,6 +1,6 @@
 # Macro redesign: keys and plucks, first half (12 of 23)
 
-Same method as `MACRO-REDESIGN.md` and `MACRO-REDESIGN-BASS-LEAD.md`: each preset gets four macros from what makes that patch interesting, four different kinds of change, clean by default, the stored (default) timbre unchanged. Builders: `tools/examples/presets_keys_pluck.rs` (shared stages, `Rack::span` / `span_hi` / `rise` / `level`, `routed`), `presets_keys_pluck/bank.rs` and `group2.rs`. This PR does the first twelve (Velvet Tine to Corduroy); the other eleven (Matinee, Snowmelt, Scaffold, Brass Filament, Spinet, Willow, Dry Creek, Gumdrop, Cold Cut, Rivet Gun, Tuning Fork) keep their old macros and their patch files are untouched (bit-identical renders).
+Same method as `MACRO-REDESIGN.md` and `MACRO-REDESIGN-BASS-LEAD.md`: each preset gets four macros from what makes that patch interesting, four different kinds of change, clean by default, the stored (default) timbre unchanged. Builders: `tools/examples/presets_keys_pluck.rs` (shared stages, `Rack::span` / `span_hi` / `rise` / `level`, `routed`), `presets_keys_pluck/bank.rs` and `group2.rs`. This PR does the first twelve (Velvet Tine to Corduroy); the other eleven (Matinee, Snowmelt, Scaffold, Brass Filament, Spinet, Willow, Dry Creek, Gumdrop, Cold Cut, Rivet Gun, Gossamer, formerly Tuning Fork) keep their old macros and their patch files are untouched (bit-identical renders).
 
 Written from the patch recipes, the audit renders and Kosta's first listen (Spark Plug, Hand Bell, Checkerboard); the other nine are not heard yet. "What you hear" is what the parameters and measures say, the tours are the test.
 
@@ -189,3 +189,175 @@ Cellar Door, Pulpit and Tin Roof are at the old level. Linoleum (-23.5) is the q
 ## Tours
 
 `docs/presets/clips/macros-keys-pluck/` (git-ignored): `<slug>-tour.mp3` per preset, new macros 1 to 4 back to back (20 s each: 6 s at 0, 4 s up, 6 s at 1, 4 s down; 1 s between; 84 s per file) and `tours.txt` with the start seconds. Gap guard on, all pass. Tempi: Velvet Tine 84, Checkerboard 124, Linoleum 122, Cellar Door 80, Pulpit 120, Rosewood 120, Rain Gutter 120, Spark Plug 124, Tin Roof 100, Turnstile 123, Hand Bell 120, Corduroy 104 (`.kabl-agent`-free regeneration: `MACRO_TOUR_BPM=<bpm> macro_audit patches phrases renders slug`, then `macro_tour_ab.py`). Turnstile's Pump needs the clock; the tour mode starts it. Listened by Kosta: Spark Plug, Hand Bell, Checkerboard (first versions, notes above). Listen next: Velvet Tine (Detune and the open peak flag), Rosewood Ring and Roll, Pulpit Perc, Rain Gutter Echo.
+
+# Second half: Matinee to Gossamer (11 of 23)
+
+Same method and builders as above (`presets_keys_pluck/group2.rs`: `Post { fixed: true, old: [..] }`, `span` / `span_hi` / `rise` / `level`). The old habit set (m1 cutoff or index, m2 drive, m3 space, m4 one extra) is gone: every macro is a gesture of that patch and the stored (default) timbre is the old one. A macro is stored where its line passes through the old sound, so several sit at 1.0 or 0.0 because the old routes left the filter or the decay at its far end (Matinee Glass, Spinet Jack, Willow Ring, Cold Cut Ring). Every preset has **4 macros; no 3 and no 5+**. Space is the constant old stored wet amount, except the **Hall** macros of Matinee, Snowmelt and Willow, which own the space: reverb decay and echo feedback move, the wet level stays.
+
+Written from the patch recipes and the audit renders (steps, sweeps, combinations); nobody has listened yet. "What you hear" is what the parameters and meters say; the tours are the test.
+
+Two findings of the audit of the old macros, as in the first half: the old cutoff routes left the ladder wide open at the stored position (Matinee 19 kHz, Spinet and Dry Creek fully open, Gumdrop 10 kHz), and the old decay routes of Scaffold, Gumdrop, Willow and Cold Cut sat at 1.4 to 10 s on notes a fraction of a second long. Those slots became gestures that work (Matinee Square, Scaffold Tail on the release, Gumdrop Hold, Cold Cut Click).
+
+## Presets (stored position in brackets)
+
+### Matinee (seven detuned saws, soft filter, big room)
+
+| Macro | What you hear 0 to 1 | What it moves |
+|---|---|---|
+| Swell [0.00] | each chord is struck at once to one that pushes in over 1.4 s (level-type, off by default) | attack of amp and filter envelope 8 to 1400 ms |
+| Glass [1.00] | a dark, closed pad to the stored bright, open one | cutoff 450 Hz to 19 kHz |
+| Square [0.50] | the bright saw stack to a hollow, woody square pad at the same loudness | square level 0 to 0.6, saw level 0.75 to 0.25, gain -3 dB at 1 |
+| Hall [0.60] | a small room and one echo to a huge, ringing hall (the wet level stays) | reverb decay 0.4 to 14 s, echo feedback 8 to 58 % |
+
+### Snowmelt (soft, slow electric piano, six-second room)
+
+| Macro | What you hear 0 to 1 | What it moves |
+|---|---|---|
+| Tine [0.40] | a soft, round key to a glassy one | index 0.1 to 1.8, hammer partial 0 to 0.375 |
+| Bloom [0.00] | each key struck at once to a chord that grows in over 1.5 s (level-type, off; the hammer thud stays) | attack of five operators 12 to 1500 ms |
+| Drift [0.50] | a still tone to a beating partner tine under a deep, slow chorus | chorus mix 0 to 60, depth 10 to 100, rate 0.07 to 0.9 Hz; partner tine fine 3 to 28 ct |
+| Hall [0.65] | the room grows from small to huge, ten seconds and more (the wet level stays) | reverb decay 0.6 to 20 s, echo feedback 8 to 65 %, gain -2.5 dB at 1 |
+
+### Scaffold (dark, wide drum-and-bass stab)
+
+| Macro | What you hear 0 to 1 | What it moves |
+|---|---|---|
+| Shut [0.78] | a shut, boxed-in stab to one whose filter snaps open and closes on every hit | cutoff 200 Hz to 16 kHz, filter decay 50 to 414 ms |
+| Stack [0.50] | a tight pair of stacks to a vast, ripping wall | detune 3 to 49 ct, second stack detune 2 to 34, fine -2 to -22 |
+| Swirl [0.50] | a still stab to a deep, ringing phaser | mix 0 to 70, rate 0.1 to 0.4 Hz, depth 52 to 98, feedback 5 to 88 |
+| Tail [0.60] | a clipped tick to a stab that rings on after the key is up | release 12 ms to 0.5 s, gain -3 dB at 1 |
+
+### Brass Filament (sustained metallic FM, algorithm 5)
+
+| Macro | What you hear 0 to 1 | What it moves |
+|---|---|---|
+| Blow [1.00] | a tone bowed in over 450 ms to a hard strike (level-type; stored at 1, the strike) | attack of all six operators 450 to 3 ms |
+| Alloy [0.50] | a tuned tone to a clangorous metal, the partials pulled out of tune | fine of partials 2, 4 and 5: 0 to 280, 0 to -180, 0 to 60 ct |
+| Space [0.00] | a dry, close tone to a wide echo and a huge, ringing room (level-compensated; the one macro that owns the space) | echo mix 0 to 22.5 %, feedback 8 to 72 %; room mix 0 to 31.5 %, decay 0.64 to 14 s; gain_db 7.75 to 5.25 |
+| Warp [0.30] | smooth to a rough, tearing metal (bolder: feedback and modulation index rise together; top +15 dB at 1) | feedback 0.02 to 1.0, index to 1.6 |
+
+### Spinet (harpsichord-like pluck)
+
+| Macro | What you hear 0 to 1 | What it moves |
+|---|---|---|
+| Jack [1.00] | a dull, boxed key to the stored bright pluck whose filter snaps on every note | cutoff 700 Hz to 20 kHz, filter decay 40 to 300 ms |
+| Honky [0.15] | two strings in tune to a second one pulled out of tune, a honky-tonk beating | second string fine 2 to 48 ct |
+| Sustain [0.50] | a damped tick to a string that rings on after the key is up | release 6 to 600 ms, gain -3 dB at 1 |
+| Double [0.35] | one string to two, a deep chorus doubling it | chorus mix 0 to 50, depth 10 to 67, rate 0.35 to 2.5 Hz |
+
+### Willow (soft harp)
+
+| Macro | What you hear 0 to 1 | What it moves |
+|---|---|---|
+| Nail [0.50] | a soft fingertip to a bright, clicking nail | index 0.1 to 1.7, two fast partials 0 to 0.6 and 0.4 |
+| Ring [1.00] | a damped, quickly dying string to one that sings for ten seconds | decay of two operators to 10 s, release 60 to 500 ms, gain -6 dB at 1 |
+| Halo [0.35] | a plain string to a shimmering one, the octave partial drifting out of tune | fine of partial 3, 4 to 40 ct |
+| Hall [0.60] | a small room to a huge hall with a long echo (the wet level stays) | reverb decay 0.7 to 16 s, echo feedback 8 to 61 % |
+
+### Dry Creek (nylon-string guitar)
+
+| Macro | What you hear 0 to 1 | What it moves |
+|---|---|---|
+| Pick [0.50] | a soft fingertip to a hard, clicking pick | two fast click partials 0 to 0.6 and 0.4 |
+| Nylon [0.00] | the bright stored string to a dark, round nylon one (off by default) | cutoff 20 kHz to 700 Hz, drive to 0, gain +3 dB at 1 |
+| Ring [0.50] | a muted, palm-damped note to a string let ring | decay of two operators 150 ms to 5.4 s, release 20 to 220 ms, gain -9 dB at 1 |
+| Double [0.30] | one string to a doubled, chorused pair | chorus mix 0 to 50, depth 0 to 100, rate 0.25 to 2.5 Hz; partner string fine 0 to 10 ct |
+
+### Gumdrop (bouncy pop pluck)
+
+| Macro | What you hear 0 to 1 | What it moves |
+|---|---|---|
+| Bounce [0.85] | a flat, dull pluck to a squelching, resonant bounce on every note | cutoff 300 Hz to 10 kHz, resonance 0.1 to 0.4 |
+| Hold [0.80] | a clipped dot to a long, bouncing note | decay 130 ms to 8 s, release 80 to 120 ms, gain -5 dB at 1 |
+| Boing [0.00] | each note drops in from above, up to 120 ct, and falls into tune (off) | filter envelope on both oscillators' fine tune |
+| Chorus [0.30] | a dry pluck to a deep, fast chorus | mix 0 to 83, depth 10 to 93, rate 0.6 to 3 Hz |
+
+### Cold Cut (dark bell-pluck for trap)
+
+| Macro | What you hear 0 to 1 | What it moves |
+|---|---|---|
+| Click [0.50] | a hollow knock to a hard, metallic click on top | the metal partial (ratio 3, 267 ct) 0 to 1.0 |
+| Ring [1.00] | a dead tick to a bell that hangs in the air | decay of two operators 120 ms to 6.5 s, release 30 to 150 ms, gain -7 dB at 1 |
+| Grit [0.40] | a clean, hollow bell to a crushed one, the trim following the drive down | drive 2 to 20 dB, trim 0 to -7 dB |
+| Dark [0.17] | the open stored tone to a muffled, closed bell (the gain follows the filter down) | cutoff 20 kHz to 1.2 kHz, gain +8 dB at 1 |
+
+### Rivet Gun (bright, phased, compressed staccato pluck)
+
+| Macro | What you hear 0 to 1 | What it moves |
+|---|---|---|
+| Gate [0.50] | a clipped tick to a rivet that holds and rings on | decay 30 to 120 ms (and on), release 8 to 40 ms, gain -7 dB at 1 |
+| Phase [0.45] | a dry rivet to a deep, fast, ringing phaser | mix 0 to 45, rate 0.5 to 4 Hz, feedback 40 to 90, gain +4 dB at 1 |
+| Snap [1.00] | a closed, dull rivet to the stored one whose filter snaps open on every hit | cutoff 450 Hz to 15 kHz |
+| Stack [0.40] | a tight pulse to a wide, ratty stack | detune 2 to 32 ct, second oscillator fine 0 to 17 ct |
+
+### Gossamer (tuned metal bars; formerly Tuning Fork, then Free Bar)
+
+| Macro | What you hear 0 to 1 | What it moves |
+|---|---|---|
+| Overtones [0.50] | a pure fork to a clangorous bar | partial levels 2, 3, 4 up to twice the stored value |
+| Ring [1.00] | a dead, damped tick (decay 25 ms) to a bar that sings for ten seconds (level-type, +12 dB; stored at 1.0, so the default carries the long decays: a deliberate loudness change) | decay of the partials 25 ms to 9.5 s, 5 s, 1.8 s and 0.6 s, release 8 to 700 ms, gain -4 dB at 1 |
+| Beat [0.10] | the doubled partials drift apart from unison to a slow, wide beating | fine 5: 0 to 50 ct, fine 6: 0 to 80 ct; gain +1.5 dB (compensation) |
+| Bowed [0.00] | each bar struck to one that is bowed in over 250 ms (level-type, off) | attack of all operators 0.5 to 250 ms |
+
+Numbers are from the macro routes; the stored sound is the old one (see "Default sound").
+
+## Flags: final audit
+
+Level rule as in the first half: Swell, Bloom, Blow, Hold (Gumdrop), Ring (Gossamer) and Bowed are level-type (`--level-type`); every other macro keeps the loudness within about 3 dB over its travel (the audit measures with the phrase; compensation with `Rack::level`).
+
+| Preset | Flags left |
+|---|---|
+| Matinee | Glass `dead` and `jump` (the stored filter is wide open: on a log axis the top third does little; same as Bite and Quack in the first half), Swell `jump` (an attack time on a log axis); Glass/Square cos -0.93 (one brightens, the other hollows) |
+| Snowmelt | Bloom `jump` (attack on a log axis) |
+| Scaffold | Shut `jump` (the filter opens in the first steps) |
+| Brass Filament | Blow/Warp cos -0.97 by the meters (Warp is now a big timbre move, Blow a small onset move the meters barely see; not alike by ear) |
+| Spinet | Jack and Sustain `jump` |
+| Willow | Nail/Halo cos -0.95 (Nail brightens, the beating Halo takes it away) |
+| Dry Creek | Nylon `jump`; Pick/Nylon opposite (cos -0.95); Nylon/Ring cos 0.87 (both darken the sustained part) |
+| Gumdrop | Bounce and Hold `jump` |
+| Cold Cut | Ring `jump`; Click/Grit cos 0.82; Click/Dark opposite (one adds top, the other closes it); `duplicate` on the shared trim gain (the level compensation, not a doubled move) |
+| Rivet Gun | `duplicate` on the shared trim gain only |
+| Gossamer | Ring `level` (level-type) and `duplicate` with Beat on the shared trim gain (Beat compensates the level); Overtones `jump`; Beat/Bowed `cancel` in combination (7.0 dB against 12.4 dB single) |
+
+Peaks: every step, sweep and combination render is at or under -1 dBFS; no combination flag in any preset; no click in any end or sweep render. The factory level test (all macros at 0.15, 0.65 and 1, and each alone at 1) passes.
+
+## Default sound against master (stored position)
+
+The stored timbre is the old one: a 16 s clip against master with the overall gain divided out is -130 dB (float noise) for Matinee, Snowmelt, Brass Filament, Spinet, Willow, Dry Creek, Gumdrop and Gossamer (Brass Filament and Free Bar: before the Space and the Ring changes below, which are deliberate default changes). Scaffold, Cold Cut and Rivet Gun read -37, -28 and -23 dB after the gain is divided out: their patch gain changed on purpose and the compressor behind it takes part of any gain back (same as Checkerboard in the first half). The patch gain (`preset_trims.inc`) changed for headroom, presence and the compensation rule:
+
+| Preset | Trim | Why |
+|---|---|---|
+| Snowmelt | -0.6 to -2.6 dB | the all-1 combination peaked at -0.5 dBFS |
+| Scaffold | 0 to -1.0 dB | headroom for Swirl |
+| Brass Filament | -2.0 to -0.5 dB | presence |
+| Spinet | -3.0 to -0.5 dB | presence |
+| Willow | -5.0 to -3.0 dB | presence |
+| Dry Creek | -3.0 to -4.5 dB | the Ring compensation raises Ring at 0 |
+| Gumdrop | -3.0 to -2.0 dB | the Hold compensation |
+| Cold Cut | -3.0 to -13.4 dB | the Ring and Dark compensations raise the peak at 0; the macro sweep peak rule (-1 dBFS) then leaves the loudness 0.2 dB under the window, so Cold Cut is in `LOUD_EXCEPTIONS` |
+| Rivet Gun | -0.9 to -4.5 dB | the stored chord peaked at +0.2 dBFS |
+| Gossamer | -5.0 (unchanged) | the longer stored Ring carries the loudness; chord peak -2.6 dBFS |
+
+The preset descriptions and the library test entries name the new macros.
+
+## Notes on the design
+
+- **Matinee:** the old Width (the detune) became **Square**, a timbre change at constant loudness (Checkerboard Hollow's trick), because Stack and Hall both moved the side level (cos 0.93).
+- **Gossamer:** (Kosta's name; formerly Free Bar) the tour is quiet next to the others (RMS -24 to -28 dB against about -19.5 for Brass Filament; peak -8.9): a sparse phrase on a soft preset. Its Ring went to a stored 1.0 with longer decays so the default is louder.
+- **Brass Filament:** the old Hold (sustain to full) is replaced by **Space** (echo and room, the one macro that owns them, level-compensated); the first version had four brightening macros (cos 0.82 to 0.90). Strike became **Blow** (the attack), Alloy works on the tuning of the partials, Warp closes the filter while it tears.
+- **Spinet:** Buzz (a louder second saw) overlapped Jack (cos 0.98), so it is **Honky**, the detune of the second string alone. The decay route was dead (the notes are 0.16 s) and is gone; Sustain works on the release.
+- **Willow:** Halo is the detune of an octave partial, not a level (the level version overlapped Nail, cos 0.94).
+- **Dry Creek:** Steel (cutoff and drive up) overlapped Pick (cos 0.91), so it is **Nylon**, the same move the other way, stored at 0.
+- **Rivet Gun:** Crunch (the drive) overlapped Gate (cos 0.82); the slot is **Snap**, the filter, stored at 1.0.
+- **Cold Cut:** Dark runs from the open stored tone down (stored 0.17); the first version, closed to open, was cos 0.85 with Click.
+
+## Open flags (honest list)
+
+- Chord-held loudness (the factory test) and phrase loudness (the audit) disagree for the long-ring macros (Willow Ring, Gumdrop Hold, Cold Cut Ring, Dry Creek Ring): the compensation follows the audit phrase, so a three-second held chord is quieter at 0 than at 1. The peak rule holds either way.
+- Willow Nail/Halo and Matinee Glass/Square are opposite by the meters (different gestures that push the top in opposite directions); nobody has listened.
+- Over the 0.8 line by the meters, left on purpose until someone has listened: Brass Filament Blow/Warp (now -0.97, opposite by the meters), Cold Cut Click/Grit (0.82), Dry Creek Nylon/Ring (0.87).
+- Weak by the meters, pitch or phase moves they do not see: Spinet Honky, Willow Halo, Gossamer Beat, Gumdrop Boing, Snowmelt Drift. The tours are the test.
+
+## Tours
+
+`docs/presets/clips/macros-keys-pluck-2/` (git-ignored): `<slug>-tour.mp3` per preset (new macros 1 to 4, 20 s each: 6 s at 0, 4 s up, 6 s at 1, 4 s down, 1 s between) and `tours.txt` with the start seconds. Gap guard on. Tempi: Matinee 90, Snowmelt 70, Scaffold 174, Brass Filament 60, Spinet 120, Willow 100, Dry Creek 100, Gumdrop 110, Cold Cut 140, Rivet Gun 125, Gossamer 120. Regenerate: `MACRO_TOUR_BPM=<bpm> macro_audit patches phrases renders slug`, then `macro_tour_ab.py`. **Listen first:** Brass Filament (Blow, Alloy, Space, Warp), Cold Cut (Dark runs the other way, Ring on a sparse line), Gossamer (Ring, Beat and Bowed).

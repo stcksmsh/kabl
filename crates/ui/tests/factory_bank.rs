@@ -681,7 +681,10 @@ const LOUD_WINDOW: f64 = 5.5;
 /// Deep Field -26.1, Salt Flat -26.2. Raise them only by narrowing a macro, not by patch gain.
 /// Velvet Tine: its chord strike peaks within a dB of the ceiling with Ring and Phase up, so its
 /// gain is set by the -1 dBFS rule on the audit clip and the loudness sits about 1.4 dB under the window.
-const LOUD_EXCEPTIONS: [&str; 3] = [
+/// Cold Cut: Ring on a sparse line peaks 2.8 dB over the stored level, so the -1 dBFS rule leaves
+/// its loudness about 0.2 dB under the window.
+const LOUD_EXCEPTIONS: [&str; 4] = [
+    "presets/cold-cut",
     "presets/deep-field",
     "presets/salt-flat",
     "presets/velvet-tine",

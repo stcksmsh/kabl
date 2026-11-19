@@ -7,6 +7,6 @@ tags = [
     "pop",
     "world",
 ]
-description = "A nylon-string guitar pluck: a soft pick, a woody body and a quick decay. Play arpeggios. Pick sets the attack brightness, Warmth adds a little drive, Room sets the echo and a room, Chorus doubles the string."
+description = "A nylon-string guitar pluck: a soft pick, a woody body and a quick decay. Play arpeggios. Pick goes from a soft fingertip to a hard, clicking pick, Nylon turns the bright string into a dark, round nylon one, Ring lets the string ring, Double brings in a second string and a chorus."
 keys = true
 sequence = false
