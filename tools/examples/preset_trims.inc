@@ -2,7 +2,7 @@
 // Patch gain only: no limiter, so these keep every peak at or under -1 dBFS.
 fn level_trim(slug: &str) -> f32 {
     match slug {
-        "boxwood" => -1.0,
+        "boxwood" => 1.5,
         "brass-filament" => -2.0,
         "cellar-door" => -3.0,
         "checkerboard" => -5.0,
@@ -24,7 +24,7 @@ fn level_trim(slug: &str) -> f32 {
         "rain-gutter" => -2.3,
         "rivet-gun" => -0.9,
         "rosewood" => -2.0,
-        "salt-flat" => -6.3,
+        "salt-flat" => -2.3,
         "snowmelt" => -0.6,
         "spark-plug" => -5.0,
         "spinet" => -3.0,

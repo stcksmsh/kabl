@@ -102,14 +102,6 @@ impl Rack {
         let cable = self.e.connect_route(jack(a, ap), b, param);
         self.e.set_route_amount(cable, amount, true);
     }
-    /// An LFO whose depth is macro 4: the LFO runs through a VCA the macro opens.
-    fn motion(&mut self, knob: ModuleId, rate_hz: f32) -> ModuleId {
-        let lfo = self.add("lfo", &[("rate_hz", rate_hz)]);
-        let depth = self.add("vca", &[("gain", 0.0)]);
-        self.wire(lfo, "out", depth, "in");
-        self.route(knob, "m4", depth, "gain", 1.0);
-        depth
-    }
     /// The last stage: the output. No limiter; headroom comes from the patch gain.
     fn out_stereo(&mut self, from: ModuleId) {
         let out = self.add("out", &[]);
@@ -167,7 +159,178 @@ fn perform(r: &mut Rack, knob: ModuleId, clock: Option<ModuleId>, cue: Option<(M
     r.e.set_presentation(&changes);
 }
 
+// ---- macro helpers ---------------------------------------------------------------------------
+
+/// A range check; with `PP_LAX` set it only prints, so one run lists every spot to fix.
+fn check(ok: bool, msg: String) {
+    if !ok {
+        if std::env::var("PP_LAX").is_ok() {
+            eprintln!("RANGE {msg}");
+        } else {
+            panic!("{msg}");
+        }
+    }
+}
+
+fn param_of(kind: &str, param: &str) -> kabl_modules::ParamInfo {
+    *kabl_modules::registry::info_for(kind)
+        .and_then(|i| i.params.iter().find(|p| p.name == param))
+        .unwrap_or_else(|| panic!("{kind}.{param}"))
+}
+
+/// Macro `m` (1-based) takes `param` from `lo` at 0 to `d` at its stored position, and on in the
+/// same line to 1. The stored sound is exactly `d`; panics when the line leaves the param's range.
+#[allow(clippy::too_many_arguments)]
+fn span(
+    r: &mut Rack,
+    knob: ModuleId,
+    m: usize,
+    stored: f32,
+    id: ModuleId,
+    kind: &str,
+    param: &str,
+    lo: f32,
+    d: f32,
+) {
+    let i = param_of(kind, param);
+    let (n0, nd) = (i.to_norm(lo), i.to_norm(d));
+    let amount = (nd - n0) / stored;
+    check(
+        n0 + amount <= 1.0 + 1e-3 && n0 + amount >= -1e-3,
+        format!(
+            "{kind}.{param}: macro {m} runs out of range ({})",
+            n0 + amount
+        ),
+    );
+    r.e.set_param(id, param, lo);
+    r.route(knob, &format!("m{m}"), id, param, amount);
+}
+
+/// As `span`, with the value `hi` at macro 1 given and the value at 0 derived.
+#[allow(clippy::too_many_arguments)]
+fn span_hi(
+    r: &mut Rack,
+    knob: ModuleId,
+    m: usize,
+    stored: f32,
+    id: ModuleId,
+    kind: &str,
+    param: &str,
+    d: f32,
+    hi: f32,
+) {
+    let i = param_of(kind, param);
+    let (nd, n1) = (i.to_norm(d), i.to_norm(hi));
+    let n0 = (nd - stored * n1) / (1.0 - stored);
+    check(
+        (-1e-3..=1.0 + 1e-3).contains(&n0),
+        format!("{kind}.{param}: macro {m} starts out of range ({n0})"),
+    );
+    span(
+        r,
+        knob,
+        m,
+        stored,
+        id,
+        kind,
+        param,
+        i.from_norm(n0.clamp(0.0, 1.0)),
+        d,
+    );
+}
+
+/// `span` with the three values given: `lo` at macro 0, `d` at the stored position, `hi` at 1.
+/// Stores the macro at the position that fits and returns it.
+#[allow(clippy::too_many_arguments)]
+fn span_lh(
+    r: &mut Rack,
+    knob: ModuleId,
+    m: usize,
+    id: ModuleId,
+    kind: &str,
+    param: &str,
+    lo: f32,
+    d: f32,
+    hi: f32,
+) -> f32 {
+    let i = param_of(kind, param);
+    let (n0, nd, n1) = (i.to_norm(lo), i.to_norm(d), i.to_norm(hi));
+    let s = (nd - n0) / (n1 - n0);
+    check(
+        s > 0.02 && s < 0.98,
+        format!("{kind}.{param}: stored position {s}"),
+    );
+    span(r, knob, m, s, id, kind, param, lo, d);
+    r.e.set_param(knob, &format!("m{m}"), s);
+    s
+}
+
+/// Macro `m` at 0 leaves `param` at `d`; at 1 it is `hi`.
+#[allow(clippy::too_many_arguments)]
+fn rise(
+    r: &mut Rack,
+    knob: ModuleId,
+    m: usize,
+    id: ModuleId,
+    kind: &str,
+    param: &str,
+    d: f32,
+    hi: f32,
+) {
+    let i = param_of(kind, param);
+    r.e.set_param(id, param, d);
+    r.route(
+        knob,
+        &format!("m{m}"),
+        id,
+        param,
+        i.to_norm(hi) - i.to_norm(d),
+    );
+}
+
+/// What an old route of `amount` from a macro at `stored` leaves on a param with base `base`.
+fn routed(kind: &str, param: &str, base: f32, amount: f32, stored: f32) -> f32 {
+    let i = param_of(kind, param);
+    i.from_norm((i.to_norm(base) + stored * amount).clamp(0.0, 1.0))
+}
+
+/// A route that sits at 0 until macro `mac` of `knob` opens it, up to `depth` of the knob's
+/// travel: an LFO or envelope whose depth is a macro.
+#[allow(clippy::too_many_arguments)]
+fn depth_route(
+    r: &mut Rack,
+    a: ModuleId,
+    ap: &str,
+    b: ModuleId,
+    param: &str,
+    knob: ModuleId,
+    mac: &str,
+    depth: f32,
+) {
+    let cable = r.e.connect_route(jack(a, ap), b, param);
+    r.e.set_route_amount(cable, 0.0, true);
+    let d =
+        r.e.connect_cable_route(jack(knob, mac), cable, "amount")
+            .expect("a route has a depth");
+    r.e.set_route_amount(d, depth, true);
+}
+
+/// Macro `m` (stored at `stored`) takes the gain stage `id` down by `slope_db` over its whole
+/// travel, keeping the stored sound: level compensation for a macro that adds or removes level.
+fn trim_by(r: &mut Rack, knob: ModuleId, m: usize, id: ModuleId, stored: f32, slope_db: f32) {
+    let base = r.e.state().modules[&id].params["gain_db"];
+    r.e.set_param(id, "gain_db", base + slope_db * stored);
+    r.route(knob, &format!("m{m}"), id, "gain_db", -slope_db / 84.0);
+}
+
 // ---- shared stages ---------------------------------------------------------------------------
+
+/// Where the echo and the room get their mix: a macro (`m3` at the old stored value, so its
+/// sound is the old one) or a fixed fraction of the old maximum.
+enum Space {
+    Macro(ModuleId, &'static str),
+    Fixed(f32),
+}
 
 /// The tail every preset shares: a short mono-in echo (a slapback, or a tempo-synced echo when
 /// `clock` is given) and a tight room, both at mix 0 until the Space macro opens them. `src` is
@@ -175,7 +338,7 @@ fn perform(r: &mut Rack, knob: ModuleId, clock: Option<ModuleId>, cue: Option<(M
 #[allow(clippy::too_many_arguments)]
 fn space_tail(
     r: &mut Rack,
-    knob: ModuleId,
+    space: Space,
     src: ModuleId,
     echo: &[(&str, f32)],
     clock: Option<ModuleId>,
@@ -201,8 +364,16 @@ fn space_tail(
     }
     r.stereo(src, verb);
     r.wire(delay, "out", verb, "in");
-    r.route(knob, "m3", delay, "mix", echo_max);
-    r.route(knob, "m3", verb, "mix", room_max);
+    match space {
+        Space::Macro(knob, mac) => {
+            r.route(knob, mac, delay, "mix", echo_max);
+            r.route(knob, mac, verb, "mix", room_max);
+        }
+        Space::Fixed(p) => {
+            r.e.set_param(delay, "mix", 100.0 * echo_max * p);
+            r.e.set_param(verb, "mix", 100.0 * room_max * p);
+        }
+    }
     verb
 }
 
@@ -212,8 +383,8 @@ fn cinder_block() -> Rack {
     let mut r = Rack::new();
     let knob = macros(
         &mut r,
-        ["Bite", "Grit", "Room", "Crush"],
-        [0.40, 0.60, 0.25, 0.05],
+        ["Bark", "Hold", "Clamp", "Crumble"],
+        [0.45, 0.50, 0.50, 0.0],
     );
     let m = r.add("midi.in", &[("mode", 1.0), ("bend", 2.0)]);
     let saw = r.add(
@@ -223,13 +394,22 @@ fn cinder_block() -> Rack {
     let sub = r.add("osc.va", &[("base_hz", 130.81), ("waveform", 3.0)]);
     r.next_row();
     let mix = r.add("mixer", &[("level1", 0.6), ("level2", 0.5)]);
-    let drive = r.add("drive", &[("drive_db", 18.0), ("trim_db", -9.0)]);
+    // The drive saturates already (the old Grit did nothing you could hear): fixed at the old
+    // stored value, 18 dB + 0.35 x 0.6 of its 36 dB travel.
+    let drive = r.add(
+        "drive",
+        &[
+            ("drive_db", routed("drive", "drive_db", 18.0, 0.35, 0.6)),
+            ("trim_db", -9.0),
+        ],
+    );
     let lad = r.add(
         "filter.ladder",
         &[("cutoff_hz", 260.0), ("resonance", 0.3), ("drive_db", 8.0)],
     );
-    let fenv = r.add("env.adsr", &adsr(1.0, 150.0, 0.1, 80.0));
-    let aenv = r.add("env.adsr", &adsr(1.0, 200.0, 0.75, 50.0));
+    // Attacks of 5 and 6 ms: the old 1 ms clicked at every note start.
+    let fenv = r.add("env.adsr", &adsr(6.0, 150.0, 0.1, 80.0));
+    let aenv = r.add("env.adsr", &adsr(5.0, 200.0, 0.75, 50.0));
     r.next_row();
     let vca = r.add("vca", &[("gain", 0.0)]);
     let trim = r.add("gain", &[("gain_db", 11.5)]);
@@ -262,9 +442,10 @@ fn cinder_block() -> Rack {
     r.wire(vca, "out", trim, "in");
     r.wire_both(trim, "out", crush);
     r.stereo(crush, comp);
+    // The slapback and the tight room stay at the old stored level (0.25 of 22 % and 18 %).
     let tail = space_tail(
         &mut r,
-        knob,
+        Space::Fixed(0.25),
         comp,
         &[
             ("time_ms", 95.0),
@@ -279,11 +460,79 @@ fn cinder_block() -> Rack {
     );
     r.out_stereo(tail);
 
-    r.route(fenv, "out", lad, "cutoff_hz", 0.2);
     r.route(m, "wheel", lad, "cutoff_hz", 0.25);
-    r.route(knob, "m1", lad, "cutoff_hz", 0.5);
-    r.route(knob, "m2", drive, "drive_db", 0.35);
-    r.route(knob, "m4", crush, "mix", 0.6);
+    // Bark: the filter opens from a dull thud to a bark and the snap of each note digs in
+    // (envelope depth 0 to 0.2 at the stored position and on).
+    let old = routed("filter.ladder", "cutoff_hz", 260.0, 0.5, 0.4);
+    let s1 = span_lh(
+        &mut r,
+        knob,
+        1,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        150.0,
+        old,
+        6000.0,
+    );
+    depth_route(&mut r, fenv, "out", lad, "cutoff_hz", knob, "m1", 0.2 / s1);
+    // Hold: how long each note lasts: a short thud (60 ms decay, a low sustain) to a held,
+    // sustained boom.
+    span(
+        &mut r, knob, 2, 0.5, aenv, "env.adsr", "decay_ms", 60.0, 200.0,
+    );
+    span_hi(&mut r, knob, 2, 0.5, aenv, "env.adsr", "sustain", 0.75, 1.0);
+    span(
+        &mut r,
+        knob,
+        2,
+        0.5,
+        aenv,
+        "env.adsr",
+        "release_ms",
+        20.0,
+        50.0,
+    );
+    // Clamp: a slow, punchy squeeze to a fast, flat clamp (a density macro: the level follows).
+    span(
+        &mut r,
+        knob,
+        3,
+        0.5,
+        comp,
+        "compressor",
+        "threshold_db",
+        -8.0,
+        -26.0,
+    );
+    span(&mut r, knob, 3, 0.5, comp, "compressor", "ratio", 2.0, 8.0);
+    span(
+        &mut r,
+        knob,
+        3,
+        0.5,
+        comp,
+        "compressor",
+        "attack_ms",
+        12.0,
+        2.0,
+    );
+    span(
+        &mut r,
+        knob,
+        3,
+        0.5,
+        comp,
+        "compressor",
+        "makeup_db",
+        3.0,
+        9.0,
+    );
+    trim_by(&mut r, knob, 3, trim, 0.5, -11.0);
+    // Crumble: clean at 0; a coarse digital break-up mixes in.
+    rise(&mut r, knob, 4, crush, "bitcrusher", "mix", 0.0, 70.0);
+    rise(&mut r, knob, 4, crush, "bitcrusher", "bits", 10.0, 6.0);
+    rise(&mut r, knob, 4, crush, "bitcrusher", "downsample", 1.5, 5.0);
     perform(&mut r, knob, None, None);
     r
 }
@@ -294,8 +543,8 @@ fn parquet_loop() -> Rack {
     let mut r = Rack::new();
     let knob = macros(
         &mut r,
-        ["Cutoff", "Crunch", "Space", "Glide"],
-        [0.50, 0.45, 0.25, 0.90],
+        ["Loop", "Phase", "Squelch", "Glide"],
+        [0.25, 0.50, 0.50, 0.80],
     );
     let clock = r.add("clock", &[("bpm", 122.0), ("swing", 25.0)]);
     // Poly with glide on: each new note slides from the nearest tone of the chord before it, so
@@ -312,10 +561,24 @@ fn parquet_loop() -> Rack {
     let b = r.add("osc.va", &[("waveform", 3.0), ("fine", -7.0)]);
     r.next_row();
     let mix = r.add("mixer", &[("level1", 0.55), ("level2", 0.35)]);
-    let drive = r.add("drive", &[("drive_db", 12.0), ("trim_db", -5.0)]);
+    // The crunch is fixed at the old stored value (12 dB + 0.4 x 0.45 of its travel).
+    let drive = r.add(
+        "drive",
+        &[
+            ("drive_db", routed("drive", "drive_db", 12.0, 0.4, 0.45)),
+            ("trim_db", -5.0),
+        ],
+    );
+    // The filter's base (the old Cutoff) stays at its old stored value.
     let lad = r.add(
         "filter.ladder",
-        &[("cutoff_hz", 650.0), ("resonance", 0.55)],
+        &[
+            (
+                "cutoff_hz",
+                routed("filter.ladder", "cutoff_hz", 650.0, 0.5, 0.5),
+            ),
+            ("resonance", 0.55),
+        ],
     );
     let fenv = r.add("env.adsr", &adsr(1.0, 200.0, 0.3, 90.0));
     let aenv = r.add("env.adsr", &adsr(1.0, 400.0, 0.65, 90.0));
@@ -323,7 +586,7 @@ fn parquet_loop() -> Rack {
     r.next_row();
     // The filter loop: a saw LFO locked to the clock closes the filter once a beat.
     let chop = r.add("lfo", &[("waveform", 2.0), ("sync", 3.0), ("rate_hz", 2.0)]);
-    let trim = r.add("gain", &[("gain_db", 10.5)]);
+    let trim = r.add("gain", &[("gain_db", 5.0)]);
     let phaser = r.add(
         "phaser",
         &[
@@ -362,7 +625,7 @@ fn parquet_loop() -> Rack {
     r.stereo(phaser, comp);
     let tail = space_tail(
         &mut r,
-        knob,
+        Space::Fixed(0.25),
         comp,
         &[
             ("sync", 3.0),
@@ -379,11 +642,42 @@ fn parquet_loop() -> Rack {
     r.out_stereo(tail);
 
     r.route(fenv, "out", lad, "cutoff_hz", 0.3);
-    r.route(chop, "out", lad, "cutoff_hz", 0.3);
     r.route(m, "velocity", lad, "cutoff_hz", 0.15);
-    r.route(knob, "m1", lad, "cutoff_hz", 0.5);
-    r.route(knob, "m2", drive, "drive_db", 0.4);
-    r.route(knob, "m4", m, "glide_ms", 0.8);
+    // Loop: how hard the beat-locked saw closes the filter: flat at 0, a deep pump at 1
+    // (0.3 of the travel at the stored position, as before).
+    depth_route(
+        &mut r,
+        chop,
+        "out",
+        lad,
+        "cutoff_hz",
+        knob,
+        "m1",
+        0.3 / 0.25,
+    );
+    // Phase: a plain chord, a slow shallow phaser, a fast deep ringing one.
+    span(&mut r, knob, 2, 0.5, phaser, "phaser", "mix", 0.0, 45.0);
+    span(&mut r, knob, 2, 0.5, phaser, "phaser", "rate_hz", 0.15, 0.5);
+    span_hi(&mut r, knob, 2, 0.5, phaser, "phaser", "depth", 85.0, 100.0);
+    span_hi(
+        &mut r, knob, 2, 0.5, phaser, "phaser", "feedback", 60.0, 80.0,
+    );
+    // Squelch: the resonance of the filter, from a plain, round close to a ringing, vocal one.
+    let s3 = span_lh(
+        &mut r,
+        knob,
+        3,
+        lad,
+        "filter.ladder",
+        "resonance",
+        0.08,
+        0.55,
+        0.85,
+    );
+    trim_by(&mut r, knob, 3, trim, s3, 2.0);
+    // Glide: how long a chord change takes to slide (5 ms to a slow 1.5 s).
+    let old = routed("midi.in", "glide_ms", 5.0, 0.8, 0.9);
+    span_lh(&mut r, knob, 4, m, "midi.in", "glide_ms", 5.0, old, 1500.0);
     perform(&mut r, knob, Some(clock), None);
     r
 }
@@ -402,17 +696,22 @@ fn drum_lane(r: &mut Rack, on: &[usize]) -> ModuleId {
 
 /// (name, [Sweep, Drive, Wash, Pump] targets, morph in beats, launch time in the clip, s)
 const DROP_CUES: [(&str, [f32; 4], f32, f32); 5] = [
-    ("Intro", [0.12, 0.30, 0.00, 0.50], 0.0, 0.0),
-    ("Build", [0.90, 0.75, 0.65, 0.80], 12.0, 4.0),
+    ("Intro", [0.12, 0.61, 0.00, 0.70], 0.0, 0.0),
+    ("Build", [0.90, 0.88, 0.65, 0.85], 12.0, 4.0),
     // The pre-drop suck: filter shut, the wash still ringing, the pump at full.
-    ("Gap", [0.08, 0.60, 0.85, 1.00], 0.0, 10.0),
-    ("Drop", [0.78, 1.00, 0.10, 1.00], 0.0, 12.0),
-    ("Break", [0.20, 0.25, 0.60, 0.30], 4.0, 20.0),
+    ("Gap", [0.08, 0.00, 0.85, 1.00], 0.0, 10.0),
+    ("Drop", [0.78, 0.85, 0.10, 1.00], 0.0, 12.0),
+    ("Break", [0.20, 0.50, 0.60, 0.50], 4.0, 20.0),
 ];
+
+/// The trim after the filter at Sweep 0 and Pump 0, and how it follows Sweep (down) and Pump (up).
+const LEVEL: f32 = 14.0;
+const SWEEP_COMP: f32 = 12.0;
+const PUMP_COMP: f32 = 16.0;
 
 fn loading_dock() -> Rack {
     let mut r = Rack::new();
-    let knob = macros(&mut r, ["Sweep", "Drive", "Wash", "Pump"], DROP_CUES[0].1);
+    let knob = macros(&mut r, ["Sweep", "Stabs", "Wash", "Pump"], DROP_CUES[0].1);
     let cue = r.add("cues", &[]);
     let clock = r.add("clock", &[("bpm", 124.0), ("swing", 28.0)]);
     let bass_seq = r.add("seq", &[("length", 8.0), ("gate_len", 45.0)]);
@@ -469,8 +768,13 @@ fn loading_dock() -> Rack {
     let play_vca = r.add("vca", &[("gain", 0.0)]);
     let mix = r.add(
         "mixer",
-        &[("level1", 0.55), ("level2", 0.3), ("level3", 0.35)],
+        &[("level1", 0.55), ("level2", 0.0), ("level3", 0.15)],
     );
+    // The stab line has its own drive and joins after the filter, so a closed Sweep does not
+    // mask it (Kosta: Stabs were not obvious at the Intro's dark filter).
+    let stab_drive = r.add("drive", &[("drive_db", 14.0), ("trim_db", 3.0)]);
+    let stab_gain = r.add("gain", &[("gain_db", -18.0)]);
+    let after = r.add("mixer", &[("level1", 1.0), ("level2", 1.0)]);
     // The riser: pink noise the Wash macro lets in, joining after the drive (the drive turned
     // it into a loud, steady hiss even at a low Wash) and before the filter, which the Sweep
     // macro opens over it.
@@ -490,33 +794,37 @@ fn loading_dock() -> Rack {
     );
     let clap = r.add("drum.clap", &[("level_db", -9.0)]);
     let hat = r.add("drum.hat", &[("level_db", -10.0)]);
+    // The drums sit 5 dB higher than before (the whole piece was the quietest of the bank).
     let drums = r.add(
         "mixer",
-        &[("level1", 0.45), ("level2", 0.2), ("level3", 0.15)],
+        &[("level1", 0.7), ("level2", 0.31), ("level3", 0.24)],
     );
     let duck = r.add(
         "compressor",
         &[
             ("threshold_db", -34.0),
-            ("ratio", 1.0),
+            ("ratio", 20.0),
             ("attack_ms", 1.0),
-            ("release_ms", 220.0),
+            ("release_ms", 260.0),
             ("knee_db", 3.0),
         ],
     );
     let mix_l = r.add("mixer", &[("level1", 1.0), ("level2", 1.0)]);
     let mix_r = r.add("mixer", &[("level1", 1.0), ("level2", 1.0)]);
     r.next_row();
-    let drive = r.add("drive", &[("drive_db", 20.0), ("trim_db", -9.0)]);
+    // The drive saturates whatever Grind does: fixed at what the old Drive left at Intro.
+    let drive = r.add(
+        "drive",
+        &[
+            ("drive_db", routed("drive", "drive_db", 20.0, 0.6, 0.30)),
+            ("trim_db", -9.0),
+        ],
+    );
     let lad = r.add(
         "filter.ladder",
         &[("cutoff_hz", 170.0), ("resonance", 0.6), ("drive_db", 5.0)],
     );
     let trim = r.add("gain", &[("gain_db", 9.0)]);
-    let crush = r.add(
-        "bitcrusher",
-        &[("bits", 9.0), ("downsample", 2.0), ("mix", 0.0)],
-    );
     let comp = r.add(
         "compressor",
         &[
@@ -545,14 +853,16 @@ fn loading_dock() -> Rack {
     r.wire(play, "out", play_vca, "in");
     r.wire(play_env, "out", play_vca, "cv");
     r.wire(bass_vca, "out", mix, "in1");
-    r.wire(stab_vca, "out", mix, "in2");
+    r.wire(stab_vca, "out", stab_drive, "in");
+    r.wire(stab_drive, "out", stab_gain, "in");
+    r.wire(stab_gain, "out", after, "in2");
     r.wire(play_vca, "out", mix, "in3");
     r.wire(mix, "out", drive, "in");
     r.wire(drive, "out", post, "in1");
     r.wire(post, "out", lad, "in");
-    r.wire(lad, "out", trim, "in");
-    r.wire_both(trim, "out", crush);
-    r.stereo(crush, comp);
+    r.wire(lad, "out", after, "in1");
+    r.wire(after, "out", trim, "in");
+    r.wire_both(trim, "out", comp);
     r.wire(comp, "out", duck, "in");
     r.wire(kick, "out", duck, "sc");
     for (seq, voice, gate) in [
@@ -570,20 +880,23 @@ fn loading_dock() -> Rack {
     r.wire(hat, "out", drums, "in3");
     let tail = space_tail(
         &mut r,
-        knob,
+        Space::Macro(knob, "m3"),
         duck,
         &[
-            ("sync", 3.0),
+            // A straight quarter note (was a dotted eighth: the repeats landed between the stabs,
+            // on other notes of the line, and clashed), darker and with fewer repeats.
+            ("sync", 4.0),
             ("time_ms", 360.0),
-            ("feedback", 40.0),
+            ("feedback", 30.0),
             ("mix", 0.0),
-            ("tone_hz", 4000.0),
+            ("tone_hz", 2200.0),
         ],
         Some(clock),
         0.3,
         1.2,
         0.3,
     );
+    r.e.set_param(tail, "damp_hz", 2200.0);
     // The drums join after the echo and the room, then the output.
     let split = r.split(tail);
     r.wire(split, "left", mix_l, "in1");
@@ -594,20 +907,74 @@ fn loading_dock() -> Rack {
     let out = r.add("out", &[]);
     r.wire(master, "out", out, "in");
 
-    r.route(knob, "m4", duck, "ratio", 0.95);
-    // Headroom: the first beat of a run peaks above 0 dBFS with the filter open (Sweep from 0.43
-    // up) or with no duck (Pump 0). The trim after the filter follows: -9.0 dB per unit of Sweep
-    // from its stored value, +2.2 dB per unit of Pump, so the stored (Intro) macros are unchanged.
-    let (sweep0, pump0) = (DROP_CUES[0].1[0], DROP_CUES[0].1[3]);
-    r.e.set_param(trim, "gain_db", 9.0 + 9.0 * sweep0 - 2.2 * pump0);
-    r.route(knob, "m1", trim, "gain_db", -9.0 / 84.0);
-    r.route(knob, "m4", trim, "gain_db", 2.2 / 84.0);
+    // Pump: the duck threshold falls from 0 (nothing) to -57 dB at a fixed 10:1, so the first
+    // step already ducks (the old ratio did 80 % of the work in the first notch).
+    let pump0 = DROP_CUES[0].1[3];
+    span(
+        &mut r,
+        knob,
+        4,
+        pump0,
+        duck,
+        "compressor",
+        "threshold_db",
+        0.0,
+        -42.0,
+    );
+    // Headroom: the first beat of a run peaks above 0 dBFS with the filter open or with no duck
+    // (Pump 0). The trim after the filter follows: SWEEP_COMP dB per unit of Sweep from its
+    // stored value, PUMP_COMP dB per unit of Pump, so the stored (Intro) macros are unchanged.
+    // PP_SWEEP0 stores another Sweep position (a masking experiment, never used for the bank).
+    let sweep0 = std::env::var("PP_SWEEP0")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DROP_CUES[0].1[0]);
+    r.e.set_param(knob, "m1", sweep0);
+    // PP_STABS0 stores another Stabs position (for the Stabs-at-1 clip of the Wash sweep).
+    if let Some(v) = std::env::var("PP_STABS0")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+    {
+        r.e.set_param(knob, "m2", v);
+    }
+    r.e.set_param(
+        trim,
+        "gain_db",
+        LEVEL + SWEEP_COMP * sweep0 - PUMP_COMP * pump0,
+    );
+    // The music compressor flattens what the trim does, so the level lives in its makeup, which
+    // follows Pump: 7 dB at 0 (no duck, the loudest peaks), 13.5 dB at the stored position.
+    span(
+        &mut r,
+        knob,
+        4,
+        pump0,
+        comp,
+        "compressor",
+        "makeup_db",
+        7.0,
+        13.5,
+    );
+    // ... and falls as Sweep opens (the open filter is where the peaks are): 5 dB over the travel.
+    r.e.set_param(comp, "makeup_db", 7.0 + 5.0 * DROP_CUES[0].1[0]);
+    r.route(knob, "m1", comp, "makeup_db", -5.0 / 24.0);
+    r.route(knob, "m1", trim, "gain_db", -SWEEP_COMP / 84.0);
+    r.route(knob, "m4", trim, "gain_db", PUMP_COMP / 84.0);
     r.wire(noise, "out", riser, "in");
     r.wire(riser, "out", post, "in2");
     r.route(knob, "m3", riser, "gain", 0.9);
     r.route(knob, "m1", lad, "cutoff_hz", 0.65);
-    r.route(knob, "m2", drive, "drive_db", 0.6);
-    r.route(knob, "m2", crush, "mix", 0.6);
+    // Stabs: the off-beat stab line sits low in the mix at the stored position (-18 dB) and the
+    // macro brings it forward: the gain is a straight line in dB from -40 dB (out) at 0 to 0 dB at 1
+    // (even steps, no onset), and the decay lengthens along an exponential line from 20 ms to ~280 ms.
+    let stabs0 = DROP_CUES[0].1[1];
+    let s2 = span_lh(
+        &mut r, knob, 2, stab_gain, "gain", "gain_db", -40.0, -18.0, -4.0,
+    );
+    assert!((s2 - stabs0).abs() < 0.01, "Intro stabs must be {s2}");
+    span(
+        &mut r, knob, 2, stabs0, stab_env, "env.adsr", "decay_ms", 20.0, 100.0,
+    );
 
     for (name, targets, beats, _) in DROP_CUES {
         let n = cues::add(&mut r.e, cue, &|_| 0).expect("cue");
@@ -630,8 +997,8 @@ fn neon_highway() -> Rack {
     let mut r = Rack::new();
     let knob = macros(
         &mut r,
-        ["Cutoff", "Bite", "Space", "Vibrato"],
-        [0.55, 0.40, 0.60, 0.35],
+        ["Open", "Pulse", "Vibrato", "Space"],
+        [0.90, 0.30, 0.35, 0.60],
     );
     let m = r.add(
         "midi.in",
@@ -649,7 +1016,14 @@ fn neon_highway() -> Rack {
     let b = r.add("osc.va", &[("waveform", 3.0), ("pw", 40.0), ("fine", 7.0)]);
     r.next_row();
     let mix = r.add("mixer", &[("level1", 0.5), ("level2", 0.35)]);
-    let drive = r.add("drive", &[("drive_db", 6.0), ("trim_db", -3.0)]);
+    // The old Bite (drive) stays at its old stored value.
+    let drive = r.add(
+        "drive",
+        &[
+            ("drive_db", routed("drive", "drive_db", 6.0, 0.45, 0.4)),
+            ("trim_db", -3.0),
+        ],
+    );
     let lad = r.add(
         "filter.ladder",
         &[("cutoff_hz", 1500.0), ("resonance", 0.3), ("drive_db", 3.0)],
@@ -675,7 +1049,10 @@ fn neon_highway() -> Rack {
         "reverb",
         &[("decay_s", 2.2), ("damp_hz", 5000.0), ("mix", 0.0)],
     );
-    let vibrato = r.motion(knob, 5.2);
+    let wave = r.add("lfo", &[("rate_hz", 5.2)]);
+    let vibrato = r.add("vca", &[("gain", 0.0)]);
+    r.wire(wave, "out", vibrato, "in");
+    r.route(knob, "m3", vibrato, "gain", 1.0);
 
     r.wire(m, "pitch", a, "pitch");
     r.wire(m, "pitch", b, "pitch");
@@ -692,13 +1069,31 @@ fn neon_highway() -> Rack {
     r.stereo(chorus, verb);
     r.out_stereo(verb);
 
-    r.route(knob, "m1", lad, "cutoff_hz", 0.5);
-    r.route(knob, "m2", drive, "drive_db", 0.45);
-    r.route(knob, "m3", delay, "mix", 0.3);
-    r.route(knob, "m3", verb, "mix", 0.3);
-    r.route(vibrato, "out", a, "fine", 0.1);
-    r.route(vibrato, "out", b, "fine", 0.1);
+    r.route(knob, "m4", delay, "mix", 0.3);
+    r.route(knob, "m4", verb, "mix", 0.3);
     r.route(m, "velocity", lad, "cutoff_hz", 0.12);
+    // Open: from a dark, muffled lead (the velocity still brightens it) to a fully open one.
+    span_lh(
+        &mut r,
+        knob,
+        1,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        350.0,
+        14000.0,
+        20000.0,
+    );
+    // Pulse: the square pulse under the saws comes forward and thins from a round, full
+    // square to a narrow, nasal pulse.
+    span_hi(&mut r, knob, 2, 0.3, mix, "mixer", "level2", 0.35, 0.8);
+    span(&mut r, knob, 2, 0.3, b, "osc.va", "pw", 50.0, 40.0);
+    trim_by(&mut r, knob, 2, trim, 0.3, 1.0);
+    // Vibrato: the depth stays at the old stored 7 ct at the stored position and reaches only
+    // 20 ct at 1 (a warm lead, no seasick wobble); the rate climbs from 4.5 to 6.8 Hz.
+    r.route(vibrato, "out", a, "fine", 0.10);
+    r.route(vibrato, "out", b, "fine", 0.10);
+    span(&mut r, knob, 3, 0.35, wave, "lfo", "rate_hz", 4.5, 5.2);
     perform(&mut r, knob, None, None);
     r
 }
@@ -709,8 +1104,8 @@ fn glass_elevator() -> Rack {
     let mut r = Rack::new();
     let knob = macros(
         &mut r,
-        ["Tine", "Grit", "Space", "Chorus"],
-        [0.60, 0.25, 0.60, 0.50],
+        ["Tine", "Ring", "Tremolo", "Space"],
+        [0.60, 0.50, 0.00, 0.60],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     // Algorithm 1 (2 into 1, 4 into 3, 6 into 5): a mellow body pair, a bright tine pair that
@@ -734,13 +1129,34 @@ fn glass_elevator() -> Rack {
         }
     }
     r.next_row();
-    let drive = r.add("drive", &[("drive_db", 0.0), ("trim_db", -1.0)]);
+    // The old Grit and Tine filter stay where the old stored macros left them.
+    let drive = r.add(
+        "drive",
+        &[
+            ("drive_db", routed("drive", "drive_db", 0.0, 0.35, 0.25)),
+            ("trim_db", -1.0),
+        ],
+    );
     let lad = r.add(
         "filter.ladder",
-        &[("cutoff_hz", 5000.0), ("resonance", 0.05)],
+        &[
+            (
+                "cutoff_hz",
+                routed("filter.ladder", "cutoff_hz", 5000.0, 0.3, 0.6),
+            ),
+            ("resonance", 0.05),
+        ],
     );
-    let trim = r.add("gain", &[("gain_db", 8.5)]);
-    let chorus = r.add("chorus", &[("rate_hz", 0.7), ("depth", 35.0), ("mix", 0.0)]);
+    let trim = r.add("gain", &[("gain_db", LEVEL_GE)]);
+    let chorus = r.add(
+        "chorus",
+        &[
+            ("rate_hz", routed("chorus", "rate_hz", 0.7, 0.15, 0.5)),
+            ("depth", 35.0),
+            ("mix", 30.0),
+        ],
+    );
+    let trem = r.add("lfo", &[("rate_hz", 4.0)]);
     let delay = r.add(
         "delay",
         &[
@@ -769,16 +1185,66 @@ fn glass_elevator() -> Rack {
     r.wire(delay, "out", verb, "in");
     r.out_stereo(verb);
 
-    r.route(knob, "m1", voice, "index", 0.5);
-    r.route(knob, "m1", lad, "cutoff_hz", 0.3);
-    r.route(knob, "m2", drive, "drive_db", 0.35);
-    r.route(knob, "m3", delay, "mix", 0.25);
-    r.route(knob, "m3", verb, "mix", 0.35);
-    r.route(knob, "m4", chorus, "mix", 0.6);
-    r.route(knob, "m4", chorus, "rate_hz", 0.15);
+    r.route(knob, "m4", delay, "mix", 0.25);
+    r.route(knob, "m4", verb, "mix", 0.35);
+    // Tine: the bright pair of operators (a tenth of a second long) comes forward and rings.
+    span(&mut r, knob, 1, 0.6, voice, "osc.fm6", "index", 0.4, 1.0);
+    span(&mut r, knob, 1, 0.6, voice, "osc.fm6", "level4", 0.0, 0.5);
+    span(&mut r, knob, 1, 0.6, voice, "osc.fm6", "decay4", 25.0, 90.0);
+    // Ring: the body rings on like a held pedal: every decay 2.5 times longer at 1.
+    for (op, d) in [
+        (1, 2400.0),
+        (2, 650.0),
+        (3, 2800.0),
+        (5, 3200.0),
+        (6, 1400.0),
+    ] {
+        span(
+            &mut r,
+            knob,
+            2,
+            0.5,
+            voice,
+            "osc.fm6",
+            &format!("decay{op}"),
+            d * 0.4,
+            d,
+        );
+    }
+    for (op, d) in [(1, 260.0), (3, 260.0), (5, 260.0)] {
+        span(
+            &mut r,
+            knob,
+            2,
+            0.5,
+            voice,
+            "osc.fm6",
+            &format!("release{op}"),
+            d * 0.4,
+            d,
+        );
+    }
+    // Tremolo: off at 0; a suitcase-piano tremolo fades in and speeds up. The gain stage rides
+    // down as its depth grows, since the swing is symmetric around it.
+    depth_route(
+        &mut r,
+        trem,
+        "out",
+        trim,
+        "gain_db",
+        knob,
+        "m3",
+        TREM_DEPTH / 84.0,
+    );
+    rise(&mut r, knob, 3, trem, "lfo", "rate_hz", 3.5, 6.5);
+    trim_by(&mut r, knob, 3, trim, 0.0, TREM_DEPTH * 0.7);
     perform(&mut r, knob, None, None);
     r
 }
+
+/// The Glass Elevator gain stage, and the swing of its tremolo in dB (peak, one way).
+const LEVEL_GE: f32 = 9.5;
+const TREM_DEPTH: f32 = 5.0;
 
 // ---- the bank entries and their clips -------------------------------------------------------
 
@@ -905,8 +1371,8 @@ fn undertow() -> Rack {
     let mut r = Rack::new();
     let knob = macros(
         &mut r,
-        ["Cutoff", "Weight", "Room", "Beating"],
-        [0.45, 0.35, 0.30, 0.40],
+        ["Open", "Beat", "Slide", "Wobble"],
+        [0.45, 0.40, 0.45, 0.40],
     );
     let m = r.add(
         "midi.in",
@@ -926,7 +1392,14 @@ fn undertow() -> Rack {
         "mixer",
         &[("level1", 0.45), ("level2", 0.45), ("level3", 0.5)],
     );
-    let drive = r.add("drive", &[("drive_db", 8.0), ("trim_db", -4.0)]);
+    // The drive (the old Weight) is fixed at its old stored value.
+    let drive = r.add(
+        "drive",
+        &[
+            ("drive_db", routed("drive", "drive_db", 8.0, 0.4, 0.35)),
+            ("trim_db", -4.0),
+        ],
+    );
     let lad = r.add(
         "filter.ladder",
         &[("cutoff_hz", 420.0), ("resonance", 0.25)],
@@ -935,7 +1408,7 @@ fn undertow() -> Rack {
     let aenv = r.add("env.adsr", &adsr(5.0, 800.0, 0.9, 150.0));
     let vca = r.add("vca", &[("gain", 0.0)]);
     r.next_row();
-    let trim = r.add("gain", &[("gain_db", 7.8)]);
+    let trim = r.add("gain", &[("gain_db", 14.8)]);
     let comp = r.add(
         "compressor",
         &[
@@ -951,12 +1424,16 @@ fn undertow() -> Rack {
         &[
             ("decay_s", 0.7),
             ("damp_hz", 2500.0),
-            ("mix", 0.0),
+            // The room stays at the old stored mix (0.25 of travel x 0.3).
+            ("mix", 7.5),
             ("predelay_ms", 0.0),
             ("width", 50.0),
         ],
     );
-    let sweep = r.motion(knob, 0.4);
+    let wob = r.add("lfo", &[("rate_hz", 0.4)]);
+    let sweep = r.add("vca", &[("gain", 0.0)]);
+    r.wire(wob, "out", sweep, "in");
+    r.route(knob, "m4", sweep, "gain", 1.0);
 
     for o in [a, b, sub] {
         r.wire(m, "pitch", o, "pitch");
@@ -977,13 +1454,29 @@ fn undertow() -> Rack {
 
     r.route(fenv, "out", lad, "cutoff_hz", 0.25);
     r.route(m, "wheel", lad, "cutoff_hz", 0.25);
-    r.route(knob, "m1", lad, "cutoff_hz", 0.5);
-    r.route(knob, "m2", drive, "drive_db", 0.4);
-    r.route(knob, "m3", verb, "mix", 0.25);
+    // Open: the filter from a closed rumble to a bright snarl.
+    let old = routed("filter.ladder", "cutoff_hz", 420.0, 0.5, 0.45);
+    span_lh(
+        &mut r,
+        knob,
+        1,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        130.0,
+        old,
+        2300.0,
+    );
+    // Beat: the two saws pull apart, so the beating goes from a slow throb to a fast shimmer.
+    span(&mut r, knob, 2, 0.40, a, "osc.va", "fine", 5.0, 18.4);
+    span(&mut r, knob, 2, 0.40, b, "osc.va", "fine", -5.0, -18.4);
+    // Slide: how long the bass takes to glide between overlapped notes: a quick step at 0 to a
+    // long swoop at 1.
+    span_lh(&mut r, knob, 3, m, "midi.in", "glide_ms", 5.0, 40.0, 900.0);
+    // Wobble: a slow filter sweep (0.3 of the travel at the stored position, as before: 0.12) deepens
+    // to 0.4 of the travel and speeds up from a slow roll to a wub.
     r.route(sweep, "out", lad, "cutoff_hz", 0.3);
-    // Beating also pulls the two saws apart, so the beating speeds up.
-    r.route(knob, "m4", a, "fine", 0.08);
-    r.route(knob, "m4", b, "fine", -0.08);
+    span(&mut r, knob, 4, 0.40, wob, "lfo", "rate_hz", 0.2, 0.4);
     perform(&mut r, knob, None, None);
     r
 }
@@ -994,8 +1487,8 @@ fn salt_flat() -> Rack {
     let mut r = Rack::new();
     let knob = macros(
         &mut r,
-        ["Bloom", "Saturation", "Space", "Texture"],
-        [0.50, 0.20, 0.65, 0.0],
+        ["Bloom", "Depth", "Glare", "Space"],
+        [0.65, 0.0, 0.0, 0.65],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let a = r.add(
@@ -1004,11 +1497,18 @@ fn salt_flat() -> Rack {
     );
     let b = r.add(
         "osc.va",
-        &[("base_hz", 523.25), ("waveform", 1.0), ("fine", 5.0)],
+        &[("base_hz", 130.81), ("waveform", 1.0), ("fine", 5.0)],
     );
     r.next_row();
     let mix = r.add("mixer", &[("level1", 0.45), ("level2", 0.0)]);
-    let drive = r.add("drive", &[("drive_db", 0.0), ("trim_db", 0.0)]);
+    // The old Saturation and Bloom filter stay where the old stored macros left them.
+    let drive = r.add(
+        "drive",
+        &[
+            ("drive_db", routed("drive", "drive_db", 0.0, 0.4, 0.2)),
+            ("trim_db", 0.0),
+        ],
+    );
     let lad = r.add(
         "filter.ladder",
         &[("cutoff_hz", 1400.0), ("resonance", 0.1)],
@@ -1063,15 +1563,63 @@ fn salt_flat() -> Rack {
     r.out_stereo(verb);
 
     r.route(fenv, "out", lad, "cutoff_hz", 0.25);
-    r.route(knob, "m1", lad, "cutoff_hz", 0.5);
-    r.route(knob, "m2", drive, "drive_db", 0.4);
-    r.route(knob, "m3", delay, "mix", 0.3);
-    r.route(knob, "m3", verb, "mix", 0.6);
     r.route(drift, "out", lad, "cutoff_hz", 0.15);
-    // Texture: the shimmer layer, the chorus smear and the unison spread come in together.
-    r.route(knob, "m4", mix, "level2", 0.3);
-    r.route(knob, "m4", chorus, "mix", 0.3);
-    r.route(knob, "m4", a, "detune", 0.1);
+    r.route(knob, "m4", delay, "mix", 0.3);
+    r.route(knob, "m4", verb, "mix", 0.6);
+    // Space adds tail energy: the trim rides down 2 dB over the travel (it is not a level macro).
+    trim_by(&mut r, knob, 4, trim, 0.65, 2.0);
+    // Bloom: each chord leans in over a fraction of a second at 0 to a slow 6 s bloom at 1, and
+    // the tail lengthens with it (the filter envelope follows the amp).
+    let s1 = span_lh(
+        &mut r,
+        knob,
+        1,
+        aenv,
+        "env.adsr",
+        "attack_ms",
+        300.0,
+        2200.0,
+        6500.0,
+    );
+    span(
+        &mut r,
+        knob,
+        1,
+        s1,
+        fenv,
+        "env.adsr",
+        "attack_ms",
+        350.0,
+        2500.0,
+    );
+    span(
+        &mut r,
+        knob,
+        1,
+        s1,
+        aenv,
+        "env.adsr",
+        "release_ms",
+        1500.0,
+        5000.0,
+    );
+    // Depth: clean at 0; a triangle an octave down fills in the floor under the chord.
+    rise(&mut r, knob, 2, mix, "mixer", "level2", 0.0, 0.6);
+    trim_by(&mut r, knob, 2, trim, 0.0, 8.0);
+    // Glare: the filter from a dark, close haze to the stored bright open sound (7.9 kHz) and
+    // on to a glassy 16 kHz.
+    let old = routed("filter.ladder", "cutoff_hz", 1400.0, 0.5, 0.5);
+    span_lh(
+        &mut r,
+        knob,
+        3,
+        lad,
+        "filter.ladder",
+        "cutoff_hz",
+        300.0,
+        old,
+        16000.0,
+    );
     perform(&mut r, knob, None, None);
     r
 }
@@ -1082,11 +1630,19 @@ fn boxwood() -> Rack {
     let mut r = Rack::new();
     let knob = macros(
         &mut r,
-        ["Brightness", "Warmth", "Space", "Chorus"],
-        [0.60, 0.20, 0.45, 0.40],
+        ["Mallet", "Ring", "Metal", "Space"],
+        [0.50, 0.50, 0.00, 0.45],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
-    let voice = r.add("osc.fm6", &[("algorithm", 1.0), ("index", 0.6)]);
+    // The old Brightness (FM index and filter), Warmth (drive) and Chorus stay where the old
+    // stored macros left them.
+    let voice = r.add(
+        "osc.fm6",
+        &[
+            ("algorithm", 1.0),
+            ("index", routed("osc.fm6", "index", 0.6, 0.5, 0.6)),
+        ],
+    );
     // ratio, fine, level, attack, decay, sustain, release, velocity: a wooden bar, a bright
     // overtone that is gone at once, and a click.
     let ops: [[f32; 8]; 6] = [
@@ -1106,13 +1662,32 @@ fn boxwood() -> Rack {
         }
     }
     r.next_row();
-    let drive = r.add("drive", &[("drive_db", 0.0), ("trim_db", 0.0)]);
+    let drive = r.add(
+        "drive",
+        &[
+            ("drive_db", routed("drive", "drive_db", 0.0, 0.35, 0.2)),
+            ("trim_db", 0.0),
+        ],
+    );
     let lad = r.add(
         "filter.ladder",
-        &[("cutoff_hz", 5000.0), ("resonance", 0.05)],
+        &[
+            (
+                "cutoff_hz",
+                routed("filter.ladder", "cutoff_hz", 5000.0, 0.3, 0.6),
+            ),
+            ("resonance", 0.05),
+        ],
     );
     let trim = r.add("gain", &[("gain_db", 8.0)]);
-    let chorus = r.add("chorus", &[("rate_hz", 0.5), ("depth", 30.0), ("mix", 0.0)]);
+    let chorus = r.add(
+        "chorus",
+        &[
+            ("rate_hz", routed("chorus", "rate_hz", 0.5, 0.15, 0.4)),
+            ("depth", 30.0),
+            ("mix", 24.0),
+        ],
+    );
     let delay = r.add(
         "delay",
         &[
@@ -1140,13 +1715,51 @@ fn boxwood() -> Rack {
     r.wire(delay, "out", verb, "in");
     r.out_stereo(verb);
 
-    r.route(knob, "m1", voice, "index", 0.5);
-    r.route(knob, "m1", lad, "cutoff_hz", 0.3);
-    r.route(knob, "m2", drive, "drive_db", 0.35);
-    r.route(knob, "m3", delay, "mix", 0.2);
-    r.route(knob, "m3", verb, "mix", 0.35);
-    r.route(knob, "m4", chorus, "mix", 0.6);
-    r.route(knob, "m4", chorus, "rate_hz", 0.15);
+    r.route(knob, "m4", delay, "mix", 0.2);
+    r.route(knob, "m4", verb, "mix", 0.35);
+    // Mallet: a soft felt mallet (a dull knock) to a hard wooden one (a bright, long overtone
+    // and a sharp click).
+    span(&mut r, knob, 1, 0.5, voice, "osc.fm6", "level2", 0.2, 0.6);
+    span(&mut r, knob, 1, 0.5, voice, "osc.fm6", "decay2", 30.0, 90.0);
+    span_hi(&mut r, knob, 1, 0.5, voice, "osc.fm6", "attack2", 0.5, 0.1);
+    span(&mut r, knob, 1, 0.5, voice, "osc.fm6", "level4", 0.0, 0.4);
+    span(&mut r, knob, 1, 0.5, voice, "osc.fm6", "decay4", 12.0, 30.0);
+    trim_by(&mut r, knob, 1, trim, 0.5, -2.0);
+    // Ring: the bar rings on, from a dry knock to a vibraphone: every body decay 2.9 times longer.
+    for (op, d, rel) in [
+        (1, 700.0, 150.0),
+        (3, 520.0, 130.0),
+        (5, 320.0, 100.0),
+        (6, 260.0, 100.0),
+    ] {
+        span(
+            &mut r,
+            knob,
+            2,
+            0.5,
+            voice,
+            "osc.fm6",
+            &format!("decay{op}"),
+            d * 0.35,
+            d,
+        );
+        span(
+            &mut r,
+            knob,
+            2,
+            0.5,
+            voice,
+            "osc.fm6",
+            &format!("release{op}"),
+            rel * 0.35,
+            rel,
+        );
+    }
+    // Metal: clean at 0; the overtones slide off the harmonics (a wooden bar to a struck
+    // metal one) without moving the note itself.
+    rise(&mut r, knob, 3, voice, "osc.fm6", "fine2", 0.0, 600.0);
+    rise(&mut r, knob, 3, voice, "osc.fm6", "fine4", 0.0, 600.0);
+    rise(&mut r, knob, 3, voice, "osc.fm6", "fine5", 0.0, 600.0);
     perform(&mut r, knob, None, None);
     r
 }
@@ -1196,8 +1809,8 @@ fn presets() -> Vec<Preset> {
             name: "Cinder Block",
             category: "Bass",
             tags: &["mono", "distorted", "compressed", "french touch", "signature"],
-            description: "A blunt mono bass: two saws over a square sub, hit with 18 dB of drive, a filter that closes on every note and a compressor squeezing it flat. No wobble, just dirt. Play short, off-beat notes. Bite opens the filter (the mod wheel does too), Grit pushes the drive harder, Room adds a slapback and a tight room, Crush mixes in a bitcrusher.",
-            listen: "The blunt, flattened attack and the dry, steady dirt: nothing moves on its own; Grit and Crush make it nastier.",
+            description: "A blunt mono bass: two saws over a square sub, hit with 18 dB of drive, a filter that closes on every note and a compressor squeezing it flat. No wobble, just dirt. Play short, off-beat notes. Bark opens the filter from a dull thud to a bark (the mod wheel does too), Hold sets how long each note lasts, Clamp squeezes the compressor from a punchy squeeze to a flat clamp, Crumble breaks the note up into coarse digital grit.",
+            listen: "The blunt, flattened attack and the dry, steady dirt: nothing moves on its own; Clamp and Crumble make it nastier.",
             build: cinder_block,
             phrase: bass_phrase,
             secs: 9.0,
@@ -1207,7 +1820,7 @@ fn presets() -> Vec<Preset> {
             name: "Parquet Loop",
             category: "Keys",
             tags: &["poly", "filtered", "phased", "disco", "122bpm", "signature"],
-            description: "Hold a chord and it becomes a filtered disco loop: saws and pulse into crunch, a resonant filter that closes on every beat (locked to the clock), a four-stage phaser and a compressor, at 122 BPM with swing. Press Run for the filter loop. Notes slide into each other: change chords and the voices glide. Cutoff opens the filter, Crunch adds grit, Space adds a dotted echo and a tight room, Glide sets how long the slide takes (all the way down, notes just step).",
+            description: "Hold a chord and it becomes a filtered disco loop: saws and pulse into crunch, a resonant filter that closes on every beat (locked to the clock), a four-stage phaser and a compressor, at 122 BPM with swing. Press Run for the filter loop. Notes slide into each other: change chords and the voices glide. Loop sets how hard the beat closes the filter (flat at 0), Phase brings in the phaser from nothing to a fast, deep, ringing one, Squelch sets how hard the filter rings (its resonance), Glide sets how long the slide takes (all the way down, notes just step).",
             listen: "The filter closing on the beat under a held chord, and the chord tones sliding into the next chord; Glide down removes the slide.",
             build: parquet_loop,
             phrase: loop_phrase,
@@ -1218,7 +1831,7 @@ fn presets() -> Vec<Preset> {
             name: "Loading Dock",
             category: "Groove",
             tags: &["sequenced", "cues", "drums", "drop", "124bpm", "filter house", "signature"],
-            description: "A self-playing filter-house piece at 124 BPM with swing: a four-on-the-floor kick with a clap and open hats, a bass and a stab line that duck hard to the kick through the compressor sidechain, a resonant filter, a noise riser and a hand-played voice on top. Five cues: Intro (filter shut, dry, silent until Run), Build (the filter opens over three bars as the riser and the wash rise), Gap (everything shut but the wash), Drop (drive and pump at full), Break (back down, wet). Press Run, then launch the cues with the pads or CC 40-44; turn a macro to take over. Sweep opens the filter, Drive pushes the drive and the bitcrusher, Wash brings in the riser, the echo and the room, Pump sets how hard the kick ducks the bass and stabs.",
+            description: "A self-playing filter-house piece at 124 BPM with swing: a four-on-the-floor kick with a clap and open hats, a bass and a stab line that duck hard to the kick through the compressor sidechain, a resonant filter, a noise riser and a hand-played voice on top. Five cues: Intro (filter shut, dry, silent until Run), Build (the filter opens over three bars as the riser and the wash rise), Gap (everything shut but the wash), Drop (drive and pump at full), Break (back down, wet). Press Run, then launch the cues with the pads or CC 40-44; turn a macro to take over. Sweep opens the filter, Stabs brings the off-beat stab line in and lets it ring, Wash brings in the riser, the echo and the room, Pump sets how deep the kick ducks the bass and stabs.",
             listen: "The filter and riser rising through the Build, the gap, the Drop landing with the pump at full, and the Break pulling back to a dark loop.",
             build: loading_dock,
             phrase: drop_phrase,
@@ -1229,8 +1842,8 @@ fn presets() -> Vec<Preset> {
             name: "Glass Elevator",
             category: "Keys",
             tags: &["poly", "fm", "electric piano", "bell", "pop"],
-            description: "A six-operator FM electric piano with a glassy tine that fades in a tenth of a second, over a mellow body. Velocity brightens it. Tine sets the FM brightness, Grit adds grit, Space adds ping-pong echo and room, Chorus brings in the chorus.",
-            listen: "The tine on the attack against the mellow tail, and the way Tine opens the whole spectrum.",
+            description: "A six-operator FM electric piano with a glassy tine that fades in a tenth of a second, over a mellow body. Velocity brightens it. Tine brings the glassy tine forward and lets it ring, Ring lets the body ring on, Tremolo fades in a suitcase-piano tremolo, Space adds ping-pong echo and room.",
+            listen: "The tine on the attack against the mellow tail, and Tremolo fading in on held chords.",
             build: glass_elevator,
             phrase: glass_phrase,
             secs: 11.0,
@@ -1240,8 +1853,8 @@ fn presets() -> Vec<Preset> {
             name: "Undertow",
             category: "Bass",
             tags: &["mono", "reese", "sub", "glide", "drum and bass", "hip-hop"],
-            description: "A reese sub bass: two saws a few cents apart beating slowly against each other over a sine an octave down, through a gentle drive and a low-pass filter, with a short glide between overlapped notes. Play long low notes. Cutoff opens the tone, Weight thickens it with drive, Room adds a short room, Beating widens the beating and sweeps the filter.",
-            listen: "The slow beating and the weight of the sub; raise Beating and it speeds up while the filter sweeps.",
+            description: "A reese sub bass: two saws a few cents apart beating slowly against each other over a sine an octave down, through a gentle drive and a low-pass filter, with a short glide between overlapped notes. Play long low notes. Open opens the filter, Beat pulls the two saws apart so the beating speeds up, Slide sets how long the bass glides between overlapped notes, Wobble fades in a slow filter sweep that speeds up to a wub.",
+            listen: "The slow beating and the weight of the sub; raise Slide for long swoops, raise Beat and it speeds up, raise Wobble and the filter starts to wub.",
             build: undertow,
             phrase: undertow_phrase,
             secs: 11.0,
@@ -1251,8 +1864,8 @@ fn presets() -> Vec<Preset> {
             name: "Salt Flat",
             category: "Pad",
             tags: &["poly", "ambient", "cinematic", "slow", "evolving"],
-            description: "A slow, wide ambient pad: soft triangle stacks with a slow filter bloom, a light chorus, a long echo and a long room. Hold open chords and let them breathe. It starts clean. Bloom opens the filter, Saturation adds a little drive, Space is the echo and the room, Texture brings in a grainy, staticky layer: a high shimmer voice, a wider chorus and a looser unison.",
-            listen: "The slow bloom of each chord and the long tail that carries into the next; then raise Texture to about 0.7 for the grainy, staticky version.",
+            description: "A slow, wide ambient pad: soft triangle stacks with a slow filter bloom, a light chorus, a long echo and a long room. Hold open chords and let them breathe. It starts clean. Bloom stretches each chord's swell from a quick lean to a slow 6 s bloom, Depth brings in a triangle an octave below, Glare opens the pad from a dark, close haze to a glassy shine, Space is the echo and the room.",
+            listen: "The slow bloom of each chord and the long tail that carries into the next; then pull Glare down for a dark, close haze.",
             build: salt_flat,
             phrase: salt_phrase,
             secs: 18.0,
@@ -1262,8 +1875,8 @@ fn presets() -> Vec<Preset> {
             name: "Boxwood",
             category: "Pluck",
             tags: &["poly", "mallet", "fm", "wooden", "velocity"],
-            description: "An FM mallet, like a wooden bar: a round body with a bright overtone that vanishes at once and a small click. Velocity brings out the overtone. Brightness sets the FM brightness, Warmth adds warmth, Space adds an echo and a medium room, Chorus brings in the chorus.",
-            listen: "The click and the wooden ring of each note, and the short bloom when Space is raised.",
+            description: "An FM mallet, like a wooden bar: a round body with a bright overtone that vanishes at once and a small click. Velocity brings out the overtone. Mallet goes from a soft felt mallet to a hard wooden one, Ring lets the bar ring on like a vibraphone, Metal slides the overtones off the harmonics into a struck metal bar, Space adds an echo and a medium room.",
+            listen: "The click and the wooden ring of each note; then Metal for a struck bar and Ring for a long vibraphone tail.",
             build: boxwood,
             phrase: boxwood_phrase,
             secs: 9.0,
@@ -1273,8 +1886,8 @@ fn presets() -> Vec<Preset> {
             name: "Neon Highway",
             category: "Lead",
             tags: &["mono", "legato", "glide", "bright", "synthwave", "80s"],
-            description: "A wide mono lead for late-night driving: a detuned saw stack and a pulse, a light drive, a ladder filter that opens with velocity, chorus, a dotted echo and a room. Legato notes glide. Cutoff brightens, Bite adds drive, Space adds echo and room, Vibrato adds vibrato.",
-            listen: "The glide between overlapped notes and the echo trailing each phrase.",
+            description: "A wide mono lead for late-night driving: a detuned saw stack and a pulse, a light drive, a ladder filter that opens with velocity, chorus, a dotted echo and a room. Legato notes glide. Open brightens it from muffled to fully open, Pulse brings the nasal square pulse forward under the saws, Vibrato fades in a vibrato that speeds up as it deepens, Space adds echo and room.",
+            listen: "The glide between overlapped notes and the echo trailing each phrase; Pulse for the nasal square under the saws.",
             build: neon_highway,
             phrase: neon_phrase,
             secs: 9.0,
@@ -1500,17 +2113,24 @@ fn main() {
             std::fs::write(&args[2], format!("{{{}}}\n", entries.join(","))).unwrap();
         }
         Some("macros") => {
-            // Peak and loudness (dBFS) with every macro at 0, at 1, and with only Space at 0.
+            // Peak and loudness (dBFS) with every macro at 0, at 1, as stored, and (Loading Dock)
+            // at each cue's targets.
             let db = |v: f32| 20.0 * v.max(1e-9).log10();
             for p in presets() {
                 // No cues launched: the macros stay where this loop puts them.
                 let piece = false;
                 let mut line = format!("{:16}", p.slug);
-                for (label, set) in [
-                    ("all 0", [Some(0.0); 4]),
-                    ("all 1", [Some(1.0); 4]),
-                    ("no Space", [None, None, Some(0.0), None]),
-                ] {
+                let mut cases: Vec<(String, [Option<f32>; 4])> = vec![
+                    ("all 0".into(), [Some(0.0); 4]),
+                    ("all 1".into(), [Some(1.0); 4]),
+                    ("stored".into(), [None; 4]),
+                ];
+                if p.slug == "loading-dock" {
+                    for (name, t, _, _) in DROP_CUES {
+                        cases.push((name.into(), t.map(Some)));
+                    }
+                }
+                for (label, set) in cases {
                     let mut rack = (p.build)();
                     let knob = *rack
                         .e
