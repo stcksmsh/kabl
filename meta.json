@@ -1,0 +1,11 @@
+{
+  "slug": "kabl",
+  "title": "kabl",
+  "tagline": "A legible modular synthesizer in Rust: cables are instruments, and patches explain themselves. Standalone and CLAP plugin.",
+  "status": "active",
+  "stack": ["Rust", "egui", "CLAP"],
+  "repo": "https://github.com/stcksmsh/kabl",
+  "accent": [0.8, 0.15, 85],
+  "featured": false,
+  "order": 7
+}

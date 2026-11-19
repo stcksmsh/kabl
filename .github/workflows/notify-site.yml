@@ -1,0 +1,33 @@
+# Drop this into each PROJECT repo (not the site repo).
+# It pings the site to rebuild whenever you push a devlog to io-page.
+name: notify site
+on:
+  push:
+    branches: [io-page]
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: dispatch rebuild
+        run: |
+          resp=$(curl -sS -w '\n%{http_code}' -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.SITE_DISPATCH_TOKEN }}" \
+            https://api.github.com/repos/stcksmsh/stcksmsh.github.io/actions/workflows/deploy.yml/dispatches \
+            -d '{"ref":"main"}')
+          status="${resp##*$'\n'}"
+          body="${resp%$'\n'*}"
+          echo "HTTP $status"
+          echo "$body"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "::error::dispatch failed (HTTP $status) — check SITE_DISPATCH_TOKEN is set on this repo"
+            exit 1
+          fi
+# SITE_DISPATCH_TOKEN = a fine-grained PAT scoped to just stcksmsh.github.io
+# with ONLY "Actions: Read and write" permission (not Contents) -- that's the
+# minimum GitHub allows for triggering a workflow_dispatch run. Store it as
+# a secret in THIS repo (Settings -> Secrets and variables -> Actions).
+#
+# Uses workflow_dispatch rather than repository_dispatch specifically for
+# this narrower scope -- repository_dispatch requires Contents:write on the
+# site repo, which is much more access than "rebuild the site" needs.
