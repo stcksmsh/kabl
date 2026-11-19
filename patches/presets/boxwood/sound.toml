@@ -7,6 +7,6 @@ tags = [
     "wooden",
     "velocity",
 ]
-description = "An FM mallet, like a wooden bar: a round body with a bright overtone that vanishes at once and a small click. Velocity brings out the overtone. Brightness sets the FM brightness, Warmth adds warmth, Space adds an echo and a medium room, Chorus brings in the chorus."
+description = "An FM mallet, like a wooden bar: a round body with a bright overtone that vanishes at once and a small click. Velocity brings out the overtone. Mallet goes from a soft felt mallet to a hard wooden one, Ring lets the bar ring on like a vibraphone, Metal slides the overtones off the harmonics into a struck metal bar, Space adds an echo and a medium room."
 keys = true
 sequence = false

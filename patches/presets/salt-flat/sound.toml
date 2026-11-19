@@ -7,6 +7,6 @@ tags = [
     "slow",
     "evolving",
 ]
-description = "A slow, wide ambient pad: soft triangle stacks with a slow filter bloom, a light chorus, a long echo and a long room. Hold open chords and let them breathe. It starts clean. Bloom opens the filter, Saturation adds a little drive, Space is the echo and the room, Texture brings in a grainy, staticky layer: a high shimmer voice, a wider chorus and a looser unison."
+description = "A slow, wide ambient pad: soft triangle stacks with a slow filter bloom, a light chorus, a long echo and a long room. Hold open chords and let them breathe. It starts clean. Bloom stretches each chord's swell from a quick lean to a slow 6 s bloom, Depth brings in a triangle an octave below, Glare opens the pad from a dark, close haze to a glassy shine, Space is the echo and the room."
 keys = true
 sequence = false

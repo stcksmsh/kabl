@@ -8,6 +8,6 @@ tags = [
     "synthwave",
     "80s",
 ]
-description = "A wide mono lead for late-night driving: a detuned saw stack and a pulse, a light drive, a ladder filter that opens with velocity, chorus, a dotted echo and a room. Legato notes glide. Cutoff brightens, Bite adds drive, Space adds echo and room, Vibrato adds vibrato."
+description = "A wide mono lead for late-night driving: a detuned saw stack and a pulse, a light drive, a ladder filter that opens with velocity, chorus, a dotted echo and a room. Legato notes glide. Open brightens it from muffled to fully open, Pulse brings the nasal square pulse forward under the saws, Vibrato fades in a vibrato that speeds up as it deepens, Space adds echo and room."
 keys = true
 sequence = false
