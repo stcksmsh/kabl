@@ -859,12 +859,11 @@ fn stab_phrase() -> Vec<Hit> {
 
 // ---- level trims and the dry finish ----------------------------------------------------------
 
-/// Per-preset level trims in dB, added to the preset's gain stage when it is written.
-/// Patch gain only: no limiter.
-fn level_trim(slug: &str) -> f32 {
-    match slug {
-        _ => 0.0,
-    }
+/// Per-preset level trims in dB, added to every `gain` stage when a preset is written. The voices
+/// set their level in the recipe (`trim_db`), and the compensation stages (`comp_gain`) are gain
+/// stages too, so a trim here would move them all: it stays 0. Patch gain only, no limiter.
+fn level_trim(_slug: &str) -> f32 {
+    0.0
 }
 
 impl Voice {
@@ -1021,7 +1020,7 @@ fn temple_bowl() -> Rack {
         fenv_amt: 0.0,
         wheel_amt: 0.0,
         aenv: [3.0, 2500.0, 0.0, 1200.0],
-        trim_db: 10.0,
+        trim_db: 6.5,
     });
     // The modulator (inharmonic ratio) phase-modulates the carrier; the carrier's index is how hard.
     let modulator = v.r.add(
@@ -1214,7 +1213,7 @@ fn presets() -> Vec<Preset> {
             build: depth_charge,
             group: 1,
             phrase: charge_phrase,
-            secs: 22.0,
+            secs: 20.0,
         },
         Preset {
             slug: "oracle",
@@ -1226,7 +1225,7 @@ fn presets() -> Vec<Preset> {
             build: oracle,
             group: 1,
             phrase: choir_phrase,
-            secs: 21.0,
+            secs: 20.0,
         },
         Preset {
             slug: "automaton",
@@ -1250,7 +1249,7 @@ fn presets() -> Vec<Preset> {
             build: vox_chop,
             group: 2,
             phrase: chop_phrase,
-            secs: 9.0,
+            secs: 10.5,
         },
         Preset {
             slug: "chandelier",
@@ -1262,7 +1261,7 @@ fn presets() -> Vec<Preset> {
             build: chandelier,
             group: 2,
             phrase: glass_phrase,
-            secs: 21.0,
+            secs: 20.0,
         },
         Preset {
             slug: "whiteout",
@@ -1274,7 +1273,7 @@ fn presets() -> Vec<Preset> {
             build: whiteout,
             group: 2,
             phrase: wind_phrase,
-            secs: 21.0,
+            secs: 20.0,
         },
         Preset {
             slug: "updraft",
@@ -1286,7 +1285,7 @@ fn presets() -> Vec<Preset> {
             build: updraft,
             group: 2,
             phrase: riser_phrase,
-            secs: 24.0,
+            secs: 17.5,
         },
         Preset {
             slug: "maw",
@@ -1298,7 +1297,7 @@ fn presets() -> Vec<Preset> {
             build: maw,
             group: 2,
             phrase: maw_phrase,
-            secs: 8.4,
+            secs: 10.4,
         },
     ]
 }
@@ -1326,7 +1325,7 @@ fn oracle() -> Rack {
         fenv_amt: 0.0,
         wheel_amt: 0.0,
         aenv: [380.0, 600.0, 0.9, 1100.0],
-        trim_db: 22.0,
+        trim_db: 16.0,
     });
     let mix = v.mix;
     let noise = v.r.add("noise", &[("color", 0.3), ("level_db", 0.0)]);
@@ -1431,7 +1430,7 @@ fn vox_chop() -> Rack {
         fenv_amt: 0.0,
         wheel_amt: 0.0,
         aenv: [4.0, 300.0, 0.9, 140.0],
-        trim_db: 22.0,
+        trim_db: 23.5,
     });
     let clock = v.r.add("clock", &[("bpm", 124.0), ("swing", 0.0)]);
     let formant = v.mono_after(
@@ -1488,7 +1487,7 @@ fn chandelier() -> Rack {
         fenv_amt: 0.0,
         wheel_amt: 0.0,
         aenv: [300.0, 600.0, 0.9, 1400.0],
-        trim_db: 3.5,
+        trim_db: 2.5,
     });
     let mix = v.mix;
     // The glass partial: a modulator and a carrier a few times the pitch, a thin ring on top.
@@ -1559,7 +1558,7 @@ fn whiteout() -> Rack {
         fenv_amt: 0.0,
         wheel_amt: 0.0,
         aenv: [900.0, 600.0, 0.9, 1800.0],
-        trim_db: 19.0,
+        trim_db: 17.7,
     });
     let mix = v.mix;
     let noise = v.r.add("noise", &[("color", 0.4), ("level_db", 0.0)]);
@@ -1582,6 +1581,7 @@ fn whiteout() -> Rack {
     let lad = v.lad;
     v.r.depth_route(lfo, "out", lad, "cutoff_hz", v.knob, "m2", 0.3);
     span(&mut v, 2, 0.35, lfo, "lfo", "rate_hz", 0.1, 0.3);
+    comp_gain(&mut v, 2, 0.35, 4.0);
     // Grain: a bitcrusher on the wind, from clean to gritty.
     let crush = v.stage(
         "bitcrusher",
@@ -1693,7 +1693,7 @@ fn maw() -> Rack {
     // Grit: drive and a crusher.
     let drive = v.drive;
     let s = span_lh(&mut v, 3, drive, "drive", "drive_db", 4.0, 12.0, 30.0);
-    span_hi(&mut v, 3, s, drive, "drive", "trim_db", -3.0, -10.0);
+    span_hi(&mut v, 3, s, drive, "drive", "trim_db", -0.5, -10.0);
     let crush = v.stage(
         "bitcrusher",
         &[("bits", 8.0), ("downsample", 3.0), ("mix", 0.0)],
@@ -1739,6 +1739,7 @@ fn chop_phrase() -> Vec<Hit> {
         (1, &[53, 57, 60]),
         (2, &[55, 59, 62]),
         (3, &[57, 60, 64]),
+        (4, &[53, 57, 60]),
     ] {
         for h in stabs(notes, &grid) {
             v.push(Hit(h.0 + 0.5 + bar as f32 * 16.0 * S16, h.1, h.2));
@@ -1773,7 +1774,7 @@ fn wind_phrase() -> Vec<Hit> {
 }
 
 fn riser_phrase() -> Vec<Hit> {
-    line(&[(0.5, 45, 7.5), (9.0, 48, 7.5), (17.5, 50, 6.0)])
+    line(&[(0.5, 45, 7.5), (9.0, 48, 7.5)])
 }
 
 fn maw_phrase() -> Vec<Hit> {
@@ -1787,10 +1788,108 @@ fn maw_phrase() -> Vec<Hit> {
             (14, 31, 2.0),
         ],
         16,
-        4,
+        5,
         0.5,
     )
 }
+
+/// The render of `factory_levels_hold_the_target` (crates/ui/tests/factory_bank.rs `render_raw`):
+/// 24 s, keys down at 1, 5 and 13 s (a chord, or one note for a legato patch) and up at 4, 9 and
+/// 17 s, the clock run at 1 s, and every macro set to 0.65 at 3 s and to 0.15 later, or to 1 for the
+/// macros in `hot` (bit n-1 is macro n). Returns (peak dBFS, loudness dBFS over blocks above -50).
+fn test_level(state: &kabl_core::PatchState, hot: u8) -> (f32, f32) {
+    let collector = Collector::new();
+    let mut engine = PatchEngine::new(&collector.handle(), state, 48000.0, 8).expect("compiles");
+    let clocks: Vec<ModuleId> = state
+        .modules
+        .iter()
+        .filter(|(_, m)| m.kind == "clock")
+        .map(|(&id, _)| id)
+        .collect();
+    let legato = state
+        .modules
+        .values()
+        .any(|m| m.kind == "midi.in" && m.params.get("mode").is_some_and(|v| *v > 0.0));
+    let first_is_midi = state.modules.get(&1).is_some_and(|m| m.kind == "midi.in");
+    let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
+    let mut samples = Vec::new();
+    for b in 0..24 * 48000 / BLOCK {
+        let t = b * BLOCK;
+        if t == 0 {
+            for &c in &clocks {
+                engine.transport(c, Transport::Stop);
+            }
+        }
+        if t == 48000 {
+            for &c in &clocks {
+                engine.transport(c, Transport::Run);
+            }
+        }
+        if t.is_multiple_of(48000) && [1, 5, 13].contains(&(t / 48000)) {
+            let notes: Vec<u8> = if legato {
+                vec![if first_is_midi { 48 } else { 64 }]
+            } else {
+                vec![52, 59, 64, 67]
+            };
+            for note in notes {
+                engine.key(KeyEvent::On { note, velocity: 90 });
+            }
+        }
+        if t.is_multiple_of(48000) && [4, 9, 17].contains(&(t / 48000)) {
+            engine.key(KeyEvent::AllOff);
+        }
+        if t.is_multiple_of(48000) && [3, 7, 19].contains(&(t / 48000)) {
+            for (&id, m) in &state.modules {
+                if m.kind == "macro" {
+                    for n in 1..=4u16 {
+                        let value = if hot & (1 << (n - 1)) != 0 {
+                            1.0
+                        } else if t == 3 * 48000 {
+                            0.65
+                        } else {
+                            0.15
+                        };
+                        engine.set(&kabl_engine::runtime::ParamSet {
+                            rev: t as u64 + 1,
+                            target: kabl_engine::runtime::RuntimeTarget::Param {
+                                id,
+                                kind: "macro",
+                                index: n - 1,
+                            },
+                            value,
+                        });
+                    }
+                }
+            }
+        }
+        if t == 16 * 48000 {
+            engine.key(KeyEvent::AllOff);
+            for &c in &clocks {
+                engine.transport(c, Transport::Stop);
+            }
+        }
+        engine.process_block(&mut l, &mut r);
+        for (a, c) in l.iter().zip(&r) {
+            samples.push(*a);
+            samples.push(*c);
+        }
+    }
+    let db = |v: f64| 20.0 * v.max(1e-12).log10();
+    let peak = samples.iter().fold(0.0f32, |a, b| a.max(b.abs()));
+    let (mut sum, mut n) = (0.0f64, 0usize);
+    for block in samples.chunks(9600) {
+        let ms = block.iter().map(|s| (*s as f64).powi(2)).sum::<f64>() / block.len() as f64;
+        if ms > 1e-5 {
+            sum += ms;
+            n += 1;
+        }
+    }
+    (
+        db(peak as f64) as f32,
+        db((sum / n.max(1) as f64).sqrt()) as f32,
+    )
+}
+
 /// Peak and loudness (dBFS) the way `factory_levels_hold_the_target` measures a poly keys patch:
 /// the chord E3 B3 E4 G4 at velocity 90, down at 1, 5 and 13 s, up at 4, 9 and 17 s, 24 s render.
 fn level(p: &Preset, state: &kabl_core::PatchState) -> (f32, f32) {
@@ -1893,6 +1992,30 @@ fn main() {
                 })
                 .collect();
             std::fs::write(&args[2], format!("{{{}}}\n", entries.join(","))).unwrap();
+        }
+        Some("testlevel") => {
+            // testlevel <patches dir> [slug ...]: what the factory level test measures, with
+            // every macro at 0.65 then 0.15, and each macro alone at 1, and all four at 1
+            let want: Vec<&String> = args.iter().skip(3).collect();
+            for p in presets()
+                .into_iter()
+                .filter(|p| want.is_empty() || want.iter().any(|w| **w == p.slug))
+            {
+                let log =
+                    kabl_core::load(&Path::new(&args[2]).join("presets").join(p.slug)).unwrap();
+                let (peak0, loud) = test_level(log.state(), 0);
+                let mut line = format!(
+                    "TEST {:13} stored: peak {peak0:6.2} loud {loud:6.2} |",
+                    p.slug
+                );
+                let mut worst = f32::MIN;
+                for hot in [1u8, 2, 4, 8, 15] {
+                    let (pk, _) = test_level(log.state(), hot);
+                    worst = worst.max(pk);
+                    line += &format!(" {hot}:{pk:6.2}");
+                }
+                println!("{line} | worst {:6.2}", worst.max(peak0));
+            }
         }
         Some("levels") => {
             // levels <patches dir>: peak and loudness (dBFS) as the level test measures them
