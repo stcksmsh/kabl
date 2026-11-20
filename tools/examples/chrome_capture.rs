@@ -125,6 +125,9 @@ fn perform_mockup_patch() -> PatchEditor {
         id,
         port: port.to_string(),
     };
+    // Bite is modulated: an LFO into the macro, so its dial shows a live dot.
+    let lfo = e.add_module("lfo", at(1184.0, 320.0));
+    e.connect_route(m(lfo, "out"), mac, "m1");
     let macros = [
         ("Bite", 0.62, [(svf, "cutoff_hz"), (adsr, "decay_ms")]),
         ("Wash", 0.35, [(verb, "decay_s"), (delay, "mix")]),
@@ -141,7 +144,8 @@ fn perform_mockup_patch() -> PatchEditor {
         }
         toggle_pin(&mut e, mac, &out);
     }
-    // Step levels (percent) of the first eight steps of each lane in the mockup.
+    // Step levels (percent) of the first eight steps of each lane in the mockup; the second
+    // eight repeat them at 85 % (the mockup's 16 steps).
     let lanes: [(&str, [f32; 8]); 3] = [
         ("Bass", [90.0, 50.0, 0.0, 70.0, 100.0, 30.0, 0.0, 80.0]),
         ("Drums", [100.0, 0.0, 60.0, 0.0, 100.0, 0.0, 60.0, 30.0]),
@@ -150,7 +154,9 @@ fn perform_mockup_patch() -> PatchEditor {
     for (&s, (name, levels)) in seqs.iter().zip(lanes) {
         // Every bank plays the lane (the playing bank is the one the lane shows).
         for prefix in ["", "b.", "c.", "d."] {
-            for (k, &v) in levels.iter().enumerate() {
+            e.set_param(s, &format!("{prefix}length"), 16.0);
+            for k in 0..16 {
+                let v = levels[k % 8] * if k < 8 { 1.0 } else { 0.85 };
                 e.set_param(s, &format!("{prefix}v{}", k + 1), v);
                 e.set_param(
                     s,
@@ -339,7 +345,9 @@ impl App {
             .map(|(&id, _)| id)
             .collect();
         for s in seqs {
-            ui.seq_steps.insert(s, 4);
+            // The mockup's playhead sits on step 5 (index 4); the Perform mockup's on step 1.
+            ui.seq_steps
+                .insert(s, if j.scene == "perform" { 0 } else { 4 });
         }
         if j.scene.starts_with("file-") {
             use kabl_ui::filebrowser::{self as fb, Mode, Purpose};
@@ -556,7 +564,7 @@ impl App {
                 ui.clock_pos.insert(c, 16.0 * 16.0 + 2.0 * 4.0 + 1.0);
             }
             for s in ids("seq") {
-                ui.seq_steps.insert(s, 5);
+                ui.seq_steps.insert(s, 0);
             }
             for cues in ids("cues") {
                 let all = kabl_ui::cues::cues(state, cues);
@@ -1020,6 +1028,34 @@ impl eframe::App for App {
             STATUS.pos.store(76_800, Ordering::Relaxed);
             for l in &STATUS.level {
                 l.store(0.55f32.to_bits(), Ordering::Relaxed);
+            }
+        }
+        if self.jobs[self.i].scene == "perform" {
+            // The engine's face tap for the LFO that modulates Bite: a steady 0.2 above rest.
+            let lfo = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "lfo")
+                .map(|(&id, _)| id);
+            if let Some(id) = lfo {
+                let t = ctx.input(|i| i.time);
+                self.ui.live.set_tap(
+                    id,
+                    0,
+                    kabl_ui::displays::LiveTap {
+                        last: 0.2,
+                        min: -0.2,
+                        max: 0.2,
+                        view: kabl_modules::ModuleView {
+                            valid: false,
+                            position: 0.0,
+                            cycle: [0.0; kabl_modules::VIEW_CYCLE],
+                        },
+                        at: t,
+                    },
+                );
             }
         }
         if self.jobs[self.i].scene.starts_with("first-run") {
