@@ -252,7 +252,9 @@ fn finish(mut samples: Vec<f32>, rate: u32, bpm: Option<f32>) -> Result<Clip, St
 
 // ---- the audio side -------------------------------------------------------------------------
 
-/// What the audio callback reports back; read by the UI, written by the callback only.
+/// What the audio callback reports back; read by the UI, written by the callback only. One per
+/// channel: several instances in one process (a plugin host) never share it.
+#[derive(Default)]
 pub struct Status {
     /// Frames played of the current clip.
     pub pos: AtomicU32,
@@ -265,14 +267,6 @@ pub struct Status {
     pub active: AtomicBool,
 }
 
-pub static STATUS: Status = Status {
-    pos: AtomicU32::new(0),
-    len: AtomicU32::new(0),
-    level: [AtomicU32::new(0), AtomicU32::new(0)],
-    gen: AtomicU32::new(0),
-    active: AtomicBool::new(false),
-};
-
 pub enum Msg {
     Play(Shared<Vec<f32>>, u32),
     Stop,
@@ -284,6 +278,7 @@ pub struct Voice {
     clip: Option<Shared<Vec<f32>>>,
     pos: usize,
     peak: [f32; 2],
+    status: Arc<Status>,
 }
 
 impl Voice {
@@ -292,10 +287,12 @@ impl Voice {
         while let Ok(m) = self.rx.pop() {
             match m {
                 Msg::Play(c, gen) => {
-                    STATUS.len.store((c.len() / 2) as u32, Ordering::Relaxed);
-                    STATUS.pos.store(0, Ordering::Relaxed);
-                    STATUS.gen.store(gen, Ordering::Relaxed);
-                    STATUS.active.store(true, Ordering::Relaxed);
+                    self.status
+                        .len
+                        .store((c.len() / 2) as u32, Ordering::Relaxed);
+                    self.status.pos.store(0, Ordering::Relaxed);
+                    self.status.gen.store(gen, Ordering::Relaxed);
+                    self.status.active.store(true, Ordering::Relaxed);
                     self.clip = Some(c);
                     self.pos = 0;
                 }
@@ -307,7 +304,12 @@ impl Voice {
 
     fn stop(&mut self) {
         self.clip = None;
-        STATUS.active.store(false, Ordering::Relaxed);
+        self.status.active.store(false, Ordering::Relaxed);
+    }
+
+    /// Ends the clip now (a host whose transport runs gets no preview). No allocation.
+    pub fn silence(&mut self) {
+        self.stop();
     }
 
     /// One frame of the clip (silence when none plays).
@@ -329,9 +331,9 @@ impl Voice {
 
     /// End of a callback: report position and level.
     pub fn report(&self) {
-        STATUS.pos.store(self.pos as u32, Ordering::Relaxed);
+        self.status.pos.store(self.pos as u32, Ordering::Relaxed);
         for k in 0..2 {
-            STATUS.level[k].store(self.peak[k].to_bits(), Ordering::Relaxed);
+            self.status.level[k].store(self.peak[k].to_bits(), Ordering::Relaxed);
         }
     }
 }
@@ -341,23 +343,36 @@ pub struct Player {
     tx: rtrb::Producer<Msg>,
     handle: Handle,
     gen: u32,
+    status: Arc<Status>,
 }
 
 /// A connected pair: the `Player` stays with the UI, the `Voice` moves into the callback.
 pub fn channel(handle: Handle) -> (Player, Voice) {
     let (tx, rx) = rtrb::RingBuffer::new(8);
+    let status = Arc::new(Status::default());
     (
-        Player { tx, handle, gen: 0 },
+        Player {
+            tx,
+            handle,
+            gen: 0,
+            status: status.clone(),
+        },
         Voice {
             rx,
             clip: None,
             pos: 0,
             peak: [0.0; 2],
+            status,
         },
     )
 }
 
 impl Player {
+    /// What the audio side reports for this channel.
+    pub fn status(&self) -> &Arc<Status> {
+        &self.status
+    }
+
     /// Plays `clip` from its start; the generation to recognise it by.
     pub fn play(&mut self, clip: &Clip) -> Option<u32> {
         self.gen = self.gen.wrapping_add(1);
@@ -481,8 +496,10 @@ impl Previews {
             }
         }
         if let Some((_, gen, since)) = &self.playing {
-            let live =
-                STATUS.active.load(Ordering::Relaxed) && STATUS.gen.load(Ordering::Relaxed) == *gen;
+            let live = self.player.as_ref().is_some_and(|p| {
+                p.status.active.load(Ordering::Relaxed)
+                    && p.status.gen.load(Ordering::Relaxed) == *gen
+            });
             if !live && since.elapsed().as_secs_f32() > 0.3 {
                 self.playing = None;
             }
@@ -566,15 +583,22 @@ impl Previews {
 
     /// Playhead 0..=1 of the playing clip.
     pub fn progress(&self) -> f32 {
-        let len = STATUS.len.load(Ordering::Relaxed).max(1) as f32;
-        (STATUS.pos.load(Ordering::Relaxed) as f32 / len).clamp(0.0, 1.0)
+        let Some(s) = self.status() else { return 0.0 };
+        let len = s.len.load(Ordering::Relaxed).max(1) as f32;
+        (s.pos.load(Ordering::Relaxed) as f32 / len).clamp(0.0, 1.0)
     }
 
     /// Level 0..=1 of the last audio callback.
     pub fn level(&self) -> f32 {
-        let l = f32::from_bits(STATUS.level[0].load(Ordering::Relaxed));
-        let r = f32::from_bits(STATUS.level[1].load(Ordering::Relaxed));
+        let Some(s) = self.status() else { return 0.0 };
+        let l = f32::from_bits(s.level[0].load(Ordering::Relaxed));
+        let r = f32::from_bits(s.level[1].load(Ordering::Relaxed));
         l.max(r).clamp(0.0, 1.0)
+    }
+
+    /// What the audio side reports (`None` without a player).
+    pub fn status(&self) -> Option<&Arc<Status>> {
+        self.player.as_ref().map(Player::status)
     }
 }
 
@@ -590,6 +614,30 @@ mod tests {
             gain_db: 0.0,
             bpm: None,
         })
+    }
+
+    #[test]
+    fn channels_do_not_share_status() {
+        // Two plugin instances in one host: one's preview never shows as the other's.
+        let collector = basedrop::Collector::new();
+        let (mut a, mut voice_a) = channel(collector.handle());
+        let (b, mut voice_b) = channel(collector.handle());
+        let clip = Clip {
+            rate: 48000,
+            samples: vec![0.1; 200],
+            wave: vec![1.0],
+            gain_db: 0.0,
+            bpm: None,
+        };
+        a.play(&clip).unwrap();
+        voice_a.poll();
+        voice_b.poll();
+        voice_a.report();
+        voice_b.report();
+        assert!(a.status().active.load(Ordering::Relaxed));
+        assert!(!b.status().active.load(Ordering::Relaxed));
+        assert_eq!(a.status().len.load(Ordering::Relaxed), 100);
+        assert_eq!(b.status().len.load(Ordering::Relaxed), 0);
     }
 
     #[test]

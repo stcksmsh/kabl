@@ -1520,7 +1520,7 @@ fn follow_selection(ui_state: &mut UiState) {
         .library
         .as_ref()
         .is_some_and(|l| l.prefs.preview_on_select);
-    let quiet = !ui_state.host_clock && !ui_state.clock_running.values().any(|r| *r);
+    let quiet = !ui_state.host_playing && !ui_state.clock_running.values().any(|r| *r);
     if let (true, true, Some(id)) = (on, quiet, sel) {
         ui_state.browser.clips.play(&id);
     }
@@ -1535,7 +1535,9 @@ fn preview_keys(ui_state: &mut UiState, ui: &egui::Ui, open: &mut Option<String>
         return;
     };
     if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Space)) {
-        if ui_state.browser.clips.busy(&sel) {
+        if ui_state.host_playing {
+            // The host's transport runs: no preview.
+        } else if ui_state.browser.clips.busy(&sel) {
             ui_state.browser.clips.stop();
         } else {
             ui_state.browser.clips.stop();
@@ -1550,6 +1552,7 @@ fn preview_keys(ui_state: &mut UiState, ui: &egui::Ui, open: &mut Option<String>
 /// The detail pane's preview: a waveform well with a playhead, the play button, and the facts.
 fn preview_well(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, id: &str) {
     let now = ui.input(|i| i.time);
+    let host_playing = ui_state.host_playing;
     let clips = &ui_state.browser.clips;
     let playing = clips.playing() == Some(id);
     let waiting = !playing && clips.busy(id);
@@ -1602,7 +1605,7 @@ fn preview_well(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, id: &str)
         }
         ClipLook::Rendering => note = Some("Rendering the preview…"),
         ClipLook::Failed(why) => note = Some(why),
-        ClipLook::NoOutput => note = Some("Previews play through the standalone app's output."),
+        ClipLook::NoOutput => note = Some("Previews need an audio output."),
         ClipLook::Idle => {}
     }
     if let Some(t) = note {
@@ -1629,7 +1632,7 @@ fn preview_well(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, id: &str)
             PlayView {
                 playing,
                 waiting,
-                off: !ready,
+                off: !ready || host_playing,
                 pause: true,
                 level,
                 progress,
@@ -1658,7 +1661,7 @@ fn preview_well(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, id: &str)
     let r = row.inner.tip(st, "Play or stop the preview (Space)");
     ui_state.record("preview-play".to_string(), r.rect);
     ui_state.record("preview-well".to_string(), well.rect);
-    if (r.clicked() || well.clicked()) && ready {
+    if (r.clicked() || well.clicked()) && ready && !host_playing {
         let clips = &mut ui_state.browser.clips;
         let was = clips.playing() == Some(id);
         clips.stop();
@@ -1926,7 +1929,7 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
                             "Play a sound's preview as soon as you select it. Never while a \
                          clock is running."
                         } else {
-                            "Previews play through the standalone app's output."
+                            "Previews need an audio output."
                         },
                     ),
                 );
@@ -2117,12 +2120,14 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
                             .map(|(n, _)| n.as_str())
                             .collect::<Vec<_>>()
                             .join(" · ");
+                        let host_playing = ui_state.host_playing;
                         let clips = &ui_state.browser.clips;
                         let playing = clips.playing() == Some(e.id.as_str());
                         let pv = PlayView {
                             playing,
                             waiting: !playing && clips.busy(&e.id),
                             off: !clips.available()
+                                || host_playing
                                 || matches!(clips.look(&e.id), ClipLook::Failed(_)),
                             level: if playing { clips.level() } else { 0.0 },
                             progress: if playing { clips.progress() } else { 0.0 },
@@ -2136,6 +2141,8 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
                             st,
                             if playing {
                                 "Stop the preview"
+                            } else if host_playing {
+                                "Stop the host transport to preview"
                             } else if pv.off {
                                 "No preview for this sound: load it to hear it"
                             } else {
