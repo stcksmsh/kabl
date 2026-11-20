@@ -1,0 +1,12 @@
+name = "Maw"
+category = "Voice"
+tags = [
+    "mono",
+    "formant",
+    "growl",
+    "distorted",
+    "drum and bass",
+]
+description = "A growling bass voice for drum and bass: a saw stack through a formant filter whose vowel a free LFO throws around, dry and heavy (no echo or room). Play low single notes. Vowel sets the mouth from a to u, Growl goes from still to a fast growl, Grit adds drive and a crusher, Weight brings in a sine sub."
+keys = true
+sequence = false
