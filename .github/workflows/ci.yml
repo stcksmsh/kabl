@@ -137,6 +137,27 @@ jobs:
       - name: Workspace tests
         run: cargo test --workspace
 
+  perf:
+    # Audio-thread cost gate. Whole patches with 8 and 16 voices sounding, 64-sample blocks
+    # (1333 us budget). Fails when any median block time is above 50 % of the budget. The
+    # slowest patch measures about 20 % on a dev machine (docs/benchmarks.md), so 50 % leaves
+    # 2.5x for a slower shared runner and still catches a real regression toward the limit.
+    # The median is gated, never p99.9: one noisy neighbour moves the tail.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.100.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the bench
+        run: cargo build --locked --release -p kabl-engine --example bench_patches
+      - name: Block time within budget
+        run: >
+          target/release/examples/bench_patches --max-median-pct 50
+          patches/sound-engines/demos/glass-bells patches/sound-engines/demos/tine-keys
+          patches/sound-engines/demos/vowel-drift patches/sound-engines/demos/imported-morph
+          patches/palette/strings patches/palette/pad patches/palette/lead patches/palette/bass
+
   package:
     runs-on: ubuntu-24.04
     timeout-minutes: 60

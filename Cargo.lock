@@ -1167,7 +1167,6 @@ dependencies = [
 [[package]]
 name = "egui-baseview"
 version = "0.7.0"
-source = "git+https://codeberg.org/RustAudio/egui-baseview.git?rev=07c89cdb1eca83d65c470e1fd8dd252f53f41097#07c89cdb1eca83d65c470e1fd8dd252f53f41097"
 dependencies = [
  "baseview",
  "copypasta",

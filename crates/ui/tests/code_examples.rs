@@ -19,6 +19,19 @@ fn serial() -> std::sync::MutexGuard<'static, ()> {
     LOCK.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+/// Waits until the audio-like runner thread has processed `n` blocks, so a test never depends on
+/// how fast a loaded machine starts the thread (a fixed sleep made these tests flaky under load).
+fn wait_blocks(blocks: &std::sync::atomic::AtomicUsize, n: usize) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    while blocks.load(std::sync::atomic::Ordering::Relaxed) < n {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the runner thread never processed {n} blocks"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+}
+
 fn editor() -> PatchEditor {
     PatchEditor::seed_from(&kabl_standalone::default_patch())
 }
@@ -259,8 +272,10 @@ fn module_settings_survive_save_and_reopen_through_the_real_path() {
     //    module's state changes: the filter memory moves with the audio.
     let scope = host::active_scope();
     let stop = Arc::new(AtomicBool::new(false));
+    let blocks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let runner = {
         let (state, scope, stop) = (log.state().clone(), scope.clone(), Arc::clone(&stop));
+        let blocks = Arc::clone(&blocks);
         std::thread::spawn(move || {
             let collector = basedrop::Collector::new();
             let mut eng =
@@ -272,11 +287,12 @@ fn module_settings_survive_save_and_reopen_through_the_real_path() {
             let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
             while !stop.load(Ordering::Relaxed) {
                 eng.process_block(&mut l, &mut r);
+                blocks.fetch_add(1, Ordering::Relaxed);
                 std::thread::sleep(std::time::Duration::from_micros(200));
             }
         })
     };
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    wait_blocks(&blocks, 20);
 
     // 3. Save: the real call asks the running graph for the module's settings.
     let second = dir.path().join("second.kabl");
@@ -468,8 +484,10 @@ fn rejected_settings_stay_in_the_file_through_play_and_repeated_saves() {
         let log = library::read_patch(&file, &lib.prefs.code_trust).unwrap();
         let scope = host::active_scope();
         let stop = Arc::new(AtomicBool::new(false));
+        let blocks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let runner = {
             let (state, scope, stop) = (log.state().clone(), scope.clone(), Arc::clone(&stop));
+            let blocks = Arc::clone(&blocks);
             std::thread::spawn(move || {
                 let collector = basedrop::Collector::new();
                 let mut eng =
@@ -481,11 +499,12 @@ fn rejected_settings_stay_in_the_file_through_play_and_repeated_saves() {
                 let (mut l, mut r) = ([0f32; BLOCK], [0f32; BLOCK]);
                 while !stop.load(Ordering::Relaxed) {
                     eng.process_block(&mut l, &mut r);
+                    blocks.fetch_add(1, Ordering::Relaxed);
                     std::thread::sleep(std::time::Duration::from_micros(200));
                 }
             })
         };
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        wait_blocks(&blocks, 20);
         for n in 0..2 {
             let out = dir.path().join(format!("out{n}.kabl"));
             library::save_patch(&out, &log).unwrap();

@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/*", "tools"]
 # Developer tools (tools/) are built on request only: `cargo test`/`clippy` on the default set skip them.
 default-members = ["crates/*"]
-exclude = ["vendor/nice-plug"]
+exclude = ["vendor/nice-plug", "vendor/egui-baseview"]
 
 [workspace.package]
 version = "0.1.0"
