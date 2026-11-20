@@ -14,11 +14,15 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 34] = [
+const SCENES: [&str; 38] = [
     "rack",
     "perform",
     "sounds",
     "sounds-preview",
+    "first-run-sounds",
+    "first-run-flows",
+    "first-run",
+    "first-run-own",
     "drawer",
     "wavetable-editor",
     "seq-pattern-editor",
@@ -288,14 +292,36 @@ impl App {
             ui.browser.filter = kabl_ui::browser::Filter::Factory;
             ui.browser.category = Some("Groove".into());
         }
-        let mut doc = kabl_ui::browser::Doc::new(
-            "Acid Line",
-            kabl_ui::browser::DocOrigin::Library("factory:acid-line".into()),
-            self.editor.state(),
-        );
+        // The first-run scenes start on the unsaved start patch: a library origin would tell the
+        // tour that a sound was already loaded.
+        let origin = if j.scene == "first-run-sounds" {
+            kabl_ui::browser::DocOrigin::New
+        } else {
+            kabl_ui::browser::DocOrigin::Library("factory:acid-line".into())
+        };
+        let mut doc = kabl_ui::browser::Doc::new("Acid Line", origin, self.editor.state());
         doc.meta.category = "Bass".into();
         ui.doc = Some(doc);
         ui.browser_open = j.scene == "sounds" || j.scene == "sounds-preview";
+        // The first-run tour, one scene per step, over the start patch.
+        if let Some(step) = match j.scene {
+            "first-run-sounds" => Some(kabl_ui::tour::Step::Sounds),
+            "first-run-flows" => Some(kabl_ui::tour::Step::Flows),
+            "first-run" => Some(kabl_ui::tour::Step::Knob),
+            "first-run-own" => Some(kabl_ui::tour::Step::Own),
+            _ => None,
+        } {
+            self.editor = kabl_ui::first_run::start_patch();
+            // The start patch's own document: its name in the header, clean.
+            ui.doc = Some(kabl_ui::browser::Doc::new(
+                kabl_ui::first_run::start_name(),
+                kabl_ui::browser::DocOrigin::New,
+                self.editor.state(),
+            ));
+            ui.first_run = Some(kabl_ui::tour::begin_at(step));
+            ui.browser_open = step == kabl_ui::tour::Step::Sounds;
+            ui.browser.selected = Some("factory:presets/acid-line".into());
+        }
         ui.drawer_open = matches!(
             j.scene,
             "rack"
@@ -1022,6 +1048,34 @@ impl eframe::App for App {
                         last: 0.2,
                         min: -0.2,
                         max: 0.2,
+                        view: kabl_modules::ModuleView {
+                            valid: false,
+                            position: 0.0,
+                            cycle: [0.0; kabl_modules::VIEW_CYCLE],
+                        },
+                        at: t,
+                    },
+                );
+            }
+        }
+        if self.jobs[self.i].scene.starts_with("first-run") {
+            // The engine's face tap for the envelope that opens the filter: mid-note.
+            let env = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "env.adsr")
+                .map(|(&id, _)| id);
+            if let Some(id) = env {
+                let t = ctx.input(|i| i.time);
+                self.ui.live.set_tap(
+                    id,
+                    0,
+                    kabl_ui::displays::LiveTap {
+                        last: 0.7,
+                        min: 0.0,
+                        max: 1.0,
                         view: kabl_modules::ModuleView {
                             valid: false,
                             position: 0.0,

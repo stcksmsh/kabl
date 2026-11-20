@@ -31,6 +31,7 @@ mod drum_grid;
 pub mod editor;
 pub mod explain;
 pub mod filebrowser;
+pub mod first_run;
 mod fm6;
 mod fx_displays;
 pub mod help;
@@ -59,6 +60,7 @@ pub mod tables;
 pub mod theme;
 #[cfg(test)]
 mod theme_tests;
+pub mod tour;
 
 pub use editor::PatchEditor;
 
@@ -188,6 +190,8 @@ pub struct UiState {
     pub last_message: Option<String>,
     /// Messages as toasts (errors stay, warnings 8 s, success 3 s); fed from `last_message`.
     pub toasts: Vec<kit::g4::Toast>,
+    /// The first-run tour while it runs (`None`: not running, or dismissed for good).
+    pub first_run: Option<tour::Tour>,
     /// The `last_message` text already turned into a toast.
     toast_seen: Option<String>,
     /// Scene (0 rack, 1 perform, 2 sounds) of the last frame and when it was entered: the view
@@ -453,6 +457,7 @@ impl Default for UiState {
             sample_rate: 48000.0,
             last_message: None,
             toasts: Vec::new(),
+            first_run: None,
             toast_seen: None,
             view_seen: None,
             glide: None,
@@ -1276,6 +1281,7 @@ pub fn show_with(
             });
     }
     browser::dialogs(editor, ui_state, ui.ctx());
+    tour::frame(editor, ui_state, ui, &st, page);
     show_toasts(ui_state, ui, &st, page);
     ui_state.explain.typing =
         routing::wants_text_input(ui.ctx()) || egui::Popup::is_any_open(ui.ctx());
