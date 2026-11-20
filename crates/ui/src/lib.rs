@@ -53,6 +53,7 @@ pub mod recipes;
 pub mod record;
 pub mod routing;
 mod seq_editor;
+pub mod sound_preview;
 pub mod style;
 pub mod tables;
 pub mod theme;

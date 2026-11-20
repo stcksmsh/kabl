@@ -150,6 +150,8 @@ struct AudioHost {
     faults_rx: Option<rtrb::Consumer<cpal::Error>>,
     /// Revisions the callback applied and when (`KABL_LATENCY_FILE` only).
     applied_rx: Option<rtrb::Consumer<(u64, f64)>>,
+    /// The Sounds scene's preview player, handed to the UI state once (`None` when offline).
+    preview: Option<kabl_ui::sound_preview::Player>,
 }
 
 #[derive(Clone)]
@@ -442,6 +444,7 @@ impl AudioHost {
             face_rx: None,
             faults_rx: None,
             applied_rx: None,
+            preview: None,
             _stream: None,
             _input: None,
             input_lost: None,
@@ -575,6 +578,9 @@ impl AudioHost {
             rtrb::RingBuffer::<cpal::Error>::new(kabl_standalone::STREAM_ERROR_QUEUE);
 
         let (control_tx, mut control_rx) = rtrb::RingBuffer::<ToAudio>::new(control::QUEUE);
+        // Sound previews: a clip the UI rendered, mixed on top of the rack below.
+        let (preview_player, mut preview_voice) =
+            kabl_ui::sound_preview::channel(collector.handle());
         let feedback = Arc::new(Feedback::default());
         let fb = feedback.clone();
         let gate = Arc::new(AtomicU64::new(if restarting { 0 } else { u64::MAX }));
@@ -661,6 +667,7 @@ impl AudioHost {
                 // commands and transport in request order (allocation-free, at most one queue's
                 // worth per callback), apply MIDI to every running graph, render.
                 engine.drain(&mut control_rx, control::QUEUE, &fb);
+                preview_voice.poll();
                 if measure {
                     let a = Feedback::get(&fb.applied_rev);
                     if a != last_applied {
@@ -767,6 +774,10 @@ impl AudioHost {
                     let l = left_ring.pop().unwrap_or(0.0);
                     let r = right_ring.pop().unwrap_or(0.0);
                     let (l, r) = if muted { (0.0, 0.0) } else { (l, r) };
+                    // The preview sounds on top of the rack, through the same output, meter
+                    // and recorder.
+                    let (pl, pr) = preview_voice.frame();
+                    let (l, r) = (l + pl, r + pr);
                     if rec {
                         tap.frame(l, r);
                     }
@@ -776,6 +787,7 @@ impl AudioHost {
                         *s = r;
                     }
                 }
+                preview_voice.report();
                 if t.count.load(Ordering::Relaxed) >= fault_after {
                     match fault.as_deref() {
                         Some("stall") => return,
@@ -852,6 +864,7 @@ impl AudioHost {
             face_rx: stream.is_some().then_some(face_rx),
             faults_rx: stream.is_some().then_some(faults_rx),
             applied_rx: (stream.is_some() && measure).then_some(applied_rx),
+            preview: stream.is_some().then_some(preview_player),
             _stream: stream,
             _input: input_stream,
             input_lost: take_input.then_some(input_lost),
@@ -1665,6 +1678,7 @@ impl App {
             self.phase = AudioPhase::Unavailable;
         }
         self.audio = done.audio;
+        core.ui.browser.clips.attach(self.audio.preview.take());
         core.delivery = done.delivery;
         core.progress = self
             .audio
@@ -2413,6 +2427,7 @@ fn main() -> eframe::Result<()> {
     ui_state.inspect.rebuilt(1, None, editor.state(), 0.0);
     ui_state.recorder = audio.recorder.take();
     ui_state.sample_rate = audio.sample_rate;
+    ui_state.browser.clips.attach(audio.preview.take());
     if let (Some(rec), Some(dir)) = (ui_state.recorder.as_mut(), flag("--record-dir")) {
         rec.dir = dir;
     }

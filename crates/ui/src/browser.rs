@@ -13,6 +13,7 @@
 use crate::filebrowser::{self, Mode, Purpose};
 use crate::kit::g4::{self, Sev, Size};
 use crate::kit::{self, Ic, Tip, Tone};
+use crate::sound_preview::ClipLook;
 use crate::style::{Role, Style};
 use crate::wheel::OwnedScroll;
 use egui::{pos2, vec2, Rect, Sense};
@@ -204,6 +205,8 @@ pub struct Browser {
     pub dialog: Option<Dialog>,
     /// A preview was started and may still sound (egui time it ends).
     pub preview_until: Option<f64>,
+    /// Rendered sound previews and their player (the Sounds scene's play buttons).
+    pub clips: crate::sound_preview::Previews,
     pub folder: String,
     /// The advanced patch-folder disclosure is open.
     pub folder_open: bool,
@@ -273,6 +276,7 @@ impl Default for Browser {
             audition: Audition::default(),
             dialog: None,
             preview_until: None,
+            clips: Default::default(),
             folder: "my-patch".into(),
             folder_open: false,
             focused: true,
@@ -496,6 +500,7 @@ pub fn is_modified(editor: &PatchEditor, ui: &UiState) -> bool {
 pub fn replace_patch(editor: &mut PatchEditor, ui: &mut UiState, log: PatchLog) {
     ui.launches.push(Command::PreviewStop);
     ui.browser.preview_until = None;
+    ui.browser.clips.stop();
     *editor = PatchEditor::from_log(log);
     if editor
         .state()
@@ -961,6 +966,10 @@ pub fn frame_input(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &egui::
         ui_state.launches.push(Command::PreviewStop);
         ui_state.browser.preview_until = None;
     }
+    if ui_state.browser.focused && !focused {
+        ui_state.browser.clips.stop();
+    }
+    ui_state.browser.clips.poll();
     ui_state.browser.focused = focused;
     let now = ui.input(|i| i.time);
     if ui_state.browser.preview_until.is_some_and(|t| now > t) {
@@ -1227,7 +1236,79 @@ fn macro_knob(ui: &mut egui::Ui, st: &Style, name: &str, v: f32, w: f32, compact
     );
 }
 
-/// One sound as a row: star, name, macro names, tags.
+/// What a row's play button shows.
+#[derive(Clone, Copy, Default)]
+struct PlayView {
+    /// Sounding now: level bars in the button and a progress line.
+    playing: bool,
+    /// Asked, waiting for the clip to render.
+    waiting: bool,
+    /// The sound has no preview (it failed to render, or there is no output here).
+    off: bool,
+    /// Show a pause icon while playing (the detail pane) instead of level bars (the rows).
+    pause: bool,
+    level: f32,
+    progress: f32,
+}
+
+/// The play button: a disc with a triangle, or level bars while it sounds. `now` is egui time,
+/// for the waiting pulse.
+fn play_button(ui: &egui::Ui, st: &Style, rect: Rect, v: PlayView, hovered: bool, now: f64) {
+    let c = rect.center();
+    let r = rect.height().min(rect.width()) / 2.0 - 1.0;
+    let p = ui.painter();
+    let fill = if v.playing {
+        st.roles.accent
+    } else if hovered && !v.off {
+        st.roles.line
+    } else {
+        st.roles.raised
+    };
+    p.circle_filled(c, r, fill);
+    if !v.playing {
+        p.circle_stroke(c, r, egui::Stroke::new(1.0, st.roles.line2));
+    }
+    if v.playing && v.pause {
+        for dx in [-0.3f32, 0.3] {
+            let x = c.x + dx * r * 1.1;
+            p.line_segment(
+                [pos2(x, c.y - r * 0.4), pos2(x, c.y + r * 0.4)],
+                egui::Stroke::new(2.6, st.roles.on_accent),
+            );
+        }
+    } else if v.playing {
+        // Three bars that follow the level, dark on the accent.
+        for (k, w) in [0.55f32, 1.0, 0.75].into_iter().enumerate() {
+            let h = (3.0 + (r * 1.1) * (v.level.sqrt() * w).clamp(0.0, 1.0)).min(r * 1.5);
+            let x = c.x + (k as f32 - 1.0) * 4.0;
+            p.line_segment(
+                [pos2(x, c.y - h / 2.0), pos2(x, c.y + h / 2.0)],
+                egui::Stroke::new(2.2, st.roles.on_accent),
+            );
+        }
+    } else {
+        let ink = if v.off {
+            st.roles.text3
+        } else if v.waiting {
+            let k = (0.5 + 0.5 * (now * 6.0).sin()) as f32;
+            st.roles.text.gamma_multiply(0.5 + 0.5 * k)
+        } else {
+            st.roles.text
+        };
+        let s = r * 0.5;
+        p.add(egui::Shape::convex_polygon(
+            vec![
+                pos2(c.x - s * 0.7, c.y - s),
+                pos2(c.x + s, c.y),
+                pos2(c.x - s * 0.7, c.y + s),
+            ],
+            ink,
+            egui::Stroke::NONE,
+        ));
+    }
+}
+
+/// One sound as a row: play button, name, macro names, tags, star.
 fn sound_row(
     ui: &mut egui::Ui,
     st: &Style,
@@ -1235,7 +1316,8 @@ fn sound_row(
     macros: &str,
     fav: bool,
     sel: bool,
-) -> (egui::Response, egui::Response) {
+    play: PlayView,
+) -> (egui::Response, egui::Response, egui::Response) {
     let w = ui.available_width();
     let (rect, row) =
         ui.allocate_exact_size(vec2(w, st.metrics.control_h + st.sp(2)), Sense::click());
@@ -1255,8 +1337,33 @@ fn sound_row(
             egui::StrokeKind::Inside,
         );
     }
-    let star_rect = egui::Rect::from_center_size(
+    let play_rect = egui::Rect::from_center_size(
         rect.left_center() + vec2(st.sp(3) + 4.0, 0.0),
+        vec2(st.metrics.control_h, st.metrics.control_h),
+    );
+    let play_r = ui.interact(play_rect, row.id.with("play"), Sense::click());
+    let now = ui.input(|i| i.time);
+    play_button(
+        ui,
+        st,
+        play_rect.shrink(2.0),
+        play,
+        play_r.hovered() || sel,
+        now,
+    );
+    if play.playing {
+        // The progress line along the foot of the row.
+        let y = rect.bottom() - 2.0;
+        ui.painter().line_segment(
+            [
+                pos2(rect.left() + 8.0, y),
+                pos2(rect.left() + 8.0 + (rect.width() - 16.0) * play.progress, y),
+            ],
+            egui::Stroke::new(2.0, st.roles.accent),
+        );
+    }
+    let star_rect = egui::Rect::from_center_size(
+        rect.right_center() - vec2(st.sp(3) + 4.0, 0.0),
         vec2(st.metrics.control_h, st.metrics.control_h),
     );
     let star = ui.interact(star_rect, row.id.with("star"), Sense::click());
@@ -1294,7 +1401,7 @@ fn sound_row(
         .cloned()
         .collect::<Vec<_>>()
         .join(" · ");
-    let tags = kit::fit_text(ui, st, &tags, rect.right() - x_tags - st.sp(2));
+    let tags = kit::fit_text(ui, st, &tags, star_rect.left() - x_tags - st.sp(1));
     let p = ui.painter();
     p.text(
         pos2(x_macros, mid),
@@ -1310,7 +1417,7 @@ fn sound_row(
         st.font(Role::Caption),
         st.roles.text3,
     );
-    (row, star)
+    (row, star, play_r)
 }
 
 /// An accent pill with the active category's name; clicking it clears the category.
@@ -1376,6 +1483,8 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     );
     let col = |r: Rect| egui::UiBuilder::new().max_rect(r);
     let mut open = None;
+    follow_selection(ui_state);
+    preview_keys(ui_state, ui, &mut open);
     ui.scope_builder(col(nav), |ui| nav_column(editor, ui_state, ui, st));
     ui.scope_builder(col(mid), |ui| list_column(ui_state, ui, st, &mut open));
     ui.scope_builder(col(side), |ui| {
@@ -1383,6 +1492,179 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     });
     if let Some(id) = open {
         request(editor, ui_state, Pending::Open(id));
+    }
+}
+
+/// Makes sure the clip of sound `id` is rendering or rendered.
+fn prepare_clip(ui_state: &mut UiState, id: &str) {
+    let Some(e) = ui_state.library.as_ref().and_then(|l| l.get(id)).cloned() else {
+        return;
+    };
+    let rate = ui_state.sample_rate.max(8000.0);
+    ui_state.browser.clips.ensure(id, &e.dir, &e.meta, rate);
+}
+
+/// The selected sound's clip renders in the background; a new selection ends the preview of the
+/// old one and, with "Preview when selected" on, starts its own. Never while a clock runs.
+fn follow_selection(ui_state: &mut UiState) {
+    let sel = ui_state.browser.selected.clone();
+    if let Some(id) = &sel {
+        prepare_clip(ui_state, id);
+    }
+    if ui_state.browser.clips.seen == sel {
+        return;
+    }
+    ui_state.browser.clips.seen = sel.clone();
+    ui_state.browser.clips.stop();
+    let on = ui_state
+        .library
+        .as_ref()
+        .is_some_and(|l| l.prefs.preview_on_select);
+    let quiet = !ui_state.host_clock && !ui_state.clock_running.values().any(|r| *r);
+    if let (true, true, Some(id)) = (on, quiet, sel) {
+        ui_state.browser.clips.play(&id);
+    }
+}
+
+/// Space plays or stops the selected sound's preview; Enter loads it.
+fn preview_keys(ui_state: &mut UiState, ui: &egui::Ui, open: &mut Option<String>) {
+    let free = ui_state.browser.dialog.is_none()
+        && !ui.ctx().egui_wants_keyboard_input()
+        && ui.memory(|m| m.focused().is_none());
+    let Some(sel) = ui_state.browser.selected.clone().filter(|_| free) else {
+        return;
+    };
+    if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Space)) {
+        if ui_state.browser.clips.busy(&sel) {
+            ui_state.browser.clips.stop();
+        } else {
+            ui_state.browser.clips.stop();
+            ui_state.browser.clips.play(&sel);
+        }
+    }
+    if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)) {
+        *open = Some(sel);
+    }
+}
+
+/// The detail pane's preview: a waveform well with a playhead, the play button, and the facts.
+fn preview_well(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, id: &str) {
+    let now = ui.input(|i| i.time);
+    let clips = &ui_state.browser.clips;
+    let playing = clips.playing() == Some(id);
+    let waiting = !playing && clips.busy(id);
+    let progress = if playing { clips.progress() } else { 0.0 };
+    let level = if playing { clips.level() } else { 0.0 };
+    let w = ui.available_width();
+    let (rect, well) = ui.allocate_exact_size(vec2(w, 76.0), Sense::click());
+    ui.painter().rect_filled(rect, 8.0, st.roles.inset);
+    ui.painter().rect_stroke(
+        rect,
+        8.0,
+        egui::Stroke::new(1.0, st.roles.line),
+        egui::StrokeKind::Inside,
+    );
+    let mut note = None;
+    let mut length: Option<String> = None;
+    let mut ready = false;
+    match clips.look(id) {
+        ClipLook::Ready(c) => {
+            ready = true;
+            length = Some(c.length_text());
+            let inner = rect.shrink2(vec2(10.0, 8.0));
+            let n = c.wave.len().max(1);
+            let step = inner.width() / n as f32;
+            let p = ui.painter();
+            for (i, v) in c.wave.iter().enumerate() {
+                let x = inner.left() + (i as f32 + 0.5) * step;
+                let h = (v * inner.height()).max(2.0);
+                let past = playing && (i as f32 / n as f32) < progress;
+                let ink = if past {
+                    st.roles.accent
+                } else {
+                    st.roles.text3
+                };
+                p.line_segment(
+                    [
+                        pos2(x, inner.center().y - h / 2.0),
+                        pos2(x, inner.center().y + h / 2.0),
+                    ],
+                    egui::Stroke::new((step * 0.6).clamp(1.0, 3.0), ink),
+                );
+            }
+            if playing {
+                let x = inner.left() + inner.width() * progress;
+                p.line_segment(
+                    [pos2(x, rect.top() + 4.0), pos2(x, rect.bottom() - 4.0)],
+                    egui::Stroke::new(1.5, st.roles.text),
+                );
+            }
+        }
+        ClipLook::Rendering => note = Some("Rendering the preview…"),
+        ClipLook::Failed(why) => note = Some(why),
+        ClipLook::NoOutput => note = Some("Previews play through the standalone app's output."),
+        ClipLook::Idle => {}
+    }
+    if let Some(t) = note {
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            t,
+            st.font(Role::Caption),
+            st.roles.text3,
+        );
+    }
+    if matches!(clips.look(id), ClipLook::Rendering) || playing || waiting {
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(16));
+    }
+    ui.add_space(st.sp(1));
+    let btn = st.metrics.control_h;
+    let row = ui.horizontal(|ui| {
+        let (b, r) = ui.allocate_exact_size(vec2(btn, btn), Sense::click());
+        play_button(
+            ui,
+            st,
+            b,
+            PlayView {
+                playing,
+                waiting,
+                off: !ready,
+                pause: true,
+                level,
+                progress,
+            },
+            r.hovered(),
+            now,
+        );
+        ui.vertical(|ui| {
+            kit::label(ui, st, Role::Body, Tone::Text, "Preview");
+            kit::label(
+                ui,
+                st,
+                Role::Caption,
+                Tone::Text3,
+                match &length {
+                    Some(t) => format!("{t} · matched loudness"),
+                    None => "matched loudness".to_string(),
+                },
+            );
+        });
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            kit::label(ui, st, Role::Caption, Tone::Text3, "Space");
+        });
+        r
+    });
+    let r = row.inner.tip(st, "Play or stop the preview (Space)");
+    ui_state.record("preview-play".to_string(), r.rect);
+    ui_state.record("preview-well".to_string(), well.rect);
+    if (r.clicked() || well.clicked()) && ready {
+        let clips = &mut ui_state.browser.clips;
+        let was = clips.playing() == Some(id);
+        clips.stop();
+        if !was {
+            clips.play(id);
+        }
     }
 }
 
@@ -1622,15 +1904,53 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
     );
     hit(ui_state, "search", &r);
     kit::gap(ui, st, 1);
-    // The active category as a chip; a click drops it.
-    if let Some(cat) = ui_state.browser.category.clone() {
-        let r = category_chip(ui, st, &cat);
+    // The active category as a chip (a click drops it); "Preview when selected" on the right.
+    let mut on_select = ui_state
+        .library
+        .as_ref()
+        .is_some_and(|l| l.prefs.preview_on_select);
+    let can_preview = ui_state.browser.clips.available();
+    let cat = ui_state.browser.category.clone();
+    let mut chip = None;
+    let mut sw = None;
+    ui.horizontal(|ui| {
+        if let Some(cat) = &cat {
+            chip = Some(category_chip(ui, st, cat));
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.add_enabled_ui(can_preview, |ui| {
+                sw = Some(
+                    kit::toggle(ui, st, &mut on_select, "Preview when selected").tip(
+                        st,
+                        if can_preview {
+                            "Play a sound's preview as soon as you select it. Never while a \
+                         clock is running."
+                        } else {
+                            "Previews play through the standalone app's output."
+                        },
+                    ),
+                );
+            });
+        });
+    });
+    if let Some(r) = chip {
         hit(ui_state, "category-chip", &r);
         if r.clicked() {
             ui_state.browser.category = None;
         }
-        kit::gap(ui, st, 1);
     }
+    if let Some(r) = sw {
+        hit(ui_state, "preview-on-select", &r);
+        if r.changed() {
+            if let Some(lib) = ui_state.library.as_mut() {
+                lib.prefs.preview_on_select = on_select;
+                if let Some(n) = lib.save_prefs() {
+                    message(ui_state, n);
+                }
+            }
+        }
+    }
+    kit::gap(ui, st, 1);
     {
         let (rect, _) =
             ui.allocate_exact_size(vec2(ui.available_width(), st.sp(4)), Sense::hover());
@@ -1698,6 +2018,47 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
     let favorites = lib.prefs.favorites.clone();
     let has_user = lib.entries.iter().any(|e| e.origin == Origin::User);
     let filter = b.filter;
+    // Up and Down move the selection through the rows shown.
+    let moved_to = {
+        let ids: Vec<&str> = rows
+            .iter()
+            .filter_map(|r| r.as_ref().ok().map(|e| e.id.as_str()))
+            .collect();
+        let keys_free = ui_state.browser.dialog.is_none()
+            && !ui.ctx().egui_wants_keyboard_input()
+            && ui.memory(|m| m.focused().is_none());
+        let step = if keys_free {
+            ui.input_mut(|i| {
+                if i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown) {
+                    1isize
+                } else if i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp) {
+                    -1
+                } else {
+                    0
+                }
+            })
+        } else {
+            0
+        };
+        if step == 0 || ids.is_empty() {
+            None
+        } else {
+            let at = ui_state
+                .browser
+                .selected
+                .as_deref()
+                .and_then(|s| ids.iter().position(|i| *i == s));
+            let to = match at {
+                Some(a) => (a as isize + step).clamp(0, ids.len() as isize - 1) as usize,
+                None if step > 0 => 0,
+                None => ids.len() - 1,
+            };
+            Some(ids[to].to_string())
+        }
+    };
+    if let Some(id) = &moved_to {
+        ui_state.browser.selected = Some(id.clone());
+    }
 
     // The panel body scrolls, so the list takes the room and the audition block sits
     // below it, reached by scrolling when the window is short.
@@ -1756,7 +2117,32 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
                             .map(|(n, _)| n.as_str())
                             .collect::<Vec<_>>()
                             .join(" · ");
-                        let (row, star) = sound_row(ui, st, e, &macros, fav, sel);
+                        let clips = &ui_state.browser.clips;
+                        let playing = clips.playing() == Some(e.id.as_str());
+                        let pv = PlayView {
+                            playing,
+                            waiting: !playing && clips.busy(&e.id),
+                            off: !clips.available()
+                                || matches!(clips.look(&e.id), ClipLook::Failed(_)),
+                            level: if playing { clips.level() } else { 0.0 },
+                            progress: if playing { clips.progress() } else { 0.0 },
+                            pause: false,
+                        };
+                        let (row, star, play) = sound_row(ui, st, e, &macros, fav, sel, pv);
+                        if moved_to.as_deref() == Some(e.id.as_str()) {
+                            ui.scroll_to_rect(row.rect.expand(8.0), None);
+                        }
+                        let play = play.tip(
+                            st,
+                            if playing {
+                                "Stop the preview"
+                            } else if pv.off {
+                                "No preview for this sound: load it to hear it"
+                            } else {
+                                "Play a preview"
+                            },
+                        );
+                        ui_state.record(format!("play:{}", e.id), play.rect);
                         let star = star.tip(
                             st,
                             if fav {
@@ -1767,7 +2153,18 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
                         );
                         ui_state.record(format!("fav:{}", e.id), star.rect);
                         ui_state.record(format!("sound:{}", e.id), row.rect);
-                        if star.clicked() {
+                        if play.clicked() {
+                            ui_state.browser.selected = Some(e.id.clone());
+                            // This selection is already handled: it must not stop the play.
+                            ui_state.browser.clips.seen = Some(e.id.clone());
+                            if playing {
+                                ui_state.browser.clips.stop();
+                            } else if !pv.off {
+                                ui_state.browser.clips.stop();
+                                prepare_clip(ui_state, &e.id);
+                                ui_state.browser.clips.play(&e.id);
+                            }
+                        } else if star.clicked() {
                             toggle = Some(e.id.clone());
                         } else if row.clicked() {
                             ui_state.browser.selected = Some(e.id.clone());
@@ -1856,6 +2253,8 @@ fn detail_column(
                     if !e.meta.description.is_empty() {
                         kit::paragraph(ui, st, Role::Body, Tone::Text2, &e.meta.description);
                     }
+                    preview_well(ui_state, ui, st, &e.id);
+                    kit::gap(ui, st, 1);
                     let compact = ui.available_width() < 330.0;
                     let mut one = 1;
                     let macros = macros_cached(&mut ui_state.browser, e, &mut one).to_vec();
@@ -1881,48 +2280,25 @@ fn detail_column(
                         )
                         .tip(st, "Load into the rack");
                     hit(ui_state, "open", &r);
+                    // The mockup's key hint, right-aligned in the button.
+                    ui.painter().text(
+                        pos2(r.rect.right() - 12.0, r.rect.center().y),
+                        egui::Align2::RIGHT_CENTER,
+                        "Enter",
+                        st.font(Role::Caption),
+                        st.roles.on_accent.gamma_multiply(0.7),
+                    );
                     if r.clicked() {
                         *open = Some(e.id.clone());
                     }
-                    ui.horizontal(|ui| {
-                        let gap = st.sp(1);
-                        ui.spacing_mut().item_spacing.x = gap;
-                        let w = (ui.available_width() - gap) / 2.0;
-                        let (keys, sequence) = Meta::play_of(editor.state());
-                        let r = ui
-                            .add(
-                                kit::Button::new(st, "Audition")
-                                    .min_width(w)
-                                    .enabled(keys || sequence),
-                            )
-                            .tip(st, "Play the sound in the rack; options below");
-                        hit(ui_state, "audition", &r);
-                        if r.clicked() {
-                            if keys {
-                                let a = &ui_state.browser.audition;
-                                let (cmd, secs) = (a.command(ui_state.sample_rate), a.secs as f64);
-                                ui_state.launches.push(cmd);
-                                let now = ui.input(|i| i.time);
-                                ui_state.browser.preview_until = Some(now + secs);
-                            } else {
-                                let clocks = editor
-                                    .state()
-                                    .modules
-                                    .iter()
-                                    .filter(|(_, m)| m.kind == "clock")
-                                    .map(|(&id, _)| (id, Transport::Run));
-                                ui_state.transport.extend(clocks);
-                            }
-                        }
-                        let r = ui
-                            .add(kit::Button::new(st, "Open in rack").min_width(w))
-                            .tip(st, "Load into the rack and show the rack");
-                        hit(ui_state, "open-rack", &r);
-                        if r.clicked() {
-                            *open = Some(e.id.clone());
-                            ui_state.browser_open = false;
-                        }
-                    });
+                    let r = ui
+                        .add(kit::Button::new(st, "Open in rack").min_width(ui.available_width()))
+                        .tip(st, "Load into the rack and show the rack");
+                    hit(ui_state, "open-rack", &r);
+                    if r.clicked() {
+                        *open = Some(e.id.clone());
+                        ui_state.browser_open = false;
+                    }
                     // Quiet facts below the buttons.
                     kit::gap(ui, st, 1);
                     ui.horizontal(|ui| {
@@ -1955,10 +2331,15 @@ fn detail_column(
                     );
                 }
             }
-            kit::gap(ui, st, 1);
-            kit::rule(ui, st);
-            kit::gap(ui, st, 1);
-            play_section(editor, ui_state, ui);
+            // The sound in the rack, when it can be played (a note, a chord, Start/Stop): the
+            // selected sound's own preview is above.
+            let (rack_keys, rack_seq) = Meta::play_of(editor.state());
+            if rack_keys || rack_seq {
+                kit::gap(ui, st, 1);
+                kit::rule(ui, st);
+                kit::gap(ui, st, 1);
+                play_section(editor, ui_state, ui);
+            }
 
             kit::gap(ui, st, 1);
             kit::rule(ui, st);
@@ -2059,7 +2440,8 @@ fn detail_column(
     ui_state.record("browser-body".into(), body.inner_rect);
 }
 
-/// Audition for keyboard sounds, Start/Stop for pieces: always the sound in the rack.
+/// Notes and chords for keyboard sounds, Start/Stop for pieces: always the sound in the rack
+/// (a selected sound's own preview is `preview_well`). Drawn only when the rack sound plays.
 fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui) {
     let st = ui_state.style.clone();
     let st = &*st;
@@ -2067,7 +2449,7 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
         .doc
         .as_ref()
         .map_or(String::new(), |d| d.name.clone());
-    kit::section(ui, st, "Audition");
+    kit::section(ui, st, "Play the rack sound");
     kit::label_truncated(
         ui,
         st,
@@ -2233,15 +2615,6 @@ fn play_section(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui:
             Role::Caption,
             Tone::Text3,
             "Start and Stop run every clock in the sound (the clock's own buttons do the same).",
-        );
-    }
-    if !keys && !sequence {
-        kit::paragraph(
-            ui,
-            st,
-            Role::Body,
-            Tone::Text3,
-            "This sound has no keyboard input and no clock: nothing to audition.",
         );
     }
 }
