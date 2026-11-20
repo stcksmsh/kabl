@@ -1,0 +1,13 @@
+name = "Temple Bowl"
+category = "Voice"
+tags = [
+    "poly",
+    "fm",
+    "metal",
+    "struck",
+    "ambient",
+    "experimental",
+]
+description = "A struck metal bowl: an FM voice with an inharmonic ratio and a ring modulated partner, a mallet strike and a long ring in a hall. Play single notes and open fifths and let them ring. Strike goes from a soft mallet to a hard clang, Metal from a tuned bowl to an inharmonic clang, Ring from a short tap to a seven second ring, Space adds the echo and the hall."
+keys = true
+sequence = false

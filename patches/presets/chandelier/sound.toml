@@ -1,0 +1,13 @@
+name = "Chandelier"
+category = "Voice"
+tags = [
+    "poly",
+    "fm",
+    "bowed",
+    "glass",
+    "pop",
+    "ambient",
+]
+description = "Bowed crystal: a sine with a high FM partial and a rubbed rim, bowed in slowly and left in a hall. Play slow, high notes and fifths. Rub brings in the friction of a wet rim with a hint of vibrato, Overtone brings forward the glassy partial, Bow goes from a struck ping to a slow bow, Space adds the echo and the hall."
+keys = true
+sequence = false
