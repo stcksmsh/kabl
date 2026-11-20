@@ -1,44 +1,19 @@
-//! `kabl` standalone binary: opens the default audio output device and a MIDI input port,
-//! compiles `default_patch()`, and plays it live. This is brief section 12's `standalone` crate
-//! (cpal + midir) — the "something a person can open and hear" milestone.
+//! `kabl` command-line tool. It has no audio player of its own: live play (audio output, MIDI
+//! input) is the `kabl-ui` app, the one live audio path.
 //!
-//! No UI yet (that's `kabl-ui`, separate) — this binary alone gets you a playable polysynth from
-//! any class-compliant MIDI controller, nothing to patch or configure yet beyond `default_patch()`.
-//!
-//! If no audio output device is found (or none of its supported configs can do `f32` samples),
-//! falls back to rendering a short self-test WAV instead of exiting silently — proves the
-//! synthesis path is intact even on a machine (or container) with no audio hardware, rather than
-//! just failing with no evidence either way.
-//!
-//! `--patch <file.kabl>` loads a patch saved by `kabl_core::format::save_kabl` (the same format `kabl-ui`'s "Save"
-//! button writes) instead of playing `default_patch()`. `--save-default <file.kabl>` writes
-//! `default_patch()` out in that format and exits, as a starting point to then edit with
-//! `kabl-ui` — neither binary shipped any way to get a save file onto disk before this existed.
-//! `--midi <substring>` connects to the first port whose name contains it (case-insensitive);
-//! without it, the first port that isn't ALSA's own "Midi Through" virtual loopback (confirmed
-//! live: a real controller plugged in still lost to it before this existed).
+//! - `kabl cat|pack|unpack ...`: the .kabl file tools (`kabl_core::cli`).
+//! - `kabl --save-default <file.kabl>`: writes `default_patch()` in the format `kabl-ui`'s Save
+//!   writes, as a starting point to edit in `kabl-ui`.
+//! - `kabl [--patch <file.kabl>]`: compiles the patch (or `default_patch()`) and renders a short
+//!   chord to `target/spike-renders/standalone_selftest.wav`, proving the synthesis path works.
+//!   `--midi` (the old live-play port choice) is ignored with a warning: use `kabl-ui`.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 
-use basedrop::Collector;
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use kabl_core::{Op, PatchLog, PatchState, Source};
 use kabl_engine::graph::BLOCK;
-use kabl_engine::patch_engine::PatchEngine;
 use kabl_engine::voice_allocator::VoiceAllocator;
-use kabl_standalone::{
-    apply_voice_event, connect_midi, default_patch, RingBuffer, VoiceEvent, DEFAULT_VOICE_COUNT,
-};
-
-/// Samples of headroom each ring buffer keeps between the engine's `BLOCK`-sized output and
-/// `cpal`'s host-chosen callback buffer size (which can be much larger than `BLOCK` and isn't
-/// known until the stream is built). 256 blocks =~ 340ms at 48kHz — comfortably more than any
-/// reasonable host buffer setting, so `RingBuffer::push_slice`'s overflow assert should never
-/// fire in practice; if it ever does, that's a real host buffer size this needs to be raised for,
-/// not a bug to silently work around.
-const RING_CAPACITY: usize = BLOCK * 256;
+use kabl_standalone::{default_patch, DEFAULT_VOICE_COUNT};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -103,169 +78,14 @@ fn run(args: &[String]) -> i32 {
         None => default_patch(),
     };
 
-    let host = cpal::default_host();
-    let Some(device) = host.default_output_device() else {
-        log::warn!(target: "app", "no audio output device found on this system.");
-        render_self_test(&patch);
-        return 0;
-    };
-
-    let Some(config) = pick_output_config(&device) else {
-        log::warn!(target: "app", "no usable (f32) output config found for the default audio device.");
-        render_self_test(&patch);
-        return 0;
-    };
-
-    let sample_rate = config.sample_rate() as f32;
-    let channels = config.channels() as usize;
-    log::info!(target: "app", "output device ready, {sample_rate} Hz, {channels} channel(s), {DEFAULT_VOICE_COUNT} voices"
-    );
-
-    // Code-module time budgets: the engine calls modules once per BLOCK frames.
-    kabl_modules::code::host::device_changed(sample_rate, kabl_engine::graph::BLOCK as u32);
-
-    let collector = Collector::new();
-    let handle = collector.handle();
-    let mut engine = match PatchEngine::new(&handle, &patch, sample_rate, DEFAULT_VOICE_COUNT) {
-        Ok(e) => e,
-        Err(err) => {
-            log::error!(target: "app", "failed to compile the default patch: {err}");
-            return 1;
-        }
-    };
-    for n in kabl_modules::code::host::active_scope().take_notes() {
-        log::warn!(target: "app", "{n}");
+    if args.iter().any(|a| a == "--midi") {
+        log::warn!(target: "app", "--midi: live play moved to kabl-ui; this binary only renders");
     }
-
-    let (midi_producer, mut midi_consumer) = rtrb::RingBuffer::<VoiceEvent>::new(256);
-    let _midi_connection = connect_midi("kabl", midi_producer, flag_value(&args, "--midi"));
-
-    let xruns = Arc::new(AtomicU64::new(0));
-    let xruns_cb = xruns.clone();
-    let errors = Arc::new(kabl_standalone::StreamErrorCounts::default());
-    let errors_cb = errors.clone();
-    let (mut faults_tx, mut faults_rx) =
-        rtrb::RingBuffer::<cpal::Error>::new(kabl_standalone::STREAM_ERROR_QUEUE);
-    let mut left_ring = RingBuffer::new(RING_CAPACITY);
-    let mut right_ring = RingBuffer::new(RING_CAPACITY);
-
-    let stream = device.build_output_stream(
-        config.config(),
-        move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-            // Flush subnormals to zero for the whole callback; restored when it returns.
-            let _ftz = kabl_engine::ftz::FtzGuard::new();
-            // Audio thread: apply any MIDI events queued since the last callback, then produce
-            // and interleave samples. No allocation anywhere in this closure body.
-            while let Ok(event) = midi_consumer.pop() {
-                apply_voice_event(&mut engine, event);
-            }
-
-            let frames_needed = data.len() / channels;
-            while left_ring.available() < frames_needed {
-                let mut l = [0f32; BLOCK];
-                let mut r = [0f32; BLOCK];
-                engine.process_block(&mut l, &mut r);
-                left_ring.push_slice(&l);
-                right_ring.push_slice(&r);
-            }
-
-            for frame in data.chunks_mut(channels) {
-                let l = left_ring.pop().unwrap_or(0.0);
-                let r = right_ring.pop().unwrap_or(0.0);
-                frame[0] = l;
-                for s in frame.iter_mut().skip(1) {
-                    *s = r;
-                }
-            }
-        },
-        // On the audio thread: count and hand over unformatted; logged below.
-        move |err| {
-            if err.kind() == cpal::ErrorKind::Xrun {
-                xruns_cb.fetch_add(1, Ordering::Relaxed);
-            }
-            kabl_standalone::hand_off_stream_error(err, &mut faults_tx, &errors_cb);
-        },
-        None,
-    );
-
-    let stream = match stream {
-        Ok(s) => s,
-        Err(err) => {
-            log::warn!(target: "app", "failed to build audio output stream: {err}");
-            render_self_test(&patch);
-            return 0;
-        }
-    };
-
-    if let Err(err) = stream.play() {
-        log::warn!(target: "app", "failed to start audio stream: {err}");
-        render_self_test(&patch);
-        return 0;
-    }
-
-    log::info!(target: "app", "playing. Ctrl+C to quit.");
-    // `collector`/`stream` just need to stay alive for the process's lifetime -- an infinite
-    // loop here keeps both in scope without an explicit leak. Nothing to swap yet (no UI/
-    // repatching), so no periodic `collector.collect()` is needed either: deferred-drop nodes
-    // only queue up on a completed swap, and none happen in this v1 binary.
-    // Every second: drop the handed-over errors here (not on the audio thread); every 10 s,
-    // log what the audio side counted, as one line when something happened.
-    let (mut seen, mut errors_seen) = (0, [0; kabl_standalone::STREAM_ERROR_KINDS.len() + 2]);
-    let mut last = None::<(String, std::time::Instant)>;
-    for tick in 1u64..=u64::MAX {
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        while let Ok(e) = faults_rx.pop() {
-            last = Some((e.to_string(), std::time::Instant::now()));
-        }
-        if tick % 10 != 0 {
-            continue;
-        }
-        let x = xruns.load(Ordering::Relaxed);
-        if x != seen {
-            log::info!(target: "audio.health", "last 10s: xruns={}", x - seen);
-            seen = x;
-        }
-        let (kinds, lost) = errors.since(&mut errors_seen);
-        if !kinds.is_empty() {
-            let last = last
-                .as_ref()
-                .map(|(t, at)| (t.as_str(), at.elapsed().as_secs_f64()));
-            log::warn!(
-                target: "audio",
-                "{}",
-                kabl_standalone::stream_error_line(10.0, &kinds, last, lost)
-            );
-        }
-    }
+    render_self_test(&patch);
     0
 }
 
-/// Picks the default output config if it supports `f32` samples, else scans every supported
-/// config range for one that does (preferring the device's own default sample rate when it falls
-/// within a candidate range). Real audio devices overwhelmingly support f32 directly via cpal's
-/// resampling-free path; this only matters on the minority that don't advertise it as default.
-fn pick_output_config(device: &cpal::Device) -> Option<cpal::SupportedStreamConfig> {
-    if let Ok(default) = device.default_output_config() {
-        if default.sample_format() == cpal::SampleFormat::F32 {
-            return Some(default);
-        }
-    }
-    let default_rate = device.default_output_config().ok().map(|c| c.sample_rate());
-    let mut configs: Vec<_> = device
-        .supported_output_configs()
-        .ok()?
-        .filter(|c| c.sample_format() == cpal::SampleFormat::F32)
-        .collect();
-    configs.sort_by_key(|c| c.channels());
-    let range = configs.into_iter().next()?;
-    let rate = default_rate
-        .filter(|&r| r >= range.min_sample_rate() && r <= range.max_sample_rate())
-        .unwrap_or_else(|| range.max_sample_rate());
-    Some(range.with_sample_rate(rate))
-}
-
-/// No audio device (or no MIDI, separately handled) — proves the synthesis path still works by
-/// rendering a short chord progression straight through the compiler (bypassing `PatchEngine`/
+/// Proves the synthesis path works by rendering a short chord progression straight through the compiler (bypassing `PatchEngine`/
 /// `cpal` entirely) to a WAV file, rather than the binary just doing nothing observable.
 fn render_self_test(patch: &kabl_core::PatchState) {
     let sample_rate = 48000.0;
@@ -321,7 +141,7 @@ fn render_self_test(patch: &kabl_core::PatchState) {
                 let _ = writer.write_sample(s);
             }
             let _ = writer.finalize();
-            log::warn!(target: "app", "no audio device -- wrote a self-test render proving the synth path works: {}",
+            log::info!(target: "app", "wrote a self-test render proving the synth path works: {}",
                 path.display()
             );
         }
