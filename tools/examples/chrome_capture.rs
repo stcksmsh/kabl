@@ -988,7 +988,7 @@ impl eframe::App for App {
         }
         // The lanes' animation runs on the clock: give the routes scenes time to settle.
         if self.jobs[self.i].scene == "sounds-preview" {
-            use kabl_ui::sound_preview::{ClipLook, STATUS};
+            use kabl_ui::sound_preview::ClipLook;
             use std::sync::atomic::Ordering;
             let id = "factory:presets/acid-line";
             let clips = &mut self.ui.browser.clips;
@@ -996,12 +996,14 @@ impl eframe::App for App {
                 clips.play(id);
             }
             // Playing, 40 % through, at a lively level.
-            STATUS.gen.store(1, Ordering::Relaxed);
-            STATUS.active.store(true, Ordering::Relaxed);
-            STATUS.len.store(192_000, Ordering::Relaxed);
-            STATUS.pos.store(76_800, Ordering::Relaxed);
-            for l in &STATUS.level {
-                l.store(0.55f32.to_bits(), Ordering::Relaxed);
+            if let Some(status) = clips.status() {
+                status.gen.store(1, Ordering::Relaxed);
+                status.active.store(true, Ordering::Relaxed);
+                status.len.store(192_000, Ordering::Relaxed);
+                status.pos.store(76_800, Ordering::Relaxed);
+                for l in &status.level {
+                    l.store(0.55f32.to_bits(), Ordering::Relaxed);
+                }
             }
         }
         if self.jobs[self.i].scene == "perform" {
