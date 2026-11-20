@@ -27,11 +27,11 @@ oracle: A wordless choir. Vowel steps cleanly between the vowels, Breath for a w
    42 s  macro 3: Choir
    63 s  macro 4: Space
 
-automaton: Chords that talk in a loop. Speech at 0 is a held vowel, at 1 a sentence. Detail for crisp consonants, Crush for grit.
+automaton: Chords that talk in a loop. Speech at 0 is a held vowel, at 1 a sentence. Detail for crisp consonants, Weight for the octave down.
     0 s  macro 1: Speech
    21 s  macro 2: Detail
    42 s  macro 3: Size
-   63 s  macro 4: Crush
+   63 s  macro 4: Weight
 
 vox-chop: Stabs whose vowel jumps on every sixteenth (needs Run). Vowels at 0 is one vowel, at 1 it chatters. Chop for the pulse.
     0 s  macro 1: Chop

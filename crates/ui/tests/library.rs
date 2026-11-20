@@ -865,8 +865,8 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "presets/automaton",
         "Automaton",
         "Voice",
-        &["poly", "vocoder", "robot", "bitcrushed", "french touch", "signature"],
-        "A robot choir for French touch: your chord is the carrier of a vocoder whose voice is a monotone buzz that speaks a looping sentence, built into the patch, close and dry (no echo or room). Play held chords. Speech goes from one held vowel to a sentence of vowels four seconds long, Detail from a coarse robot to a crisp one with consonants, Size from a small robot to a large one, Crush adds a digital grind.",
+        &["poly", "vocoder", "robot", "sub", "french touch", "signature"],
+        "A robot choir for French touch: your chord is the carrier of a vocoder whose voice is a monotone buzz that speaks a looping sentence, built into the patch, close and dry (no echo or room). Play held chords. Speech goes from one held vowel to a sentence of vowels four seconds long, Detail from a coarse robot to a crisp one with consonants, Size from a small robot to a large one, Weight brings in a saw an octave down.",
     ),
     (
         "presets/vox-chop",

@@ -1020,7 +1020,7 @@ fn temple_bowl() -> Rack {
         fenv_amt: 0.0,
         wheel_amt: 0.0,
         aenv: [3.0, 2500.0, 0.0, 1200.0],
-        trim_db: 6.5,
+        trim_db: 10.5,
     });
     // The modulator (inharmonic ratio) phase-modulates the carrier; the carrier's index is how hard.
     let modulator = v.r.add(
@@ -1062,22 +1062,26 @@ fn temple_bowl() -> Rack {
     v.r.wire(v.m, "gate", hit, "gate");
     v.r.route(hit, "out", fm, "index", 0.18);
     // Strike: a soft mallet to a hard clang (the index of the FM voice). Level held by a trim.
-    let s = span_lh(&mut v, 1, fm, "osc.fm", "index", 0.3, 1.2, 3.5);
-    let _ = s;
+    let s = span_lh(&mut v, 1, fm, "osc.fm", "index", 0.8, 1.2, 1.8);
+    span(&mut v, 1, s, hit, "env.adsr", "decay_ms", 900.0, 220.0);
+    comp_gain(&mut v, 1, s, -0.9);
     // Metal: a tuned bowl to an inharmonic clang (the ratio and the ring modulated partner).
     let s = span_lh(&mut v, 2, modulator, "osc.fm", "ratio", 1.0, 2.76, 3.9);
     span(&mut v, 2, s, mix, "mixer", "level3", 0.0, 0.2);
+    comp_gain(&mut v, 2, s, 2.3);
     // Ring: a short tap to a six second ring.
     let aenv = v.aenv;
     let s = span_lh(
         &mut v, 3, aenv, "env.adsr", "decay_ms", 350.0, 2500.0, 7000.0,
     );
     span_hi(&mut v, 3, s, aenv, "env.adsr", "release_ms", 300.0, 1200.0);
-    comp_gain(&mut v, 3, s, 9.0);
+    comp_gain(&mut v, 3, s, 10.1);
+    comp_gain(&mut v, 4, 0.6, 1.9);
     v.stage(
         "chorus",
         &[("rate_hz", 0.2), ("depth", 30.0), ("mix", 18.0)],
     );
+    v.stage("compressor", &compressor(-22.0, 4.0, 3.0, 200.0, 3.0));
     v.finish("m4", &echo(620.0, 40.0, 3500.0), 0.3, (5.0, 0.55), None)
 }
 
@@ -1099,7 +1103,7 @@ fn depth_charge() -> Rack {
     });
     let mix = v.mix;
     // The crack: a noise burst with its own short envelope.
-    let noise = v.r.add("noise", &[("color", 0.0), ("level_db", -6.0)]);
+    let noise = v.r.add("noise", &[("color", 0.0), ("level_db", 0.0)]);
     let burst = v.r.add("env.adsr", &adsr(1.0, 70.0, 0.0, 40.0));
     v.r.wire(v.m, "gate", burst, "gate");
     let vca = v.r.add("vca", &[("gain", 0.0)]);
@@ -1118,10 +1122,12 @@ fn depth_charge() -> Rack {
         &mut v, 1, aenv, "env.adsr", "decay_ms", 250.0, 1200.0, 4500.0,
     );
     span_hi(&mut v, 1, s, aenv, "env.adsr", "release_ms", 150.0, 600.0);
-    comp_gain(&mut v, 1, s, 6.0);
+    comp_gain(&mut v, 1, s, 10.3);
     // Crack: a dull thud to a hard crack on the front.
     let s = span_lh(&mut v, 2, mix, "mixer", "level3", 0.0, 0.35, 0.9);
-    comp_gain(&mut v, 2, s, 1.0);
+    comp_gain(&mut v, 2, s, 0.1);
+    comp_gain(&mut v, 3, 0.5, 1.4);
+    comp_gain(&mut v, 4, 0.6, 3.7);
     v.stage("compressor", &compressor(-18.0, 3.0, 8.0, 150.0, 2.0));
     v.finish("m4", &echo(380.0, 30.0, 2500.0), 0.15, (7.5, 0.5), None)
 }
@@ -1159,6 +1165,8 @@ fn bowl_phrase() -> Vec<Hit> {
         (11.5, 67, 3.0),
         (11.5, 55, 3.0),
         (15.0, 57, 3.0),
+        (16.5, 72, 3.0),
+        (18.0, 67, 2.0),
     ]);
     v.extend(line(&[(15.0, 64, 3.0)]));
     v
@@ -1167,11 +1175,13 @@ fn bowl_phrase() -> Vec<Hit> {
 fn charge_phrase() -> Vec<Hit> {
     line(&[
         (0.5, 31, 1.0),
-        (3.5, 28, 1.0),
-        (7.0, 33, 1.0),
-        (10.0, 26, 1.0),
-        (13.5, 31, 1.0),
-        (16.5, 24, 1.0),
+        (3.0, 28, 1.0),
+        (5.5, 33, 1.0),
+        (8.0, 26, 1.0),
+        (10.5, 31, 1.0),
+        (13.0, 24, 1.0),
+        (15.5, 28, 1.0),
+        (18.0, 33, 1.0),
     ])
 }
 
@@ -1231,9 +1241,9 @@ fn presets() -> Vec<Preset> {
             slug: "automaton",
             name: "Automaton",
             category: "Voice",
-            tags: &["poly", "vocoder", "robot", "bitcrushed", "french touch", "signature"],
-            description: "A robot choir for French touch: your chord is the carrier of a vocoder whose voice is a monotone buzz that speaks a looping sentence, built into the patch, close and dry (no echo or room). Play held chords. Speech goes from one held vowel to a sentence of vowels four seconds long, Detail from a coarse robot to a crisp one with consonants, Size from a small robot to a large one, Crush adds a digital grind.",
-            listen: "Chords that talk in a loop; Speech at 0 is a held vowel, at 1 a sentence. Detail for crisp consonants, Crush for grit.",
+            tags: &["poly", "vocoder", "robot", "sub", "french touch", "signature"],
+            description: "A robot choir for French touch: your chord is the carrier of a vocoder whose voice is a monotone buzz that speaks a looping sentence, built into the patch, close and dry (no echo or room). Play held chords. Speech goes from one held vowel to a sentence of vowels four seconds long, Detail from a coarse robot to a crisp one with consonants, Size from a small robot to a large one, Weight brings in a saw an octave down.",
+            listen: "Chords that talk in a loop; Speech at 0 is a held vowel, at 1 a sentence. Detail for crisp consonants, Weight for the octave down.",
             build: automaton,
             group: 1,
             phrase: robot_phrase,
@@ -1325,15 +1335,17 @@ fn oracle() -> Rack {
         fenv_amt: 0.0,
         wheel_amt: 0.0,
         aenv: [380.0, 600.0, 0.9, 1100.0],
-        trim_db: 16.0,
+        trim_db: 23.0,
     });
     let mix = v.mix;
     let noise = v.r.add("noise", &[("color", 0.3), ("level_db", 0.0)]);
     v.r.wire(noise, "out", mix, "in3");
     // Breath: a whispered layer through the same vowels (texture on a macro, off by default).
     v.r.e.set_param(mix, "level3", 0.0);
-    v.r.route(v.knob, "m2", mix, "level3", 1.0);
-    comp_gain(&mut v, 1, 0.10, 3.0);
+    v.r.route(v.knob, "m2", mix, "level3", 0.4);
+    comp_gain(&mut v, 1, 0.10, -2.0);
+    comp_gain(&mut v, 2, 0.0, -0.5);
+    comp_gain(&mut v, 4, 0.65, 2.1);
     let formant = v.mono_after(
         "filter.formant",
         &[("vowel", 0.0), ("shift_st", 0.0), ("q", 1.6), ("hold", 1.0)],
@@ -1344,12 +1356,14 @@ fn oracle() -> Rack {
     // Choir: one voice to a crowd (the saw stack spreads, the chorus widens). Level held by a trim.
     let o0 = v.oscs[0];
     let s = span_lh(&mut v, 3, o0, "osc.va", "detune", 3.0, 10.0, 34.0);
+    comp_gain(&mut v, 3, s, -1.0);
     let chorus = v.stage(
         "chorus",
         &[("rate_hz", 0.2), ("depth", 45.0), ("mix", 28.0)],
     );
     span(&mut v, 3, s, chorus, "chorus", "mix", 10.0, 28.0);
     span(&mut v, 3, s, chorus, "chorus", "depth", 35.0, 45.0);
+    v.stage("compressor", &compressor(-26.0, 3.0, 15.0, 200.0, 5.0));
     v.finish("m4", &echo(700.0, 45.0, 3000.0), 0.3, (8.0, 0.6), None)
 }
 
@@ -1362,12 +1376,13 @@ fn automaton() -> Rack {
             ("Speech", 0.50),
             ("Detail", 0.45),
             ("Size", 0.50),
-            ("Crush", 0.00),
+            ("Weight", 0.40),
         ],
         midi: [0.0, 0.0, 120.0],
         oscs: vec![
             osc(2.0, 0.0, 0.34).unison(3.0, 9.0),
             osc(3.0, 0.0, 0.2).pw(40.0),
+            osc(2.0, -1.0, 0.0),
         ],
         drive: [4.0, -2.0],
         lad: [9000.0, 0.05, 0.0],
@@ -1382,6 +1397,10 @@ fn automaton() -> Rack {
     // Speech: from one held vowel to a sentence that walks a, e, i, o, u and back, four seconds long.
     let sentence = v.r.add("lfo", &[("rate_hz", 0.25), ("waveform", 2.0)]);
     v.r.depth_route(sentence, "out", formant, "vowel", v.knob, "m1", 0.5);
+    // Weight: a saw an octave down joins under the robot (a low-band change, unlike Speech).
+    let mix = v.mix;
+    span(&mut v, 4, 0.40, mix, "mixer", "level3", 0.0, 0.2);
+    comp_gain(&mut v, 4, 0.40, 2.0);
     let voc = v.stage(
         "vocoder",
         &[
@@ -1398,12 +1417,6 @@ fn automaton() -> Rack {
     span(&mut v, 2, s, voc, "vocoder", "hf", 0.0, 0.25);
     // Size: a small robot to a large one.
     span_lh(&mut v, 3, voc, "vocoder", "shift_st", 6.0, 0.0, -6.0);
-    // Crush: clean to a coarse digital grind.
-    let crush = v.stage(
-        "bitcrusher",
-        &[("bits", 5.0), ("downsample", 6.0), ("mix", 0.0)],
-    );
-    v.r.route(v.knob, "m4", crush, "mix", 0.8);
     v.stage("compressor", &compressor(-24.0, 5.0, 3.0, 120.0, 5.0));
     v.finish_dry(None)
 }
@@ -1450,7 +1463,7 @@ fn vox_chop() -> Rack {
     v.r.wire(eighth, "gate", duck, "gate");
     let g = v.mono_after("gain", &[("gain_db", 0.0)]);
     v.r.depth_route(duck, "out", g, "gain_db", v.knob, "m1", -0.5);
-    comp_gain(&mut v, 1, 0.5, -3.0);
+    comp_gain(&mut v, 1, 0.5, -4.0);
     // Shift: a small, bright mouth to a large, dark one.
     span_lh(
         &mut v,
@@ -1462,8 +1475,8 @@ fn vox_chop() -> Rack {
         0.0,
         -7.0,
     );
-    comp_gain(&mut v, 3, 0.5, 3.5);
-    v.stage("compressor", &compressor(-22.0, 4.0, 3.0, 100.0, 4.0));
+    comp_gain(&mut v, 3, 0.5, 5.4);
+    v.stage("compressor", &compressor(-22.0, 4.0, 3.0, 100.0, 8.0));
     let mut e = echo(250.0, 30.0, 3500.0).to_vec();
     e.push(("sync", 0.0));
     v.finish("m4", &e, 0.2, (2.5, 0.3), Some(clock))
@@ -1487,7 +1500,7 @@ fn chandelier() -> Rack {
         fenv_amt: 0.0,
         wheel_amt: 0.0,
         aenv: [300.0, 600.0, 0.9, 1400.0],
-        trim_db: 2.5,
+        trim_db: 4.5,
     });
     let mix = v.mix;
     // The glass partial: a modulator and a carrier a few times the pitch, a thin ring on top.
@@ -1517,27 +1530,29 @@ fn chandelier() -> Rack {
     // The rim: noise through a narrow band around 1.1 kHz (a wet-finger hum, under the glass partial).
     let noise = v.r.add("noise", &[("color", 0.0), ("level_db", -6.0)]);
     let rim =
-        v.r.add("filter.svf", &[("cutoff_hz", 1100.0), ("resonance", 0.9)]);
+        v.r.add("filter.svf", &[("cutoff_hz", 700.0), ("resonance", 0.5)]);
     v.r.wire(noise, "out", rim, "in");
-    v.r.wire(rim, "bp", mix, "in4");
+    v.r.wire(rim, "lp", mix, "in4");
     v.r.e.set_param(mix, "level4", 0.0);
     // Rub: the rim's friction fades in, with a very small vibrato (the motion is the friction, not pitch).
-    v.r.route(v.knob, "m1", mix, "level4", 0.45);
+    v.r.route(v.knob, "m1", mix, "level4", 1.0);
     let lfo = v.r.add("lfo", &[("rate_hz", 5.5)]);
     for o in v.oscs.clone() {
         v.r.depth_route(lfo, "out", o, "fine", v.knob, "m1", 0.02);
     }
     // Overtone: the glass partial comes forward.
-    span(&mut v, 2, 0.35, mix, "mixer", "level3", 0.0, 0.1);
-    comp_gain(&mut v, 2, 0.35, 2.0);
+    span(&mut v, 2, 0.35, mix, "mixer", "level3", 0.0, 0.05);
+    comp_gain(&mut v, 2, 0.35, 3.2);
+    comp_gain(&mut v, 4, 0.6, 5.4);
     // Bow: from a struck ping to a slow bow.
     let aenv = v.aenv;
-    span_lh(&mut v, 3, aenv, "env.adsr", "attack_ms", 8.0, 300.0, 2600.0);
+    let s = span_lh(&mut v, 3, aenv, "env.adsr", "attack_ms", 8.0, 300.0, 2600.0);
+    comp_gain(&mut v, 3, s, 1.3);
     v.stage(
         "chorus",
         &[("rate_hz", 0.3), ("depth", 30.0), ("mix", 20.0)],
     );
-    v.finish("m4", &echo(540.0, 42.0, 3500.0), 0.35, (6.5, 0.6), None)
+    v.finish("m4", &echo(540.0, 42.0, 3500.0), 0.25, (6.5, 0.45), None)
 }
 
 /// Whiteout: wind you can play. Noise through a comb that follows the key, a ladder that gusts.
@@ -1558,7 +1573,7 @@ fn whiteout() -> Rack {
         fenv_amt: 0.0,
         wheel_amt: 0.0,
         aenv: [900.0, 600.0, 0.9, 1800.0],
-        trim_db: 17.7,
+        trim_db: 23.5,
     });
     let mix = v.mix;
     let noise = v.r.add("noise", &[("color", 0.4), ("level_db", 0.0)]);
@@ -1582,6 +1597,9 @@ fn whiteout() -> Rack {
     v.r.depth_route(lfo, "out", lad, "cutoff_hz", v.knob, "m2", 0.3);
     span(&mut v, 2, 0.35, lfo, "lfo", "rate_hz", 0.1, 0.3);
     comp_gain(&mut v, 2, 0.35, 4.0);
+    comp_gain(&mut v, 3, 0.0, 2.9);
+    comp_gain(&mut v, 4, 0.5, 4.9);
+    v.stage("compressor", &compressor(-24.0, 3.0, 10.0, 200.0, 3.0));
     // Grain: a bitcrusher on the wind, from clean to gritty.
     let crush = v.stage(
         "bitcrusher",
@@ -1675,7 +1693,7 @@ fn maw() -> Rack {
     let mix = v.mix;
     // Weight: the sub comes in under the voice.
     span(&mut v, 4, 0.4, mix, "mixer", "level3", 0.0, 0.3);
-    comp_gain(&mut v, 4, 0.4, -2.3);
+    comp_gain(&mut v, 4, 0.4, -3.3);
     let formant = v.mono_after(
         "filter.formant",
         &[
@@ -1694,12 +1712,13 @@ fn maw() -> Rack {
     let drive = v.drive;
     let s = span_lh(&mut v, 3, drive, "drive", "drive_db", 4.0, 12.0, 30.0);
     span_hi(&mut v, 3, s, drive, "drive", "trim_db", -0.5, -10.0);
+    comp_gain(&mut v, 3, s, -2.5);
     let crush = v.stage(
         "bitcrusher",
         &[("bits", 8.0), ("downsample", 3.0), ("mix", 0.0)],
     );
     span(&mut v, 3, s, crush, "bitcrusher", "mix", 0.0, 50.0 * s);
-    v.stage("compressor", &compressor(-22.0, 4.0, 3.0, 100.0, 4.0));
+    v.stage("compressor", &compressor(-22.0, 4.0, 3.0, 100.0, 9.0));
     v.finish_dry(None)
 }
 
@@ -1876,6 +1895,23 @@ fn test_level(state: &kabl_core::PatchState, hot: u8) -> (f32, f32) {
     }
     let db = |v: f64| 20.0 * v.max(1e-12).log10();
     let peak = samples.iter().fold(0.0f32, |a, b| a.max(b.abs()));
+    if std::env::var("PP_SEGMENTS").is_ok() {
+        // Peak per stretch: stored, 0.65 on the held chord, 0.65 on a fresh chord, 0.15 on its
+        // tail, 0.15 on a fresh chord.
+        let seg = |a: usize, b: usize| {
+            db(samples[a * 96000..b * 96000]
+                .iter()
+                .fold(0.0f32, |m, s| m.max(s.abs())) as f64)
+        };
+        eprintln!(
+            "  segments hot {hot}: 1-3 {:6.2} | 3-5 {:6.2} | 5-7 {:6.2} | 7-11 {:6.2} | 13-17 {:6.2}",
+            seg(1, 3),
+            seg(3, 5),
+            seg(5, 7),
+            seg(7, 11),
+            seg(13, 17)
+        );
+    }
     let (mut sum, mut n) = (0.0f64, 0usize);
     for block in samples.chunks(9600) {
         let ms = block.iter().map(|s| (*s as f64).powi(2)).sum::<f64>() / block.len() as f64;
