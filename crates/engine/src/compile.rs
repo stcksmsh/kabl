@@ -1393,144 +1393,103 @@ fn check_limits(
     Ok(())
 }
 
-fn compile_inner(
-    patch: &PatchState,
-    sample_rate: f32,
-    voice_count: usize,
-    single_instance: bool,
-    scope: &CodeScope,
-) -> Result<CompiledPatch, CompileError> {
-    let Schedule {
-        metas,
-        dests,
-        cables_by_dest,
-        order,
-    } = schedule(patch, scope)?;
-
-    // Channels. A source port is width 2 when it is a stereo pair alias (`out_st`) or an audio
-    // output of a module that runs once per channel; a module runs once per channel when an audio
-    // input of it is fed by a width-2 source (it follows the signal's width). Widths only grow, so
-    // iterating until nothing changes settles them, feedback loops included.
-    let resolve = |doubled: &std::collections::BTreeSet<ModuleId>,
-                   from_id: ModuleId,
-                   from_port: &str|
-     -> Option<(Src, PortType)> {
-        let info = metas[&from_id].info;
-        let i = output_port_index(info, from_port)?;
-        let (port, _) = info.slot_port(PortDirection::Output, i)?;
-        let port_type = port.port_type;
-        if port.width == 2 {
-            return Some((
-                Src {
-                    left: (i, 0),
-                    right: Some((i + 1, 0)),
-                },
-                port_type,
-            ));
-        }
-        let right = (port_type == PortType::Audio && doubled.contains(&from_id)).then_some((i, 1));
-        Some((
+/// Where a source port's channels come from: width 2 for a stereo pair alias (`out_st`) or an
+/// audio output of a doubled module.
+fn resolve_src(
+    metas: &BTreeMap<ModuleId, ModuleMeta>,
+    doubled: &std::collections::BTreeSet<ModuleId>,
+    from_id: ModuleId,
+    from_port: &str,
+) -> Option<(Src, PortType)> {
+    let info = metas[&from_id].info;
+    let i = output_port_index(info, from_port)?;
+    let (port, _) = info.slot_port(PortDirection::Output, i)?;
+    let port_type = port.port_type;
+    if port.width == 2 {
+        return Some((
             Src {
                 left: (i, 0),
-                right,
+                right: Some((i + 1, 0)),
             },
             port_type,
-        ))
-    };
-    let mut doubled: std::collections::BTreeSet<ModuleId> = Default::default();
-    loop {
-        let before = doubled.len();
-        for (&to_id, cables) in &cables_by_dest {
-            let info = metas[&to_id].info;
-            if !follows_channels(info) {
-                continue;
-            }
-            for c in cables {
-                let CableTo::Port(name) = &c.to else {
-                    continue;
-                };
-                let audio_in = info.ports.iter().any(|p| {
-                    p.direction == PortDirection::Input
-                        && p.name == name
-                        && p.port_type == PortType::Audio
-                });
-                if audio_in
-                    && resolve(&doubled, c.from_id, &c.from_port)
-                        .is_some_and(|(s, _)| s.right.is_some())
-                {
-                    doubled.insert(to_id);
-                }
-            }
-        }
-        if doubled.len() == before {
-            break;
-        }
+        ));
     }
+    let right = (port_type == PortType::Audio && doubled.contains(&from_id)).then_some((i, 1));
+    Some((
+        Src {
+            left: (i, 0),
+            right,
+        },
+        port_type,
+    ))
+}
 
-    let voiced = voiced_modules(patch, &metas, &dests, single_instance);
+/// What the per-module wiring reads and never changes.
+struct WireCtx<'a> {
+    patch: &'a PatchState,
+    sample_rate: f32,
+    voice_count: usize,
+    metas: &'a BTreeMap<ModuleId, ModuleMeta>,
+    cables_by_dest: &'a BTreeMap<ModuleId, Vec<CableInfo>>,
+    order: &'a [ModuleId],
+    voiced: &'a std::collections::BTreeSet<ModuleId>,
+    doubled: &'a std::collections::BTreeSet<ModuleId>,
+    reference_clock: Option<ModuleId>,
+    silence_buf: BufIdx,
+    scope: &'a CodeScope,
+}
 
-    let mut w = Wiring {
-        buffers: Vec::new(),
-        steps: Vec::new(),
+/// Everything the per-module wiring builds up, passed in and handed back whole.
+struct Built {
+    w: Wiring,
+    param_slots: Vec<ParamSlot>,
+    route_slots: Vec<RouteSlot>,
+    modules: Vec<Box<dyn Module>>,
+    module_origin: Vec<(ModuleId, Option<usize>)>,
+    module_channel: Vec<u8>,
+    midi_ins: Vec<(usize, usize)>,
+    audio_ins: Vec<usize>,
+    out_left: BufIdx,
+    out_right: BufIdx,
+    out_module: Option<ModuleId>,
+}
+
+/// Stage 4 of the compile: instance every module in run order, wire its input cables (routes
+/// into cable parameters first) and record its params, routes and output buffers in `built`.
+fn wire_modules(cx: &WireCtx, built: Built) -> Result<Built, CompileError> {
+    let WireCtx {
+        patch,
+        sample_rate,
         voice_count,
-        live: BufMaps::default(),
-        delay: BufMaps::default(),
-        cable_steps: Vec::new(),
-        cable_route_slots: Vec::new(),
-        averaged: HashMap::new(),
-    };
-    let silence_buf = w.new_buf();
+        metas,
+        cables_by_dest,
+        order,
+        voiced,
+        doubled,
+        reference_clock,
+        silence_buf,
+        scope,
+    } = *cx;
+    let Built {
+        mut w,
+        mut param_slots,
+        mut route_slots,
+        mut modules,
+        mut module_origin,
+        mut module_channel,
+        mut midi_ins,
+        mut audio_ins,
+        mut out_left,
+        mut out_right,
+        mut out_module,
+    } = built;
+    let resolve =
+        |doubled: &std::collections::BTreeSet<ModuleId>,
+         from_id: ModuleId,
+         from_port: &str|
+         -> Option<(Src, PortType)> { resolve_src(metas, doubled, from_id, from_port) };
 
-    // Delay buffers for every delayed cable's source port (brief section 7.1), pre-created before
-    // the topo-order wiring loop below: a delayed cable's source can be scheduled *after* its
-    // reader now that the edge no longer constrains ordering, so the reader can't wait for the
-    // source's normal output-buffer bookkeeping to exist yet.
-    let mut delayed_sources: std::collections::BTreeSet<(ModuleId, String)> = Default::default();
-    for cables in cables_by_dest.values() {
-        for c in cables {
-            if c.delayed {
-                delayed_sources.insert((c.from_id, c.from_port.clone()));
-            }
-        }
-    }
-    for (from_id, from_port) in delayed_sources {
-        let (src, _) =
-            resolve(&doubled, from_id, &from_port).ok_or_else(|| CompileError::UnknownPort {
-                id: from_id,
-                kind: "source",
-                port: from_port.clone(),
-            })?;
-        for (out_idx, ch) in std::iter::once(src.left).chain(src.right) {
-            if voiced.contains(&from_id) {
-                for lane in 0..voice_count {
-                    if !w.delay.voice.contains_key(&(from_id, out_idx, lane, ch)) {
-                        let b = w.new_buf();
-                        w.delay.voice.insert((from_id, out_idx, lane, ch), b);
-                    }
-                }
-            } else if !w.delay.global.contains_key(&(from_id, out_idx, ch)) {
-                let b = w.new_buf();
-                w.delay.global.insert((from_id, out_idx, ch), b);
-            }
-        }
-    }
-
-    let reference_clock = metas
-        .iter()
-        .find(|(_, m)| m.kind == "clock")
-        .map(|(&id, _)| id);
-    let mut param_slots: Vec<ParamSlot> = Vec::new();
-    let mut route_slots: Vec<RouteSlot> = Vec::new();
-    let mut modules: Vec<Box<dyn Module>> = Vec::new();
-    let mut module_origin: Vec<(ModuleId, Option<usize>)> = Vec::new();
-    let mut module_channel: Vec<u8> = Vec::new();
-    let mut midi_ins: Vec<(usize, usize)> = Vec::new();
-    let mut audio_ins: Vec<usize> = Vec::new();
-    let mut out_left = silence_buf;
-    let mut out_right = silence_buf;
-    let mut out_module = None;
-
-    for &id in &order {
+    for &id in order {
         let meta = &metas[&id];
         let mstate = &patch.modules[&id];
         let is_voice = voiced.contains(&id);
@@ -1573,7 +1532,7 @@ fn compile_inner(
                 }
             }
             let (src, port_type) =
-                resolve(&doubled, cable.from_id, &cable.from_port).ok_or_else(|| {
+                resolve(doubled, cable.from_id, &cable.from_port).ok_or_else(|| {
                     CompileError::UnknownPort {
                         id: cable.from_id,
                         kind: "source",
@@ -1899,6 +1858,166 @@ fn compile_inner(
             });
         }
     }
+    Ok(Built {
+        w,
+        param_slots,
+        route_slots,
+        modules,
+        module_origin,
+        module_channel,
+        midi_ins,
+        audio_ins,
+        out_left,
+        out_right,
+        out_module,
+    })
+}
+
+fn compile_inner(
+    patch: &PatchState,
+    sample_rate: f32,
+    voice_count: usize,
+    single_instance: bool,
+    scope: &CodeScope,
+) -> Result<CompiledPatch, CompileError> {
+    let Schedule {
+        metas,
+        dests,
+        cables_by_dest,
+        order,
+    } = schedule(patch, scope)?;
+
+    // Channels. A source port is width 2 when it is a stereo pair alias (`out_st`) or an audio
+    // output of a module that runs once per channel; a module runs once per channel when an audio
+    // input of it is fed by a width-2 source (it follows the signal's width). Widths only grow, so
+    // iterating until nothing changes settles them, feedback loops included.
+    let resolve =
+        |doubled: &std::collections::BTreeSet<ModuleId>,
+         from_id: ModuleId,
+         from_port: &str|
+         -> Option<(Src, PortType)> { resolve_src(&metas, doubled, from_id, from_port) };
+    let mut doubled: std::collections::BTreeSet<ModuleId> = Default::default();
+    loop {
+        let before = doubled.len();
+        for (&to_id, cables) in &cables_by_dest {
+            let info = metas[&to_id].info;
+            if !follows_channels(info) {
+                continue;
+            }
+            for c in cables {
+                let CableTo::Port(name) = &c.to else {
+                    continue;
+                };
+                let audio_in = info.ports.iter().any(|p| {
+                    p.direction == PortDirection::Input
+                        && p.name == name
+                        && p.port_type == PortType::Audio
+                });
+                if audio_in
+                    && resolve(&doubled, c.from_id, &c.from_port)
+                        .is_some_and(|(s, _)| s.right.is_some())
+                {
+                    doubled.insert(to_id);
+                }
+            }
+        }
+        if doubled.len() == before {
+            break;
+        }
+    }
+
+    let voiced = voiced_modules(patch, &metas, &dests, single_instance);
+
+    let mut w = Wiring {
+        buffers: Vec::new(),
+        steps: Vec::new(),
+        voice_count,
+        live: BufMaps::default(),
+        delay: BufMaps::default(),
+        cable_steps: Vec::new(),
+        cable_route_slots: Vec::new(),
+        averaged: HashMap::new(),
+    };
+    let silence_buf = w.new_buf();
+
+    // Delay buffers for every delayed cable's source port (brief section 7.1), pre-created before
+    // the topo-order wiring loop below: a delayed cable's source can be scheduled *after* its
+    // reader now that the edge no longer constrains ordering, so the reader can't wait for the
+    // source's normal output-buffer bookkeeping to exist yet.
+    let mut delayed_sources: std::collections::BTreeSet<(ModuleId, String)> = Default::default();
+    for cables in cables_by_dest.values() {
+        for c in cables {
+            if c.delayed {
+                delayed_sources.insert((c.from_id, c.from_port.clone()));
+            }
+        }
+    }
+    for (from_id, from_port) in delayed_sources {
+        let (src, _) =
+            resolve(&doubled, from_id, &from_port).ok_or_else(|| CompileError::UnknownPort {
+                id: from_id,
+                kind: "source",
+                port: from_port.clone(),
+            })?;
+        for (out_idx, ch) in std::iter::once(src.left).chain(src.right) {
+            if voiced.contains(&from_id) {
+                for lane in 0..voice_count {
+                    if !w.delay.voice.contains_key(&(from_id, out_idx, lane, ch)) {
+                        let b = w.new_buf();
+                        w.delay.voice.insert((from_id, out_idx, lane, ch), b);
+                    }
+                }
+            } else if !w.delay.global.contains_key(&(from_id, out_idx, ch)) {
+                let b = w.new_buf();
+                w.delay.global.insert((from_id, out_idx, ch), b);
+            }
+        }
+    }
+
+    let reference_clock = metas
+        .iter()
+        .find(|(_, m)| m.kind == "clock")
+        .map(|(&id, _)| id);
+    let Built {
+        w,
+        mut param_slots,
+        mut route_slots,
+        mut modules,
+        module_origin,
+        module_channel,
+        midi_ins,
+        audio_ins,
+        mut out_left,
+        mut out_right,
+        out_module,
+    } = wire_modules(
+        &WireCtx {
+            patch,
+            sample_rate,
+            voice_count,
+            metas: &metas,
+            cables_by_dest: &cables_by_dest,
+            order: &order,
+            voiced: &voiced,
+            doubled: &doubled,
+            reference_clock,
+            silence_buf,
+            scope,
+        },
+        Built {
+            w,
+            param_slots: Vec::new(),
+            route_slots: Vec::new(),
+            modules: Vec::new(),
+            module_origin: Vec::new(),
+            module_channel: Vec::new(),
+            midi_ins: Vec::new(),
+            audio_ins: Vec::new(),
+            out_left: silence_buf,
+            out_right: silence_buf,
+            out_module: None,
+        },
+    )?;
 
     let Wiring {
         buffers,
