@@ -272,6 +272,9 @@ pub struct UiState {
     pub wants: displays::Wants,
     /// Host owns clock transport in the plugin; standalone defaults to Free.
     pub host_clock: bool,
+    /// The plugin host's transport is playing (set by the plugin; always false standalone): a
+    /// Sounds preview stays silent then.
+    pub host_playing: bool,
     /// Transport commands for `main.rs` to send to the audio thread. Runtime only: never in the
     /// op log, so undo and reload can't replay them.
     pub transport: Vec<(ModuleId, Transport)>,
@@ -495,6 +498,7 @@ impl Default for UiState {
             live: displays::Live::default(),
             wants: displays::Wants::default(),
             host_clock: false,
+            host_playing: false,
             transport: Vec::new(),
             delay_status: HashMap::new(),
             lfo_status: HashMap::new(),
