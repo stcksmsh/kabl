@@ -14,10 +14,11 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 33] = [
+const SCENES: [&str; 34] = [
     "rack",
     "perform",
     "sounds",
+    "sounds-preview",
     "drawer",
     "wavetable-editor",
     "seq-pattern-editor",
@@ -265,7 +266,17 @@ impl App {
         ));
         // The file browser's Sounds place needs the user's sounds folder.
         std::fs::create_dir_all(self._user.path().join("sounds")).unwrap();
-        if j.scene == "sounds" {
+        if j.scene == "sounds-preview" {
+            // A player whose audio end nobody listens to: the clip renders for real, the
+            // playing state is driven by hand in `update`.
+            let collector: &'static basedrop::Collector =
+                Box::leak(Box::new(basedrop::Collector::new()));
+            let (player, voice) = kabl_ui::sound_preview::channel(collector.handle());
+            std::mem::forget(voice);
+            ui.browser.clips.attach(Some(player));
+            ui.sample_rate = 48000.0;
+        }
+        if j.scene == "sounds" || j.scene == "sounds-preview" {
             ui.browser.selected = Some("factory:presets/acid-line".into());
             // The mockup narrows the Factory shelf to Bass; Acid Line is a Groove sound here.
             ui.browser.filter = kabl_ui::browser::Filter::Factory;
@@ -278,7 +289,7 @@ impl App {
         );
         doc.meta.category = "Bass".into();
         ui.doc = Some(doc);
-        ui.browser_open = j.scene == "sounds";
+        ui.browser_open = j.scene == "sounds" || j.scene == "sounds-preview";
         ui.drawer_open = matches!(
             j.scene,
             "rack"
@@ -968,7 +979,26 @@ impl eframe::App for App {
             });
         }
         // The lanes' animation runs on the clock: give the routes scenes time to settle.
-        let shot = if self.jobs[self.i].scene.starts_with("cable-routes")
+        if self.jobs[self.i].scene == "sounds-preview" {
+            use kabl_ui::sound_preview::{ClipLook, STATUS};
+            use std::sync::atomic::Ordering;
+            let id = "factory:presets/acid-line";
+            let clips = &mut self.ui.browser.clips;
+            if matches!(clips.look(id), ClipLook::Ready(_)) && clips.playing().is_none() {
+                clips.play(id);
+            }
+            // Playing, 40 % through, at a lively level.
+            STATUS.gen.store(1, Ordering::Relaxed);
+            STATUS.active.store(true, Ordering::Relaxed);
+            STATUS.len.store(192_000, Ordering::Relaxed);
+            STATUS.pos.store(76_800, Ordering::Relaxed);
+            for l in &STATUS.level {
+                l.store(0.55f32.to_bits(), Ordering::Relaxed);
+            }
+        }
+        let shot = if self.jobs[self.i].scene == "sounds-preview" {
+            240
+        } else if self.jobs[self.i].scene.starts_with("cable-routes")
             || self.jobs[self.i].scene.starts_with("menu-")
             || self.jobs[self.i].scene.starts_with("more-controls")
             || self.jobs[self.i].scene == "dev-tools"
