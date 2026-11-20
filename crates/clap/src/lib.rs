@@ -1021,7 +1021,9 @@ impl Instrument {
             self.session = self.pending.take();
             self.timeline.reset();
             self.raw_position = None;
-            self.schedule = schedule::Schedule::new(self.session.as_ref().unwrap().slot_values);
+            if let Some(session) = &self.session {
+                self.schedule = schedule::Schedule::new(session.slot_values);
+            }
         }
     }
     fn live_params(&mut self) -> (u32, [f32; automation::SLOTS]) {

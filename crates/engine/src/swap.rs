@@ -89,8 +89,10 @@ impl Engine {
         if finished {
             // Move, not clone: drops the old `active` in place. `Owned::drop` only queues the
             // node on the collector (atomic pointer swap) — no deallocation happens here.
-            let (new_graph, _) = self.incoming.take().unwrap();
-            self.active = new_graph;
+            // `finished` is only set while `incoming` is `Some`, so the `if let` always runs.
+            if let Some((new_graph, _)) = self.incoming.take() {
+                self.active = new_graph;
+            }
         }
     }
 }
@@ -104,4 +106,39 @@ impl Engine {
 pub(crate) fn equal_power(t: f32) -> (f32, f32) {
     let angle = t * std::f32::consts::FRAC_PI_2;
     (angle.cos(), angle.sin())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A swap runs to its end, promotes the incoming graph and goes quiet, whatever the depth
+    /// (a NaN depth included: nothing on this path may panic).
+    #[test]
+    fn a_swap_finishes_and_promotes_for_any_depth() {
+        for depth in [0.5, 0.0, f32::NAN, f32::INFINITY] {
+            let collector = basedrop::Collector::new();
+            let mut e = Engine::new(&collector.handle(), 48_000.0, 0.25);
+            let swap = e.build_swap(&collector.handle(), depth);
+            e.receive_swap(swap);
+            assert!(e.is_swapping());
+            let mut out = [0f32; BLOCK];
+            let blocks = e.crossfade_samples() / BLOCK + 2;
+            for _ in 0..blocks {
+                e.process_block(48_000.0, &mut out);
+            }
+            assert!(!e.is_swapping(), "depth {depth}: the swap finished");
+            e.process_block(48_000.0, &mut out);
+        }
+    }
+
+    #[test]
+    fn equal_power_keeps_unit_power_and_ends_at_the_new_graph() {
+        for i in 0..=100 {
+            let (o, n) = equal_power(i as f32 / 100.0);
+            assert!((o * o + n * n - 1.0).abs() < 1e-5);
+        }
+        let (o, n) = equal_power(1.0);
+        assert!(o.abs() < 1e-6 && (n - 1.0).abs() < 1e-6);
+    }
 }
