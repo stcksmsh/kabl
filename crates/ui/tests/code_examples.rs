@@ -299,7 +299,8 @@ fn module_settings_survive_save_and_reopen_through_the_real_path() {
     library::save_patch(&second, &log).unwrap();
     stop.store(true, Ordering::Relaxed);
     runner.join().unwrap();
-    assert!(scope.take_notes().is_empty(), "no warning on a normal save");
+    let notes = scope.take_notes();
+    assert!(notes.is_empty(), "no warning on a normal save: {notes:?}");
 
     let (_, _, saved_code) = kabl_core::format::load_kabl_full(&second).unwrap();
     let version = saved_code.instance_blob(leaf).unwrap().version;
