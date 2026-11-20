@@ -2130,7 +2130,6 @@ dependencies = [
  "kabl-engine",
  "kabl-modules",
  "log",
- "midir",
  "rtrb",
  "tempfile",
 ]

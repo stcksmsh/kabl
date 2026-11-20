@@ -84,7 +84,7 @@ cargo fmt --all -- --check
 `crates/`: `core` (op log, patch state, file format, no audio dependencies), `engine` (graph
 compiler, scheduler, voices), `modules` (built-in kinds and the code-module host), `cables`,
 `ui` (egui rack and sound browser), `standalone` (app support for `kabl-ui`, and the `kabl`
-CLI: file tools, test render), `clap` (plugin), `cargo-kabl` (the module build tool). `sdk/` is
+CLI: `.kabl` file tools and a test render; it plays no audio, live play is `kabl-ui`), `clap` (plugin), `cargo-kabl` (the module build tool). `sdk/` is
 the creator SDK (0BSD), a separate workspace. `vendor/nice-plug` is a vendored copy of the plugin
 framework (ISC), see `vendor/nice-plug/STRICT-PROFILE.md`.
 
