@@ -6,6 +6,6 @@ tags = [
     "chorus",
     "pop",
 ]
-description = "A short, bouncy pop pluck: two pulses and a saw, a resonant filter that bounces on each note. Play catchy riffs. Cutoff opens the filter, Drive adds the bite, Space sets the echo and room, Decay stretches the note."
+description = "A short, bouncy pop pluck: two pulses and a saw, a resonant filter that bounces on each note. Play catchy riffs. Bounce goes from a flat pluck to a squelching, resonant bounce, Hold stretches the note from a dot to a long bounce, Boing drops each note in from above, Chorus brings in a deep, fast shimmer."
 keys = true
 sequence = false

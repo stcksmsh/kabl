@@ -6,6 +6,6 @@ tags = [
     "chorus",
     "synthwave",
 ]
-description = "A wide keyboard from seven detuned saws, a soft filter and a big room. Play slow chords. Cutoff opens the filter, Warmth adds a little drive, Space sets the echo and the long room, Width pulls the saws apart."
+description = "A wide keyboard from seven detuned saws, a soft filter and a big room. Play slow chords. Swell pushes each chord in slowly instead of striking it, Glass opens a dark pad into a bright, glassy one, Square lets a hollow square take over from the saws at the same loudness, Hall grows the room from small to huge."
 keys = true
 sequence = false

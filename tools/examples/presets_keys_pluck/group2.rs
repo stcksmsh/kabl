@@ -322,10 +322,12 @@ fn corduroy() -> Rack {
 /// Matinee: a wide detuned-saw keyboard with a soft filter and a big room.
 fn matinee() -> Rack {
     let mut r = Rack::new();
+    // Swell: the chord pushes in slowly (off); Glass: a dark pad to a bright glassy one; Square: the saws give
+    // way to a hollow square; Hall: a small room and one echo to a huge hall.
     let knob = macros(
         &mut r,
-        &["Cutoff", "Warmth", "Space", "Width"],
-        &[0.55, 0.25, 0.60, 0.50],
+        &["Swell", "Glass", "Square", "Hall"],
+        &[0.0, 1.0, 0.50, 0.60],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
@@ -357,12 +359,29 @@ fn matinee() -> Rack {
             echo_max: 0.3,
             room_decay: 3.5,
             room_max: 0.4,
+            fixed: true,
+            old: [0.55, 0.25, 0.60, 0.50],
             ..pst()
         },
     );
+    let k = knob;
     r.route(v.fenv, "out", s.lad, "cutoff_hz", 0.25);
     r.route(m, "velocity", s.lad, "cutoff_hz", 0.15);
-    r.route(knob, "m4", v.osc_a, "detune", 0.5);
+    // Swell: each chord struck at once to one that pushes in over a second and more (level-type).
+    r.rise(k, 1, v.aenv, "env.adsr", "attack_ms", 8.0, 1400.0);
+    r.rise(k, 1, v.fenv, "env.adsr", "attack_ms", 8.0, 1400.0);
+    // Glass: a dark, closed pad to a bright, glassy one.
+    let cut = routed("filter.ladder", "cutoff_hz", 2800.0, 0.5, 0.55);
+    r.span(k, 2, s.lad, "filter.ladder", "cutoff_hz", 450.0, cut);
+    // Square: a bright saw stack to a hollow, woody square pad, the saws backing off (the old Width was the detune).
+    let det = routed("osc.va", "detune", 12.0, 0.5, 0.50);
+    r.e.set_param(v.osc_a, "detune", det);
+    r.span(k, 3, v.mix, "mixer", "level2", 0.0, 0.3);
+    r.span(k, 3, v.mix, "mixer", "level1", 0.75, 0.5);
+    r.level(k, 3, s.trim, -3.0);
+    // Hall: a small room and a short echo to a huge, ringing hall (the wet level stays).
+    r.span_hi(k, 4, s.verb, "reverb", "decay_s", 3.5, 14.0);
+    r.span(k, 4, s.delay, "delay", "feedback", 8.0, 38.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -370,10 +389,12 @@ fn matinee() -> Rack {
 /// Snowmelt: a soft, slow electric piano in a big room.
 fn snowmelt() -> Rack {
     let mut r = Rack::new();
+    // Tine: the hammer's glass; Bloom: the chord grows in slowly (off); Drift: the partner tine and the chorus
+    // drift apart; Hall: the six-second room grows huge.
     let knob = macros(
         &mut r,
-        &["Tine", "Warmth", "Space", "Drift"],
-        &[0.40, 0.20, 0.65, 0.50],
+        &["Tine", "Bloom", "Drift", "Hall"],
+        &[0.40, 0.0, 0.50, 0.65],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
@@ -385,7 +406,7 @@ fn snowmelt() -> Rack {
         [1.0, 0.0, 0.2, 12.0, 1400.0, 0.1, 600.0, 0.3],
     ];
     let v = fm(&mut r, m, 1.0, 0.3, 0.0, &ops);
-    post(
+    let s = post(
         &mut r,
         knob,
         v,
@@ -407,11 +428,34 @@ fn snowmelt() -> Rack {
             echo_max: 0.3,
             room_decay: 6.0,
             room_max: 0.5,
+            fixed: true,
+            old: [0.40, 0.20, 0.65, 0.50],
             ..pst()
         },
     );
-    r.route(knob, "m1", v, "index", 0.6);
-    r.route(knob, "m4", v, "fine", 0.2);
+    let (o, k) = ("osc.fm6", knob);
+    // The old Drift detuned the whole voice by a fixed amount at its stored position: stays as it was.
+    let fine = routed(o, "fine", 0.0, 0.2, 0.50);
+    r.e.set_param(v, "fine", fine);
+    // Tine: a soft, round key to a glassy one, the hammer's tine ringing out.
+    let index = routed(o, "index", 0.3, 0.6, 0.40);
+    r.span(k, 1, v, o, "index", 0.1, index);
+    r.span(k, 1, v, o, "level4", 0.0, 0.15);
+    // Bloom: every key struck at once to a chord that grows in over a second (the hammer thud stays; level-type).
+    for n in [1, 2, 3, 5, 6] {
+        r.rise(k, 2, v, o, &format!("attack{n}"), 12.0, 1500.0);
+    }
+    // Drift: a still tone to a beating partner tine under a slow, deep chorus.
+    let ch = s.chorus.unwrap();
+    let mix = routed("chorus", "mix", 0.0, 0.6, 0.50);
+    r.span(k, 3, ch, "chorus", "mix", 0.0, mix);
+    r.span_hi(k, 3, ch, "chorus", "depth", 55.0, 100.0);
+    r.span_hi(k, 3, ch, "chorus", "rate_hz", 0.25, 0.9);
+    r.span_hi(k, 3, v, o, "fine5", 3.0, 28.0);
+    // Hall: a small room to a huge hall that rings for ten seconds (the wet level stays).
+    r.span_hi(k, 4, s.verb, "reverb", "decay_s", 6.0, 20.0);
+    r.span(k, 4, s.delay, "delay", "feedback", 8.0, 45.0);
+    r.level(k, 4, s.trim, -2.5);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -419,10 +463,12 @@ fn snowmelt() -> Rack {
 /// Scaffold: a dark, wide stab for drum and bass.
 fn scaffold() -> Rack {
     let mut r = Rack::new();
+    // Shut: the filter closes after each stab; Stack: the two saw stacks pull apart; Swirl: the phaser;
+    // Tail: the stab from a tick to a held chord.
     let knob = macros(
         &mut r,
-        &["Cutoff", "Grit", "Room", "Length"],
-        &[0.45, 0.55, 0.25, 0.35],
+        &["Shut", "Stack", "Swirl", "Tail"],
+        &[0.78, 0.50, 0.50, 0.60],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
@@ -475,12 +521,34 @@ fn scaffold() -> Rack {
             echo_max: 0.2,
             room_decay: 0.9,
             room_max: 0.2,
+            fixed: true,
+            old: [0.45, 0.55, 0.25, 0.35],
             ..pst()
         },
     );
+    let k = knob;
     r.route(v.fenv, "out", s.lad, "cutoff_hz", 0.4);
     r.route(m, "velocity", s.lad, "cutoff_hz", 0.15);
-    r.route(knob, "m4", v.aenv, "decay_ms", 0.5);
+    // Shut: a shut, boxed-in stab to one whose filter snaps open and closes after every hit.
+    let cut = routed("filter.ladder", "cutoff_hz", 1100.0, 0.55, 0.45);
+    r.span(k, 1, s.lad, "filter.ladder", "cutoff_hz", 200.0, cut);
+    r.span(k, 1, v.fenv, "env.adsr", "decay_ms", 50.0, 260.0);
+    // Stack: a tight pair of stacks to a vast, ripping wall.
+    r.span(k, 2, v.osc_a, "osc.va", "detune", 3.0, 26.0);
+    r.span(k, 2, v.osc_b, "osc.va", "detune", 2.0, 18.0);
+    r.span(k, 2, v.osc_b, "osc.va", "fine", -2.0, -12.0);
+    // Swirl: a still, thin stab to a deep, fast, ringing phaser.
+    let ph = s.phaser.unwrap();
+    r.span(k, 3, ph, "phaser", "mix", 0.0, 35.0);
+    r.span(k, 3, ph, "phaser", "rate_hz", 0.1, 0.2);
+    r.span_hi(k, 3, ph, "phaser", "depth", 75.0, 98.0);
+    r.span_hi(k, 3, ph, "phaser", "feedback", 45.0, 88.0);
+    // Tail: a clipped tick to a stab that rings on after the key is up.
+    let dec = routed("env.adsr", "decay_ms", 230.0, 0.5, 0.35);
+    r.e.set_param(v.aenv, "decay_ms", dec);
+    r.span(k, 4, v.aenv, "env.adsr", "release_ms", 12.0, 110.0);
+    r.span(k, 4, v.fenv, "env.adsr", "release_ms", 12.0, 110.0);
+    r.level(k, 4, s.trim, -3.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -488,10 +556,12 @@ fn scaffold() -> Rack {
 /// Brass Filament: a sustained, metallic, slightly unstable FM tone.
 fn brass_filament() -> Rack {
     let mut r = Rack::new();
+    // Blow: how hard the tone is blown, a soft, bowed-in swell at 0 to a hard strike at 1 (stored); Alloy: the partials pulled out of tune into a clangorous
+    // metal; Space: the only macro that owns the echo and the room; Warp: the feedback.
     let knob = macros(
         &mut r,
-        &["Strike", "Rust", "Space", "Warp"],
-        &[0.45, 0.25, 0.45, 0.30],
+        &["Blow", "Alloy", "Space", "Warp"],
+        &[1.0, 0.50, 0.50, 0.30],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     // Algorithm 5: operator 6 modulates 1 to 5. Inharmonic ratios and a long fade.
@@ -504,7 +574,7 @@ fn brass_filament() -> Rack {
         [1.0, 9.0, 0.5, 3.0, 1800.0, 0.3, 400.0, 0.5],
     ];
     let v = fm(&mut r, m, 5.0, 0.4, 0.3, &ops);
-    post(
+    let s = post(
         &mut r,
         knob,
         v,
@@ -523,11 +593,37 @@ fn brass_filament() -> Rack {
             echo_max: 0.25,
             room_decay: 3.0,
             room_max: 0.35,
+            fixed: true,
+            old: [0.45, 0.25, 0.45, 0.30],
             ..pst()
         },
     );
-    r.route(knob, "m1", v, "index", 0.5);
-    r.route(knob, "m4", v, "feedback", 0.7);
+    let (o, k) = ("osc.fm6", knob);
+    let index = routed(o, "index", 0.4, 0.5, 0.45);
+    r.e.set_param(v, "index", index);
+    // Blow: a tone bowed in over most of a second at 0 to a hard strike at 1 (stored at 1; level-type).
+    for n in 1..=6 {
+        r.span(k, 1, v, o, &format!("attack{n}"), 450.0, 3.0);
+    }
+    // Alloy: a tuned tone to a clangorous metal, the inharmonic partials pulled further out of tune.
+    r.span(k, 2, v, o, "fine2", 0.0, 140.0);
+    r.span(k, 2, v, o, "fine4", 0.0, -90.0);
+    r.span(k, 2, v, o, "fine5", 0.0, 30.0);
+    // Space: a dry, close tone to a wide echo and a huge, ringing room (the one macro that owns the space).
+    let e = routed("delay", "mix", 0.0, 0.25, 0.45);
+    let vm = routed("reverb", "mix", 0.0, 0.35, 0.45);
+    r.span(k, 3, s.delay, "delay", "mix", 0.0, e);
+    r.span(k, 3, s.verb, "reverb", "mix", 0.0, vm);
+    r.span_hi(k, 3, s.verb, "reverb", "decay_s", 3.0, 14.0);
+    r.span(k, 3, s.delay, "delay", "feedback", 8.0, 40.0);
+    r.level(k, 3, s.trim, -2.5);
+    // Warp: the sound fed back into itself: smooth to a rough, harsh, tearing metal.
+    let fb = routed(o, "feedback", 0.3, 0.7, 0.30);
+    r.span_hi(k, 4, v, o, "feedback", fb, 1.0);
+    // Bolder: the index (the depth of the modulation) rises with it, so the tear is felt along the whole travel.
+    r.span_hi(k, 4, v, o, "index", index, 1.6);
+    let cut = routed("filter.ladder", "cutoff_hz", 5500.0, 0.4, 0.45);
+    r.span(k, 4, s.lad, "filter.ladder", "cutoff_hz", 20000.0, cut);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -535,10 +631,12 @@ fn brass_filament() -> Rack {
 /// Spinet: a bright harpsichord-like key with a buzzy pluck and no dynamics to speak of.
 fn spinet() -> Rack {
     let mut r = Rack::new();
+    // Jack: the filter snap of each pluck; Honky: the second string drifts out of tune (honky-tonk); Sustain: a
+    // damped tick to a ring-out; Double: the strings doubled by a chorus.
     let knob = macros(
         &mut r,
-        &["Tone", "Buzz", "Room", "Chorus"],
-        &[0.50, 0.30, 0.35, 0.35],
+        &["Jack", "Honky", "Sustain", "Double"],
+        &[1.0, 0.15, 0.50, 0.35],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
@@ -573,10 +671,30 @@ fn spinet() -> Rack {
             echo_max: 0.15,
             room_decay: 1.8,
             room_max: 0.35,
+            fixed: true,
+            old: [0.50, 0.30, 0.35, 0.35],
             ..pst()
         },
     );
+    let k = knob;
     r.route(v.fenv, "out", s.lad, "cutoff_hz", 0.3);
+    // Jack: a dull, boxed key to a bright pluck whose filter snaps open and shut on every note.
+    let cut = routed("filter.ladder", "cutoff_hz", 4200.0, 0.45, 0.50);
+    r.span(k, 1, s.lad, "filter.ladder", "cutoff_hz", 700.0, cut);
+    r.span(k, 1, v.fenv, "env.adsr", "decay_ms", 40.0, 300.0);
+    // Honky: two strings in tune to a second one pulled out of tune, a honky-tonk beating (the drive stays as it was).
+    let dr = routed("drive", "drive_db", 6.0, 0.35, 0.30);
+    r.e.set_param(s.drive.unwrap(), "drive_db", dr);
+    r.span(k, 2, v.osc_b, "osc.va", "fine", 2.0, 9.0);
+    // Sustain: a damped tick to a string that rings out after the key is up.
+    r.span(k, 3, v.aenv, "env.adsr", "release_ms", 6.0, 60.0);
+    r.level(k, 3, s.trim, -3.0);
+    // Double: one string to two, a deep chorus doubling it.
+    let ch = s.chorus.unwrap();
+    let mix = routed("chorus", "mix", 0.0, 0.5, 0.35);
+    r.span(k, 4, ch, "chorus", "mix", 0.0, mix);
+    r.span(k, 4, ch, "chorus", "depth", 10.0, 30.0);
+    r.span_hi(k, 4, ch, "chorus", "rate_hz", 0.7, 2.5);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -586,10 +704,12 @@ fn spinet() -> Rack {
 /// Willow: a soft harp.
 fn willow() -> Rack {
     let mut r = Rack::new();
+    // Nail: a soft finger to a bright nail; Ring: how long the strings sing; Halo: glassy overtones above;
+    // Hall: the room.
     let knob = macros(
         &mut r,
-        &["Pluck", "Warmth", "Space", "Stretch"],
-        &[0.50, 0.15, 0.60, 0.45],
+        &["Nail", "Ring", "Halo", "Hall"],
+        &[0.50, 1.0, 0.35, 0.60],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
@@ -601,7 +721,7 @@ fn willow() -> Rack {
         [1.0, 0.0, 0.0, 0.5, 100.0, 0.0, 50.0, 0.0],
     ];
     let v = fm(&mut r, m, 1.0, 0.4, 0.0, &ops);
-    post(
+    let s = post(
         &mut r,
         knob,
         v,
@@ -620,12 +740,29 @@ fn willow() -> Rack {
             echo_max: 0.3,
             room_decay: 4.5,
             room_max: 0.45,
+            fixed: true,
+            old: [0.50, 0.15, 0.60, 0.45],
             ..pst()
         },
     );
-    r.route(knob, "m1", v, "index", 0.5);
-    r.route(knob, "m4", v, "decay1", 0.5);
-    r.route(knob, "m4", v, "decay3", 0.5);
+    let (o, k) = ("osc.fm6", knob);
+    // Nail: a soft fingertip to a bright, clicking nail.
+    let index = routed(o, "index", 0.4, 0.5, 0.50);
+    r.span(k, 1, v, o, "index", 0.1, index);
+    r.span(k, 1, v, o, "level2", 0.0, 0.3);
+    r.span(k, 1, v, o, "level4", 0.0, 0.2);
+    // Ring: a damped, quickly dying string to one that sings for many seconds.
+    let d1 = routed(o, "decay1", 1800.0, 0.5, 0.45);
+    let d3 = routed(o, "decay3", 1100.0, 0.5, 0.45);
+    r.span(k, 2, v, o, "decay1", 250.0, d1);
+    r.span(k, 2, v, o, "decay3", 200.0, d3);
+    r.span(k, 2, v, o, "release1", 60.0, 500.0);
+    r.level(k, 2, s.trim, -6.0);
+    // Halo: a plain string to one with a shimmering halo, the octave partial drifting out of tune.
+    r.span_hi(k, 3, v, o, "fine3", 4.0, 40.0);
+    // Hall: a small room to a huge hall with a long echo (the wet level stays).
+    r.span_hi(k, 4, s.verb, "reverb", "decay_s", 4.5, 16.0);
+    r.span(k, 4, s.delay, "delay", "feedback", 8.0, 40.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -633,10 +770,12 @@ fn willow() -> Rack {
 /// Dry Creek: a nylon-string guitar pluck.
 fn dry_creek() -> Rack {
     let mut r = Rack::new();
+    // Pick: the click of the pick; Nylon: the bright stored string to a dark, round nylon one (off); Ring: let the string ring;
+    // Double: a second string beside it and a chorus.
     let knob = macros(
         &mut r,
-        &["Pick", "Warmth", "Room", "Chorus"],
-        &[0.50, 0.20, 0.40, 0.30],
+        &["Pick", "Nylon", "Ring", "Double"],
+        &[0.50, 0.0, 0.50, 0.30],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
@@ -648,7 +787,7 @@ fn dry_creek() -> Rack {
         [5.0, 0.0, 0.2, 0.5, 30.0, 0.0, 20.0, 0.8],
     ];
     let v = fm(&mut r, m, 1.0, 0.5, 0.0, &ops);
-    post(
+    let s = post(
         &mut r,
         knob,
         v,
@@ -670,10 +809,35 @@ fn dry_creek() -> Rack {
             echo_max: 0.15,
             room_decay: 1.8,
             room_max: 0.35,
+            fixed: true,
+            old: [0.50, 0.20, 0.40, 0.30],
             ..pst()
         },
     );
-    r.route(knob, "m1", v, "index", 0.5);
+    let (o, k) = ("osc.fm6", knob);
+    // Pick: a soft fingertip to a hard, clicking pick.
+    let index = routed(o, "index", 0.5, 0.5, 0.50);
+    r.e.set_param(v, "index", index);
+    r.span(k, 1, v, o, "level4", 0.0, 0.3);
+    r.span(k, 1, v, o, "level6", 0.0, 0.2);
+    // Nylon: the bright, edgy stored string to a dark, round nylon one (off by default).
+    let cut = routed("filter.ladder", "cutoff_hz", 4500.0, 0.45, 0.50);
+    r.rise(k, 2, s.lad, "filter.ladder", "cutoff_hz", cut, 700.0);
+    let dr = routed("drive", "drive_db", 3.0, 0.35, 0.20);
+    r.rise(k, 2, s.drive.unwrap(), "drive", "drive_db", dr, 0.0);
+    r.level(k, 2, s.trim, 3.0);
+    // Ring: a muted, palm-damped note to a string let ring.
+    r.span(k, 3, v, o, "decay1", 150.0, 900.0);
+    r.span(k, 3, v, o, "decay5", 150.0, 900.0);
+    r.span(k, 3, v, o, "release1", 20.0, 120.0);
+    r.level(k, 3, s.trim, -9.0);
+    // Double: one string to a doubled, chorused pair.
+    let ch = s.chorus.unwrap();
+    let mix = routed("chorus", "mix", 0.0, 0.5, 0.30);
+    r.span(k, 4, ch, "chorus", "mix", 0.0, mix);
+    r.span_hi(k, 4, ch, "chorus", "depth", 30.0, 100.0);
+    r.span_hi(k, 4, ch, "chorus", "rate_hz", 0.5, 2.5);
+    r.span(k, 4, v, o, "fine5", 0.0, 3.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -681,10 +845,12 @@ fn dry_creek() -> Rack {
 /// Gumdrop: a short, bouncy pop pluck.
 fn gumdrop() -> Rack {
     let mut r = Rack::new();
+    // Bounce: the resonant filter squelches on each note; Hold: the note length; Boing: each note drops in from
+    // above (off); Chorus: the stereo shimmer.
     let knob = macros(
         &mut r,
-        &["Cutoff", "Drive", "Space", "Decay"],
-        &[0.55, 0.20, 0.45, 0.40],
+        &["Bounce", "Hold", "Boing", "Chorus"],
+        &[0.85, 0.80, 0.0, 0.30],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
@@ -721,12 +887,31 @@ fn gumdrop() -> Rack {
             echo_max: 0.25,
             room_decay: 2.2,
             room_max: 0.3,
+            fixed: true,
+            old: [0.55, 0.20, 0.45, 0.40],
             ..pst()
         },
     );
+    let k = knob;
     r.route(v.fenv, "out", s.lad, "cutoff_hz", 0.4);
     r.route(m, "velocity", s.lad, "cutoff_hz", 0.15);
-    r.route(knob, "m4", v.aenv, "decay_ms", 0.5);
+    // Bounce: a flat, dull pluck to a squelching, resonant bounce on every note.
+    let cut = routed("filter.ladder", "cutoff_hz", 1500.0, 0.5, 0.55);
+    r.span(k, 1, s.lad, "filter.ladder", "cutoff_hz", 300.0, cut);
+    r.span(k, 1, s.lad, "filter.ladder", "resonance", 0.1, 0.35);
+    // Hold: a clipped dot to a long, bouncing note.
+    let dec = routed("env.adsr", "decay_ms", 260.0, 0.5, 0.40);
+    r.span(k, 2, v.aenv, "env.adsr", "decay_ms", 130.0, dec);
+    r.span(k, 2, v.aenv, "env.adsr", "release_ms", 80.0, 120.0);
+    r.level(k, 2, s.trim, -5.0);
+    // Boing: each note drops in from above, up to 120 ct, and falls into tune (off by default).
+    r.depth_route(v.fenv, "out", v.osc_a, "fine", k, "m3", 0.6);
+    r.depth_route(v.fenv, "out", v.osc_b, "fine", k, "m3", 0.6);
+    // Chorus: a dry pop pluck to a deep, fast chorus.
+    let ch = s.chorus.unwrap();
+    r.span(k, 4, ch, "chorus", "mix", 0.0, 25.0);
+    r.span(k, 4, ch, "chorus", "depth", 10.0, 35.0);
+    r.span_hi(k, 4, ch, "chorus", "rate_hz", 0.6, 3.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -734,10 +919,11 @@ fn gumdrop() -> Rack {
 /// Cold Cut: a dark, short bell-pluck for trap.
 fn cold_cut() -> Rack {
     let mut r = Rack::new();
+    // Click: the metallic click of the strike; Ring: how long the bell lasts; Grit: the drive; Dark: the filter.
     let knob = macros(
         &mut r,
-        &["Tone", "Dirt", "Room", "Decay"],
-        &[0.40, 0.35, 0.30, 0.40],
+        &["Click", "Ring", "Grit", "Dark"],
+        &[0.50, 1.0, 0.40, 0.17],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let ops: [Op; 6] = [
@@ -749,7 +935,7 @@ fn cold_cut() -> Rack {
         [1.0, 0.0, 0.0, 0.5, 100.0, 0.0, 50.0, 0.0],
     ];
     let v = fm(&mut r, m, 1.0, 0.45, 0.0, &ops);
-    post(
+    let s = post(
         &mut r,
         knob,
         v,
@@ -775,12 +961,31 @@ fn cold_cut() -> Rack {
             echo_max: 0.2,
             room_decay: 1.3,
             room_max: 0.25,
+            fixed: true,
+            old: [0.40, 0.35, 0.30, 0.40],
             ..pst()
         },
     );
-    r.route(knob, "m1", v, "index", 0.5);
-    r.route(knob, "m4", v, "decay1", 0.5);
-    r.route(knob, "m4", v, "decay3", 0.5);
+    let (o, k) = ("osc.fm6", knob);
+    let index = routed(o, "index", 0.45, 0.5, 0.40);
+    r.e.set_param(v, "index", index);
+    // Click: a hollow, soft knock to a hard, metallic click on top of it.
+    r.span(k, 1, v, o, "level2", 0.0, 0.5);
+    // Ring: a dead tick to a bell that hangs in the air.
+    let d1 = routed(o, "decay1", 700.0, 0.5, 0.40);
+    let d3 = routed(o, "decay3", 500.0, 0.5, 0.40);
+    r.span(k, 2, v, o, "decay1", 120.0, d1);
+    r.span(k, 2, v, o, "decay3", 100.0, d3);
+    r.span(k, 2, v, o, "release1", 30.0, 150.0);
+    r.level(k, 2, s.trim, -7.0);
+    // Grit: a clean, hollow bell to a crushed, blown-out one, the trim following the drive down.
+    let dr = routed("drive", "drive_db", 10.0, 0.4, 0.35);
+    r.span(k, 3, s.drive.unwrap(), "drive", "drive_db", 2.0, dr);
+    r.span(k, 3, s.drive.unwrap(), "drive", "trim_db", 0.0, -4.0);
+    // Dark: the open stored tone to a muffled, closed bell (the gain follows the filter down).
+    let cut = routed("filter.ladder", "cutoff_hz", 2800.0, 0.55, 0.40);
+    r.span(k, 4, s.lad, "filter.ladder", "cutoff_hz", 20000.0, cut);
+    r.level(k, 4, s.trim, 8.0);
     perform(&mut r, knob, None, 4);
     r
 }
@@ -788,10 +993,11 @@ fn cold_cut() -> Rack {
 /// Rivet Gun: a bright, phased, compressed staccato pluck.
 fn rivet_gun() -> Rack {
     let mut r = Rack::new();
+    // Gate: the length of each rivet; Phase: the phaser; Snap: the filter; Stack: the unison pulls apart.
     let knob = macros(
         &mut r,
-        &["Cutoff", "Crunch", "Room", "Phase"],
-        &[0.55, 0.50, 0.25, 0.45],
+        &["Gate", "Phase", "Snap", "Stack"],
+        &[0.50, 0.45, 1.0, 0.40],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     let v = va(
@@ -844,22 +1050,47 @@ fn rivet_gun() -> Rack {
             echo_max: 0.25,
             room_decay: 0.5,
             room_max: 0.12,
+            fixed: true,
+            old: [0.55, 0.50, 0.25, 0.45],
             ..pst()
         },
     );
+    let k = knob;
     r.route(v.fenv, "out", s.lad, "cutoff_hz", 0.4);
     r.route(m, "velocity", s.lad, "cutoff_hz", 0.15);
+    // Gate: a clipped tick to a rivet that holds and rings on.
+    r.span(k, 1, v.aenv, "env.adsr", "decay_ms", 30.0, 120.0);
+    r.span(k, 1, v.aenv, "env.adsr", "release_ms", 8.0, 40.0);
+    r.level(k, 1, s.trim, -7.0);
+    // Phase: a dry rivet to a deep, fast, ringing phaser.
+    let ph = s.phaser.unwrap();
+    let mix = routed("phaser", "mix", 0.0, 0.6, 0.45);
+    r.span(k, 2, ph, "phaser", "mix", 0.0, mix);
+    r.span_hi(k, 2, ph, "phaser", "rate_hz", 0.5, 4.0);
+    r.span_hi(k, 2, ph, "phaser", "feedback", 55.0, 90.0);
+    r.level(k, 2, s.trim, 4.0);
+    // Snap: a closed, dull rivet to one whose filter snaps open on every hit (the drive stays as it was).
+    let dr = routed("drive", "drive_db", 14.0, 0.35, 0.50);
+    r.e.set_param(s.drive.unwrap(), "drive_db", dr);
+    let cut = routed("filter.ladder", "cutoff_hz", 2200.0, 0.5, 0.55);
+    r.span(k, 3, s.lad, "filter.ladder", "cutoff_hz", 450.0, cut);
+    r.level(k, 3, s.trim, 0.0);
+    // Stack: a tight pulse to a wide, ratty stack.
+    r.span(k, 4, v.osc_a, "osc.va", "detune", 2.0, 14.0);
+    r.span(k, 4, v.osc_b, "osc.va", "fine", 0.0, 7.0);
     perform(&mut r, knob, None, 4);
     r
 }
 
-/// Tuning Fork: tuned metal bars, soft and slightly detuned, with a slow wobble.
-fn tuning_fork() -> Rack {
+/// Gossamer (was Tuning Fork, then Free Bar): tuned metal bars, soft and slightly detuned, with a slow wobble.
+fn free_bar() -> Rack {
     let mut r = Rack::new();
+    // Overtones: a pure fork to a clangorous bar; Ring: how long the bar sings; Beat: the doubled partials drift
+    // apart and beat; Bowed: each bar struck to one that is bowed in (off).
     let knob = macros(
         &mut r,
-        &["Strike", "Warmth", "Space", "Wobble"],
-        &[0.45, 0.15, 0.55, 0.40],
+        &["Overtones", "Ring", "Beat", "Bowed"],
+        &[0.50, 1.0, 0.10, 0.0],
     );
     let m = r.add("midi.in", &[("bend", 2.0)]);
     // Six added partials of a free bar: 1, 2.76, 5.4, 8.9 and two detuned doubles.
@@ -872,7 +1103,7 @@ fn tuning_fork() -> Rack {
         [2.0, 8.0, 0.2, 0.5, 1900.0, 0.0, 300.0, 0.4],
     ];
     let v = fm(&mut r, m, 7.0, 1.0, 0.0, &ops);
-    post(
+    let s = post(
         &mut r,
         knob,
         v,
@@ -894,9 +1125,33 @@ fn tuning_fork() -> Rack {
             echo_max: 0.3,
             room_decay: 4.0,
             room_max: 0.4,
+            fixed: true,
+            old: [0.45, 0.15, 0.55, 0.40],
             ..pst()
         },
     );
+    let (o, k) = ("osc.fm6", knob);
+    // Overtones: a pure, soft fork to a clangorous bar, the inharmonic partials rising.
+    r.span(k, 1, v, o, "level2", 0.0, 0.45);
+    r.span(k, 1, v, o, "level3", 0.0, 0.3);
+    r.span(k, 1, v, o, "level4", 0.0, 0.18);
+    // Ring: a damped bar to a bar that sings for many seconds.
+    r.span(k, 2, v, o, "decay1", 25.0, 9500.0);
+    r.span(k, 2, v, o, "decay5", 25.0, 9500.0);
+    r.span(k, 2, v, o, "decay2", 18.0, 5000.0);
+    r.span(k, 2, v, o, "decay3", 12.0, 1800.0);
+    r.span(k, 2, v, o, "decay4", 10.0, 600.0);
+    r.span(k, 2, v, o, "release1", 8.0, 700.0);
+    r.span(k, 2, v, o, "release5", 8.0, 700.0);
+    r.level(k, 2, s.trim, -4.0);
+    // Beat: the doubled partials drift apart from a pure unison to a slow, wide beating.
+    r.span(k, 3, v, o, "fine5", 0.0, 5.0);
+    r.span(k, 3, v, o, "fine6", 0.0, 8.0);
+    r.level(k, 3, s.trim, 1.5);
+    // Bowed: a struck bar to one that is bowed in over a second (off by default; level-type).
+    for n in 1..=6 {
+        r.rise(k, 4, v, o, &format!("attack{n}"), 0.5, 250.0);
+    }
     perform(&mut r, knob, None, 4);
     r
 }
@@ -1204,8 +1459,8 @@ pub fn presets() -> Vec<Preset> {
             name: "Matinee",
             category: "Keys",
             tags: &["poly", "supersaw", "chorus", "synthwave"],
-            description: "A wide keyboard from seven detuned saws, a soft filter and a big room. Play slow chords. Cutoff opens the filter, Warmth adds a little drive, Space sets the echo and the long room, Width pulls the saws apart.",
-            listen: "The width of each chord and the room trailing behind it; Width at 0 narrows it",
+            description: "A wide keyboard from seven detuned saws, a soft filter and a big room. Play slow chords. Swell pushes each chord in slowly instead of striking it, Glass opens a dark pad into a bright, glassy one, Square lets a hollow square take over from the saws at the same loudness, Hall grows the room from small to huge.",
+            listen: "The width of each chord and the room trailing behind it; Square at 0 is the bright saw stack",
             group: 2,
             build: matinee,
             phrase: matinee_phrase,
@@ -1216,7 +1471,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Snowmelt",
             category: "Keys",
             tags: &["poly", "fm", "soft", "ambient", "cinematic"],
-            description: "A slow, soft electric piano in a big room: a gentle attack, a long fade and a drifting tuning. Play slow open chords. Tine opens the FM brightness and the filter, Warmth adds a little drive, Space sets the echo and a six-second room, Drift detunes the voice and slows the chorus.",
+            description: "A slow, soft electric piano in a big room: a gentle attack, a long fade and a drifting tuning. Play slow open chords. Tine grows a glassy hammer tine out of the soft key, Bloom lets each chord grow in over a second, Drift sets a partner tine beating under a deep, slow chorus, Hall grows the six-second room into a huge one.",
             listen: "The soft bloom of each chord and the room carrying it",
             group: 2,
             build: snowmelt,
@@ -1228,7 +1483,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Scaffold",
             category: "Keys",
             tags: &["poly", "stab", "phased", "compressed", "drum and bass", "174bpm"],
-            description: "A dark, wide stab for drum and bass: eight detuned saws, a closing filter, a phaser and a compressor. Play short rolling chords. Cutoff opens the filter, Grit pushes the drive, Room sets a slapback and a tight room, Length stretches the stab.",
+            description: "A dark, wide stab for drum and bass: eight detuned saws, a closing filter, a phaser and a compressor. Play short rolling chords. Shut goes from a boxed-in stab to one whose filter snaps open and closes on every hit, Stack pulls the two saw stacks apart into a wall, Swirl runs the phaser from still to deep and fast, Tail lets the stab ring on after the key is up.",
             listen: "The dark body of each stab and the filter closing after it",
             group: 2,
             build: scaffold,
@@ -1240,7 +1495,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Brass Filament",
             category: "Keys",
             tags: &["poly", "fm", "metallic", "experimental"],
-            description: "A metallic FM tone that rings and wavers: inharmonic partials, a little feedback and a slow fade. Play sparse two-note intervals. Strike sets the brightness, Rust adds drive, Space sets the echo and room, Warp feeds the sound back into itself.",
+            description: "A metallic FM tone that rings and wavers: inharmonic partials, a little feedback and a slow fade. Play sparse two-note intervals. Blow goes from a tone bowed in slowly to a hard strike, Alloy pulls the partials out of tune into clangorous metal, Space opens a wide echo and a huge, ringing room, Warp feeds the sound back into itself.",
             listen: "The unstable, slightly out-of-tune shimmer; Warp up makes it harsher",
             group: 2,
             build: brass_filament,
@@ -1252,7 +1507,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Spinet",
             category: "Keys",
             tags: &["poly", "pulse", "harpsichord", "world"],
-            description: "A bright harpsichord-like key: a thin pulse and a saw, an instant attack and a plucked fall, with a faint buzz. Play counterpoint lines. Tone opens the filter, Buzz adds drive, Room sets the echo and a room, Chorus doubles the strings.",
+            description: "A bright harpsichord-like key: a thin pulse and a saw, an instant attack and a plucked fall, with a faint buzz. Play counterpoint lines. Jack goes from a dull, boxed key to a bright pluck whose filter snaps on every note, Honky pulls the second string out of tune, Sustain lets the strings ring out after the key is up, Double brings in a deep chorus.",
             listen: "The quick pluck of each key and the buzzing ring",
             group: 2,
             build: spinet,
@@ -1264,7 +1519,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Willow",
             category: "Pluck",
             tags: &["poly", "fm", "harp", "ambient", "cinematic"],
-            description: "A soft harp: a quick pluck and a long, clean ring. Play rolled chords. Pluck sets the brightness of the attack, Warmth adds a little drive, Space sets the echo and a long room, Stretch lengthens the ring.",
+            description: "A soft harp: a quick pluck and a long, clean ring. Play rolled chords. Nail goes from a soft fingertip to a bright, clicking nail, Ring lets the strings sing for many seconds, Halo sets a shimmering halo of overtones, Hall grows the room from small to huge.",
             listen: "The rolled chords ringing into each other",
             group: 2,
             build: willow,
@@ -1276,7 +1531,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Dry Creek",
             category: "Pluck",
             tags: &["poly", "fm", "guitar", "pop", "world"],
-            description: "A nylon-string guitar pluck: a soft pick, a woody body and a quick decay. Play arpeggios. Pick sets the attack brightness, Warmth adds a little drive, Room sets the echo and a room, Chorus doubles the string.",
+            description: "A nylon-string guitar pluck: a soft pick, a woody body and a quick decay. Play arpeggios. Pick goes from a soft fingertip to a hard, clicking pick, Nylon turns the bright string into a dark, round nylon one, Ring lets the string ring, Double brings in a second string and a chorus.",
             listen: "The pick on each note and the quick, round decay",
             group: 2,
             build: dry_creek,
@@ -1288,7 +1543,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Gumdrop",
             category: "Pluck",
             tags: &["poly", "pluck", "chorus", "pop"],
-            description: "A short, bouncy pop pluck: two pulses and a saw, a resonant filter that bounces on each note. Play catchy riffs. Cutoff opens the filter, Drive adds the bite, Space sets the echo and room, Decay stretches the note.",
+            description: "A short, bouncy pop pluck: two pulses and a saw, a resonant filter that bounces on each note. Play catchy riffs. Bounce goes from a flat pluck to a squelching, resonant bounce, Hold stretches the note from a dot to a long bounce, Boing drops each note in from above, Chorus brings in a deep, fast shimmer.",
             listen: "The bounce of the filter on every note",
             group: 2,
             build: gumdrop,
@@ -1300,7 +1555,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Cold Cut",
             category: "Pluck",
             tags: &["poly", "fm", "bell", "dark", "hip-hop", "trap"],
-            description: "A dark, short bell-pluck for trap: a metallic click, a hollow body and a quick fall. Play minor figures with room to ring. Tone opens the FM brightness and the filter, Dirt pushes the drive, Room sets the echo and a room, Decay lengthens the note.",
+            description: "A dark, short bell-pluck for trap: a metallic click, a hollow body and a quick fall. Play minor figures with room to ring. Click goes from a hollow knock to a hard, metallic click, Ring lets the bell hang in the air, Grit crushes it, Dark closes the filter into a muffled bell.",
             listen: "The hollow click and the room around a sparse line",
             group: 2,
             build: cold_cut,
@@ -1312,7 +1567,7 @@ pub fn presets() -> Vec<Preset> {
             name: "Rivet Gun",
             category: "Pluck",
             tags: &["poly", "pluck", "phased", "compressed", "french touch", "125bpm", "signature"],
-            description: "A bright, staccato, phased pluck, driven and squashed: a narrow pulse with a hard filter snap. Play short syncopated riffs. Cutoff opens the filter, Crunch pushes the drive, Room sets a slapback and a tight room, Phase brings in the phaser.",
+            description: "A bright, staccato, phased pluck, driven and squashed: a narrow pulse with a hard filter snap. Play short syncopated riffs. Gate goes from a clipped tick to a rivet that holds and rings on, Phase runs the phaser from dry to deep and fast, Snap closes the filter until it snaps open on every hit, Stack pulls the unison apart.",
             listen: "The phaser on the staccato riff and the compressor holding it close",
             group: 2,
             build: rivet_gun,
@@ -1320,14 +1575,14 @@ pub fn presets() -> Vec<Preset> {
             secs: 5.0,
         },
         Preset {
-            slug: "tuning-fork",
-            name: "Tuning Fork",
+            slug: "gossamer",
+            name: "Gossamer",
             category: "Pluck",
             tags: &["poly", "fm", "metallic", "ambient", "experimental"],
-            description: "Tuned metal bars: six added partials of a free bar, a soft strike and a long ring. Play slow melodies. Strike opens the brightness, Warmth adds a little drive, Space sets the echo and a long room, Wobble brings in a slow chorus.",
-            listen: "The pure ring of each bar and the slow wobble across notes",
+            description: "Tuned metal bars: six added partials of a free bar, a soft strike and a long ring. Play slow melodies. Overtones goes from a pure fork to a clangorous bar, Ring goes from a dead, damped tick to a bar that sings for ten seconds, Beat pulls the doubled partials apart into a wide beating, Bowed pushes each bar in slowly instead of striking it.",
+            listen: "The pure ring of each bar and the slow beating across notes",
             group: 2,
-            build: tuning_fork,
+            build: free_bar,
             phrase: fork_phrase,
             secs: 11.0,
         },
