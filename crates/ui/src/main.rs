@@ -2376,7 +2376,16 @@ fn main() -> eframe::Result<()> {
         None => {
             // No patch named: start with the browser open on the plain start patch.
             ui_state.browser_open = true;
-            PatchEditor::seed_from(&default_patch())
+            // The first-run start patch (see `first_run`), and the tour over it until dismissed.
+            ui_state.first_run = kabl_ui::tour::begin(library.prefs.first_run_done);
+            let start = kabl_ui::first_run::start_patch();
+            // Its own name in the header, and clean: nothing edited yet.
+            ui_state.doc = Some(kabl_ui::browser::Doc::new(
+                kabl_ui::first_run::start_name(),
+                kabl_ui::browser::DocOrigin::New,
+                start.state(),
+            ));
+            start
         }
     };
     ui_state.library = Some(library);
