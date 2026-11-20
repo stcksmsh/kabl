@@ -1,0 +1,64 @@
+Voice presets: clips in docs/presets/clips/voice/ (git-ignored mp3).
+Per preset <slug>.mp3 = the phrase played as meant (10 to 20 s), <slug>-tour.mp3 = macros 1 to 4, each 20 s
+(6 s at 0, 4 s up, 6 s at 1, 4 s down), 1 s of silence between: 84 s per file, clips start at 0, 21, 42 and 63 s.
+Gap guard on for all; depth-charge was run with --max-gap 3 (its Space at 0 is a dry one-shot with a gap between hits).
+
+sock-puppet: A saw lead that talks. Mouth steps through the vowels, Chatter (needs Run) turns it into a chattering robot, Weight adds an octave, Bite for grit.
+    0 s  macro 1: Mouth
+   21 s  macro 2: Chatter
+   42 s  macro 3: Weight
+   63 s  macro 4: Bite
+
+temple-bowl: Bowls that ring for seconds. Strike for the clang, Metal for a harsher inharmonic tone, Ring for the length.
+    0 s  macro 1: Strike
+   21 s  macro 2: Metal
+   42 s  macro 3: Ring
+   63 s  macro 4: Space
+
+depth-charge: A low hit with a crack and a falling pitch. Boom for length, Crack for the front, Drop for the fall, Space for the hall.
+    0 s  macro 1: Boom
+   21 s  macro 2: Crack
+   42 s  macro 3: Drop
+   63 s  macro 4: Space
+
+oracle: A wordless choir. Vowel steps cleanly between the vowels, Breath for a whisper, Choir for one voice to a crowd.
+    0 s  macro 1: Vowel
+   21 s  macro 2: Breath
+   42 s  macro 3: Choir
+   63 s  macro 4: Space
+
+automaton: Chords that talk in a loop. Speech at 0 is a held vowel, at 1 a sentence. Detail for crisp consonants, Crush for grit.
+    0 s  macro 1: Speech
+   21 s  macro 2: Detail
+   42 s  macro 3: Size
+   63 s  macro 4: Crush
+
+vox-chop: Stabs whose vowel jumps on every sixteenth (needs Run). Vowels at 0 is one vowel, at 1 it chatters. Chop for the pulse.
+    0 s  macro 1: Chop
+   21 s  macro 2: Vowels
+   42 s  macro 3: Shift
+   63 s  macro 4: Space
+
+chandelier: Pure, glassy notes that bloom. Rub for the rim, Overtone for glitter, Bow for how slowly each note arrives.
+    0 s  macro 1: Rub
+   21 s  macro 2: Overtone
+   42 s  macro 3: Bow
+   63 s  macro 4: Space
+
+whiteout: A wind that sings the notes you play. Pitch at 0 is a plain wash, at 1 it rings. Gust for slow breathing, Grain for grit.
+    0 s  macro 1: Pitch
+   21 s  macro 2: Gust
+   42 s  macro 3: Grain
+   63 s  macro 4: Space
+
+updraft: Hold a note: a dark rumble that opens into a roaring wash. Build for time, Lift for how high it gets, Heat for saturation.
+    0 s  macro 1: Build
+   21 s  macro 2: Lift
+   42 s  macro 3: Heat
+   63 s  macro 4: Space
+
+maw: A mouth in the bass. Vowel moves the mouth, Growl turns it into a snarl, Grit for bite, Weight for the sub.
+    0 s  macro 1: Vowel
+   21 s  macro 2: Growl
+   42 s  macro 3: Grit
+   63 s  macro 4: Weight
