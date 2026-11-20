@@ -69,7 +69,7 @@ cargo fmt --all -- --check
 
 `crates/`: `core` (op log, patch state, file format, no audio dependencies), `engine` (graph
 compiler, scheduler, voices), `modules`, `cables`, `ui` (egui rack and sound browser),
-`standalone` (audio and MIDI I/O), `clap` (plugin). `vendor/nice-plug` is a vendored copy of
+`standalone` (app support for `kabl-ui`, and the `kabl` CLI: file tools, test render), `clap` (plugin). `vendor/nice-plug` is a vendored copy of
 the plugin framework (ISC), see `vendor/nice-plug/STRICT-PROFILE.md`.
 
 ## Documentation

@@ -920,6 +920,14 @@ clean.
 
 ## 2026-09-21 — Standalone binary (`crates/standalone`): cpal + midir, "something to hear"
 
+**Superseded 2026-11-20 (E3b, roadmap phase 7):** the `kabl` binary no longer plays. It
+duplicated `kabl-ui`'s cpal/midir path; the app is now the one live audio path. `kabl` is a CLI:
+`cat`/`pack`/`unpack`, `--save-default <file>`, and the self-test WAV render below for
+`default_patch()` or `--patch <file>`. `--midi` is ignored with a warning. The crate stays as
+the library `kabl-ui` and the tests use (`default_patch`, `RingBuffer`, `applog`, `input`,
+`code_load`, stream-error helpers, the MIDI-to-voice helpers). The old player's own MIDI
+connect (`connect_midi`) and the crate's `midir` dependency went with it.
+
 Owner: "Do the UI yourself, do everything, we can easily fix it later" — explicit authorization
 to build brief section 12's `standalone`/`ui` crates autonomously, superseding this session's
 earlier self-imposed caution about needing a person for anything UI/hardware-shaped. Built the
