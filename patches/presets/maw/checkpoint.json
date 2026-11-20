@@ -170,7 +170,7 @@
         "y": 620.0
       },
       "params": {
-        "gain_db": -0.92
+        "gain_db": -1.32
       }
     },
     "14": {
@@ -197,9 +197,19 @@
       }
     },
     "16": {
-      "kind": "bitcrusher",
+      "kind": "gain",
       "pos": {
         "x": 974.0,
+        "y": 620.0
+      },
+      "params": {
+        "gain_db": -0.76923084
+      }
+    },
+    "17": {
+      "kind": "bitcrusher",
+      "pos": {
+        "x": 1164.0,
         "y": 620.0
       },
       "params": {
@@ -208,25 +218,25 @@
         "mix": 0.0
       }
     },
-    "17": {
+    "18": {
       "kind": "compressor",
       "pos": {
-        "x": 1164.0,
+        "x": 1354.0,
         "y": 620.0
       },
       "params": {
         "attack_ms": 3.0,
         "knee_db": 4.0,
-        "makeup_db": 4.0,
+        "makeup_db": 9.0,
         "ratio": 4.0,
         "release_ms": 100.0,
         "threshold_db": -22.0
       }
     },
-    "18": {
+    "19": {
       "kind": "out",
       "pos": {
-        "x": 1354.0,
+        "x": 1544.0,
         "y": 620.0
       },
       "params": {}
@@ -507,7 +517,7 @@
         }
       },
       "params": {
-        "amount": 0.027380953
+        "amount": 0.039285712
       },
       "steps": []
     },
@@ -661,11 +671,11 @@
       "to": {
         "Param": {
           "id": 16,
-          "param": "mix"
+          "param": "gain_db"
         }
       },
       "params": {
-        "amount": 0.5
+        "amount": 0.029761905
       },
       "steps": []
     },
@@ -688,6 +698,24 @@
     "28": {
       "from": {
         "Module": {
+          "id": 2,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 17,
+          "param": "mix"
+        }
+      },
+      "params": {
+        "amount": 0.5
+      },
+      "steps": []
+    },
+    "29": {
+      "from": {
+        "Module": {
           "id": 17,
           "port": "out"
         }
@@ -695,6 +723,22 @@
       "to": {
         "Module": {
           "id": 18,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "30": {
+      "from": {
+        "Module": {
+          "id": 18,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 19,
           "port": "in"
         }
       },

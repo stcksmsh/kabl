@@ -145,7 +145,7 @@
         "y": 620.0
       },
       "params": {
-        "gain_db": 2.5
+        "gain_db": 4.5
       }
     },
     "12": {
@@ -192,8 +192,8 @@
         "y": 620.0
       },
       "params": {
-        "cutoff_hz": 1100.0,
-        "resonance": 0.9
+        "cutoff_hz": 700.0,
+        "resonance": 0.5
       }
     },
     "16": {
@@ -213,13 +213,33 @@
         "y": 620.0
       },
       "params": {
-        "gain_db": 0.7
+        "gain_db": 1.12
       }
     },
     "18": {
-      "kind": "chorus",
+      "kind": "gain",
       "pos": {
         "x": 1544.0,
+        "y": 620.0
+      },
+      "params": {
+        "gain_db": 3.2400002
+      }
+    },
+    "19": {
+      "kind": "gain",
+      "pos": {
+        "x": 1734.0,
+        "y": 620.0
+      },
+      "params": {
+        "gain_db": 0.814624
+      }
+    },
+    "20": {
+      "kind": "chorus",
+      "pos": {
+        "x": 1924.0,
         "y": 620.0
       },
       "params": {
@@ -228,10 +248,10 @@
         "rate_hz": 0.3
       }
     },
-    "19": {
+    "21": {
       "kind": "delay",
       "pos": {
-        "x": 1734.0,
+        "x": 2114.0,
         "y": 620.0
       },
       "params": {
@@ -241,10 +261,10 @@
         "tone_hz": 3500.0
       }
     },
-    "20": {
+    "22": {
       "kind": "reverb",
       "pos": {
-        "x": 1924.0,
+        "x": 2304.0,
         "y": 620.0
       },
       "params": {
@@ -255,18 +275,18 @@
         "width": 60.0
       }
     },
-    "21": {
+    "23": {
       "kind": "split",
       "pos": {
-        "x": 2114.0,
+        "x": 2494.0,
         "y": 620.0
       },
       "params": {}
     },
-    "22": {
+    "24": {
       "kind": "out",
       "pos": {
-        "x": 2304.0,
+        "x": 2684.0,
         "y": 620.0
       },
       "params": {}
@@ -551,7 +571,7 @@
       "from": {
         "Module": {
           "id": 15,
-          "port": "bp"
+          "port": "lp"
         }
       },
       "to": {
@@ -577,7 +597,7 @@
         }
       },
       "params": {
-        "amount": 0.45
+        "amount": 1.0
       },
       "steps": []
     },
@@ -667,7 +687,7 @@
         }
       },
       "params": {
-        "amount": 0.2857143
+        "amount": 0.14285715
       },
       "steps": []
     },
@@ -701,11 +721,45 @@
         }
       },
       "params": {
-        "amount": -0.023809524
+        "amount": -0.03809524
       },
       "steps": []
     },
     "27": {
+      "from": {
+        "Module": {
+          "id": 17,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 18,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "28": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 18,
+          "param": "gain_db"
+        }
+      },
+      "params": {
+        "amount": -0.06428572
+      },
+      "steps": []
+    },
+    "29": {
       "from": {
         "Module": {
           "id": 1,
@@ -723,43 +777,11 @@
       },
       "steps": []
     },
-    "28": {
-      "from": {
-        "Module": {
-          "id": 17,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 18,
-          "port": "in"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
-    "29": {
-      "from": {
-        "Module": {
-          "id": 18,
-          "port": "out"
-        }
-      },
-      "to": {
-        "Module": {
-          "id": 21,
-          "port": "in"
-        }
-      },
-      "params": {},
-      "steps": []
-    },
     "30": {
       "from": {
         "Module": {
-          "id": 21,
-          "port": "left"
+          "id": 18,
+          "port": "out"
         }
       },
       "to": {
@@ -769,6 +791,24 @@
         }
       },
       "params": {},
+      "steps": []
+    },
+    "31": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m3"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 19,
+          "param": "gain_db"
+        }
+      },
+      "params": {
+        "amount": -0.01547619
+      },
       "steps": []
     },
     "32": {
@@ -790,49 +830,97 @@
     "33": {
       "from": {
         "Module": {
-          "id": 1,
-          "port": "m4"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 19,
-          "param": "mix"
-        }
-      },
-      "params": {
-        "amount": 0.35
-      },
-      "steps": []
-    },
-    "34": {
-      "from": {
-        "Module": {
-          "id": 1,
-          "port": "m4"
-        }
-      },
-      "to": {
-        "Param": {
-          "id": 20,
-          "param": "mix"
-        }
-      },
-      "params": {
-        "amount": 0.6
-      },
-      "steps": []
-    },
-    "35": {
-      "from": {
-        "Module": {
           "id": 20,
           "port": "out"
         }
       },
       "to": {
         "Module": {
+          "id": 23,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "34": {
+      "from": {
+        "Module": {
+          "id": 23,
+          "port": "left"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 21,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "36": {
+      "from": {
+        "Module": {
+          "id": 21,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
           "id": 22,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "37": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 21,
+          "param": "mix"
+        }
+      },
+      "params": {
+        "amount": 0.25
+      },
+      "steps": []
+    },
+    "38": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m4"
+        }
+      },
+      "to": {
+        "Param": {
+          "id": 22,
+          "param": "mix"
+        }
+      },
+      "params": {
+        "amount": 0.45
+      },
+      "steps": []
+    },
+    "39": {
+      "from": {
+        "Module": {
+          "id": 22,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 24,
           "port": "in"
         }
       },
