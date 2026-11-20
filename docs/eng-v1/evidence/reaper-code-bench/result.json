@@ -1,0 +1,304 @@
+{
+ "plugin_sha256": "5892b5c9ec516be157cdc4f29c3d0eae6452905f4e248b67d0956c75bfd44c53",
+ "cpu": "13th Gen Intel(R) Core(TM) i7-13700H",
+ "secs": 30,
+ "repeats": 3,
+ "chord": [
+  48,
+  52,
+  55,
+  59,
+  60,
+  64,
+  67,
+  71
+ ],
+ "block": 256,
+ "summary": {
+  "none-0": {
+   "render_s": 0.922,
+   "realtime_factor": 32.5,
+   "silent_blocks": 0,
+   "calibrated": true
+  },
+  "filter.svf-1": {
+   "render_s": 1.052,
+   "realtime_factor": 28.5,
+   "silent_blocks": 0,
+   "calibrated": true,
+   "per_module_ms_per_audio_s": 4.343,
+   "per_module_us_per_block": 11.58,
+   "block": 128
+  },
+  "demo.bitfilter-1": {
+   "render_s": 2.015,
+   "realtime_factor": 14.9,
+   "silent_blocks": 0,
+   "calibrated": true,
+   "per_module_ms_per_audio_s": 36.431,
+   "per_module_us_per_block": 97.15,
+   "block": 128
+  },
+  "filter.svf-2": {
+   "render_s": 1.182,
+   "realtime_factor": 25.4,
+   "silent_blocks": 0,
+   "calibrated": true,
+   "per_module_ms_per_audio_s": 4.326,
+   "per_module_us_per_block": 11.54,
+   "block": 128
+  },
+  "demo.bitfilter-2": {
+   "render_s": 3.109,
+   "realtime_factor": 9.6,
+   "silent_blocks": 0,
+   "calibrated": true,
+   "per_module_ms_per_audio_s": 36.453,
+   "per_module_us_per_block": 97.21,
+   "block": 128
+  },
+  "filter.svf-3": {
+   "render_s": 1.289,
+   "realtime_factor": 23.3,
+   "silent_blocks": 0,
+   "calibrated": true,
+   "per_module_ms_per_audio_s": 4.074,
+   "per_module_us_per_block": 10.86,
+   "block": 128
+  },
+  "demo.bitfilter-3": {
+   "render_s": 1.197,
+   "realtime_factor": 25.1,
+   "silent_blocks": 5606,
+   "calibrated": true,
+   "overrun": true
+  }
+ },
+ "calibration": "worst_fuel_per_us 927.2\nspin 1233.8\nfdiv 1249.5\nidiv 1283.9\nmem 4308.8\ncall 927.2\nperiod_us 1333.3\n",
+ "runs": {
+  "none-0": [
+   {
+    "render_s": 0.92216687800828,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.07369865477085114,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 927.2\nspin 1233.8\nfdiv 1249.5\nidiv 1283.9\nmem 4308.8\ncall 927.2\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 1.0059093849995,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.07369865477085114,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 1174.9\nspin 1307.7\nfdiv 1337.8\nidiv 1174.9\nmem 3846.5\ncall 1347.6\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 1.1039654609922,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.07369865477085114,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 753.3\nspin 841.6\nfdiv 753.3\nidiv 981.1\nmem 2969.8\ncall 1052.8\nperiod_us 1333.3\n"
+   }
+  ],
+  "filter.svf-1": [
+   {
+    "render_s": 1.0524633579917,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.06684214621782303,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 1050.9\nspin 1050.9\nfdiv 1229.8\nidiv 1526.7\nmem 4417.6\ncall 1369.3\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 1.1953412840085,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.06684214621782303,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 960.4\nspin 1020.4\nfdiv 960.4\nidiv 1312.6\nmem 4291.4\ncall 1107.5\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 1.1588362220064,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.06684214621782303,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 626.9\nspin 626.9\nfdiv 1028.8\nidiv 1320.8\nmem 4200.1\ncall 1126.3\nperiod_us 1333.3\n"
+   }
+  ],
+  "demo.bitfilter-1": [
+   {
+    "render_s": 2.0151105700061,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.07990366220474243,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 876.1\nspin 1220.8\nfdiv 1295.6\nidiv 1123.7\nmem 3515.6\ncall 876.1\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 2.200507578993,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.07990366220474243,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 925.2\nspin 1266.5\nfdiv 925.2\nidiv 1247.4\nmem 4106.5\ncall 1038.8\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 2.0766884359909,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.07990366220474243,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 1081.4\nspin 1305.8\nfdiv 1262.6\nidiv 1143.8\nmem 3595.0\ncall 1081.4\nperiod_us 1333.3\n"
+   }
+  ],
+  "filter.svf-2": [
+   {
+    "render_s": 1.1817198749923,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.06481510400772095,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 1040.6\nspin 1107.7\nfdiv 1099.4\nidiv 1040.6\nmem 3178.2\ncall 1173.9\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 1.290669738999,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.06481510400772095,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 1082.1\nspin 1280.1\nfdiv 1146.7\nidiv 1227.4\nmem 3082.8\ncall 1082.1\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 1.228537160001,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.06481510400772095,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 1046.0\nspin 1095.2\nfdiv 1073.0\nidiv 1237.5\nmem 3912.0\ncall 1046.0\nperiod_us 1333.3\n"
+   }
+  ],
+  "demo.bitfilter-2": [
+   {
+    "render_s": 3.1201010590012,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.09499553591012955,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 943.1\nspin 1242.4\nfdiv 943.1\nidiv 1208.8\nmem 3968.8\ncall 1441.7\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 3.3750431280059,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.09499553591012955,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 934.9\nspin 998.3\nfdiv 934.9\nidiv 938.3\nmem 2934.6\ncall 1148.8\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 3.1093517049885,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.09499553591012955,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 980.9\nspin 991.3\nfdiv 1108.2\nidiv 1290.3\nmem 3979.3\ncall 980.9\nperiod_us 1333.3\n"
+   }
+  ],
+  "filter.svf-3": [
+   {
+    "render_s": 1.2888268810057,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.06353975832462311,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 711.4\nspin 711.4\nfdiv 895.1\nidiv 1104.6\nmem 3633.1\ncall 1172.7\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 1.3486521589948,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.06353975832462311,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 1099.8\nspin 1099.8\nfdiv 1116.7\nidiv 1281.7\nmem 3956.1\ncall 1140.6\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 1.313942356006,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.06353975832462311,
+    "silent_blocks": 0,
+    "calibration": "worst_fuel_per_us 852.0\nspin 852.0\nfdiv 886.4\nidiv 1259.9\nmem 3981.8\ncall 869.2\nperiod_us 1333.3\n"
+   }
+  ],
+  "demo.bitfilter-3": [
+   {
+    "render_s": 1.1969038809912,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.0,
+    "silent_blocks": 5606,
+    "calibration": "worst_fuel_per_us 692.4\nspin 1273.1\nfdiv 1322.6\nidiv 1449.9\nmem 4494.9\ncall 692.4\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 1.3629703640036,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.0,
+    "silent_blocks": 5606,
+    "calibration": "worst_fuel_per_us 717.3\nspin 717.3\nfdiv 994.0\nidiv 1304.6\nmem 3925.4\ncall 1106.0\nperiod_us 1333.3\n"
+   },
+   {
+    "render_s": 1.2167300759902,
+    "calibrated": true,
+    "bsize": "128",
+    "reaper": "7.75/linux-x86_64",
+    "finite": true,
+    "rms": 0.0,
+    "silent_blocks": 5606,
+    "calibration": "worst_fuel_per_us 915.4\nspin 1241.7\nfdiv 966.8\nidiv 915.4\nmem 3332.6\ncall 1113.7\nperiod_us 1333.3\n"
+   }
+  ]
+ }
+}
