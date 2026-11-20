@@ -45,6 +45,8 @@ pub enum Sev {
     Bad,
     Warn,
     Good,
+    /// A hint that stays until it is dismissed or its owner takes it away (the first-run tour).
+    Info,
 }
 
 impl Sev {
@@ -53,6 +55,7 @@ impl Sev {
             Sev::Bad => st.roles.bad,
             Sev::Warn => st.roles.warn,
             Sev::Good => st.roles.good,
+            Sev::Info => st.roles.accent,
         }
     }
     pub fn icon(self) -> Ic {
@@ -60,12 +63,13 @@ impl Sev {
             Sev::Bad => Ic::Err,
             Sev::Warn => Ic::Warn,
             Sev::Good => Ic::Check,
+            Sev::Info => Ic::Info,
         }
     }
     /// Seconds before a toast of this severity goes away; `None` = until dismissed.
     pub fn ttl(self) -> Option<f64> {
         match self {
-            Sev::Bad => None,
+            Sev::Bad | Sev::Info => None,
             Sev::Warn => Some(8.0),
             Sev::Good => Some(3.0),
         }
