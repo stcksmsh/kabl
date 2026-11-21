@@ -142,12 +142,11 @@ pub fn arc_knob(
     (resp, out)
 }
 
-/// The colour of what you play in Perform: the macro dials' value arcs and the playing scene.
-/// The mockup shows it amber (the accent), on the reasoning that Perform's primary thing is
-/// what you play. Kosta's open item: if one rule everywhere is wanted, return `st.roles.cv`
-/// (the modulation colour) here and nowhere else.
+/// The accent of the Perform view: teal (`roles.cv`), by the owner's choice. Every Perform
+/// accent uses it: macro arcs, playing and queued scenes and banks, the play button, the beat
+/// dots. Amber stays the accent of the rest of the app.
 pub fn perform_ink(st: &Style) -> Color32 {
-    st.roles.accent
+    st.roles.cv
 }
 
 /// Whether the style paints cards and pads as look B does (a family stripe, solid panels).
@@ -440,11 +439,7 @@ pub fn scene_pad(
         egui::Align2::LEFT_BOTTOM,
         state_text,
         st.font(Role::Caption),
-        if state == PadState::Queued {
-            r.accent
-        } else {
-            ink2
-        },
+        if state == PadState::Queued { hot } else { ink2 },
     );
     if let Some(f) = progress {
         let h = st.sp(0) * 1.5;
@@ -505,7 +500,7 @@ pub fn round_button(
         st.motion.hover,
     );
     let (fill, ink) = if primary {
-        (mix(r.accent, r.text, hover * 0.15), r.on_accent)
+        (mix(perform_ink(st), r.text, hover * 0.15), r.bg)
     } else {
         (mix(r.raised, r.text, hover * 0.1), r.text)
     };
