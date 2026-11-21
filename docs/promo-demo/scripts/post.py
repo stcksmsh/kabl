@@ -9,8 +9,51 @@ Bar 0 is the moment of the clock-Restart click (the line `click <restart target>
 log, plus a constant, `restart_latency_s`). That estimate is then corrected by the lag at which
 the recorded audio's loudness envelope best matches the offline render's (searched within
 +-1.5 s); the correlation is printed, and below 0.5 the script stops instead of guessing.
+
+Environment: KABL_ANCHOR is the bar-0 click key (default targets.json "anchor", else "restart");
+CRF is the final quality (default 18).
+
+Joining takes (each already finished by this script, so t=0 is 0.5 s before bar 0 in every one):
+
+    post.py --join OUT.mp4 CUT_SECONDS[,CUT_SECONDS...] TAKE1.mp4 TAKE2.mp4 ...
+
+Take i plays up to cut i, take i+1 from there on, with a 20 ms audio crossfade at the cut.
+Cut seconds = 0.5 + bar * bar_seconds.
 """
+import sys
+
+if sys.argv[1] == "--join":
+    import os
+    import subprocess
+
+    out, cuts, takes = sys.argv[2], [float(c) for c in sys.argv[3].split(",")], sys.argv[4:]
+    if len(cuts) != len(takes) - 1:
+        sys.exit("need one cut per join: len(cuts) == len(takes) - 1")
+    X = 0.02
+    cmd, v, a = ["ffmpeg", "-loglevel", "error", "-y"], [], []
+    for i, tk in enumerate(takes):
+        cmd += ["-i", tk]
+        lo = cuts[i - 1] if i else 0
+        hi = cuts[i] if i < len(cuts) else None
+        vt = f"start={lo}" + (f":end={hi}" if hi else "")
+        at = f"start={lo}" + (f":end={hi + X}" if hi else "")  # audio overlaps the next take by X
+        v.append(f"[{i}:v]trim={vt},setpts=PTS-STARTPTS[v{i}]")
+        a.append(f"[{i}:a]atrim={at},asetpts=PTS-STARTPTS[a{i}]")
+    n = len(takes)
+    chain, last = [], "a0"
+    for i in range(1, n):
+        chain.append(f"[{last}][a{i}]acrossfade=d={X}[x{i}]")
+        last = f"x{i}"
+    fc = ";".join(v + a + chain + ["".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[vo]"])
+    cmd += ["-filter_complex", fc, "-map", "[vo]", "-map", f"[{last}]", "-c:v", "libx264", "-crf",
+            os.environ.get("CRF", "18"), "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+            "-movflags", "+faststart", out]
+    subprocess.run(cmd, check=True)
+    print(f"wrote {out}")
+    sys.exit(0)
+
 import json
+import os
 import subprocess
 import sys
 import wave
@@ -24,7 +67,8 @@ targets = json.load(open(sys.argv[0].rsplit("/", 2)[0] + "/targets.json"))
 bar = tl["bar_seconds"]
 
 # Bar 0 in video time, from the drive log.
-click = next(float(l.split()[0]) for l in open(log_path) if l.split()[1:] == ["click", targets["restart"]])
+anchor = os.environ.get("KABL_ANCHOR") or targets.get("anchor", targets["restart"])
+click = next(float(l.split()[0]) for l in open(log_path) if l.split()[1:] == ["click", anchor])
 t0 = click + targets["timing"]["restart_latency_s"] - float(ff_start)
 print(f"bar 0 at video time {t0:.2f} s (drive log)")
 
@@ -85,6 +129,6 @@ for g in tl["gestures"]:
 ass_path = f"{work}/captions.ass"
 open(ass_path, "w").write("\n".join(ass) + "\n")
 subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", f"{trim:.2f}", "-i", rec_path, "-vf", f"ass={ass_path}",
-                "-c:v", "libx264", "-preset", "medium", "-crf", "26", "-pix_fmt", "yuv420p",
+                "-c:v", "libx264", "-preset", "medium", "-crf", os.environ.get("CRF", "18"), "-pix_fmt", "yuv420p",
                 "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", out_path], check=True)
 print(f"wrote {out_path}")
