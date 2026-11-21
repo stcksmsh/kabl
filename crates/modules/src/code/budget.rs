@@ -2,10 +2,19 @@
 //!
 //! wasmi cannot measure wall-clock time inside a call, so a block's time limit is fuel. Fuel is
 //! converted from time with a calibration done on the user's machine at startup and after an
-//! audio-device change. The calibration uses the **slowest fuel-per-microsecond** code mix of
-//! several probes (plain ALU, float divide/sqrt, integer divide, scattered memory, calls), so the
-//! fuel granted for a time cap never takes longer than the cap. The wall-clock backstop in
-//! `CodeModule` covers whatever the probes miss (an overrun is an overrun even with fuel left).
+//! audio-device change. Several probes (plain ALU, float divide/sqrt, integer divide, scattered
+//! memory, calls) give the slowest and the fastest fuel-per-microsecond code mix.
+//!
+//! Policy (the code-module budget follow-up to the REAPER benchmark, PR #181): a module's time
+//! share is converted to fuel at **its own measured rate**, not the worst probe. Each module gets
+//! a fuel range for its share: the floor at the slowest probe's rate (the old, always-safe
+//! budget) and the ceiling at the fastest probe's rate. Every call is timed, and the module's
+//! fuel moves within that range to what fits its share at the rate it actually runs
+//! (`Health::observe`). Typical DSP burns fuel near the fastest probe's rate, so it gets about
+//! four times the old budget; a module whose code is slow per unit of fuel drops to the floor
+//! within a block or two. The ceiling is the hard cap: one call can never run longer than its
+//! share times the ceiling/floor ratio, and the wall-clock backstop in `CodeModule` counts any
+//! call that runs past its share (eight in a row are a crash).
 //!
 //! A module's share is for the module as a whole, across all its voices: `Health::voice_fuel`
 //! splits it by the number of live voices, so 16 voices together never spend more than one
@@ -26,12 +35,19 @@ pub const TOTAL_SHARE: f64 = 0.5;
 const PROBES: [&str; 5] = ["spin", "fdiv", "idiv", "mem", "call"];
 const PROBE_FUEL: u64 = 2_000_000;
 const PROBE_REPEATS: usize = 5;
+/// The ceiling never starts below this many fuel per microsecond (about what typical DSP
+/// reaches on a 2023 laptop core). The probes run at idle priority, and on a busy machine they
+/// measure the scheduler, not the code (seen: `call` at 3 fuel/us under a load of 80); a
+/// module's own measured rate then sets its budget instead.
+pub const MIN_CEILING_FUEL_PER_US: f64 = 4_000.0;
 static CALIB_WASM: &[u8] = include_bytes!("calib.wasm");
 
 #[derive(Debug, Clone)]
 pub struct Calibration {
-    /// The worst case (lowest) fuel per microsecond over all probes: what budgets use.
+    /// The worst case (lowest) fuel per microsecond over all probes: the budget floor.
     pub fuel_per_us: f64,
+    /// The best case (highest) fuel per microsecond over all probes: the budget ceiling.
+    pub max_fuel_per_us: f64,
     /// Median fuel per microsecond of each probe, for the report.
     pub probes: Vec<(&'static str, f64)>,
 }
@@ -39,8 +55,14 @@ pub struct Calibration {
 impl Calibration {
     /// A fixed value, for tests and as a conservative fallback before the first calibration.
     pub fn fixed(fuel_per_us: f64) -> Calibration {
+        Calibration::range(fuel_per_us, fuel_per_us)
+    }
+
+    /// A fixed floor and ceiling (the fallback before the first calibration).
+    pub fn range(fuel_per_us: f64, max_fuel_per_us: f64) -> Calibration {
         Calibration {
             fuel_per_us,
+            max_fuel_per_us: max_fuel_per_us.max(fuel_per_us),
             probes: vec![],
         }
     }
@@ -48,6 +70,11 @@ impl Calibration {
     /// Fuel that, at the worst-case rate, lasts at most `us` microseconds.
     pub fn fuel_for_us(&self, us: f64) -> u64 {
         (self.fuel_per_us * us).max(1.0) as u64
+    }
+
+    /// Fuel that, at the fastest probe's rate, lasts `us` microseconds: the budget ceiling.
+    pub fn max_fuel_for_us(&self, us: f64) -> u64 {
+        (self.max_fuel_per_us * us).max(1.0) as u64
     }
 
     /// Measures this machine. Takes a few milliseconds per probe; run it on a background thread
@@ -87,8 +114,13 @@ impl Calibration {
             probes.push((name, rates[rates.len() / 2]));
         }
         let fuel_per_us = probes.iter().map(|p| p.1).fold(f64::INFINITY, f64::min);
+        let max_fuel_per_us = probes
+            .iter()
+            .map(|p| p.1)
+            .fold(MIN_CEILING_FUEL_PER_US, f64::max);
         Ok(Calibration {
             fuel_per_us,
+            max_fuel_per_us,
             probes,
         })
     }
@@ -208,7 +240,11 @@ fn apply(s: &mut State) {
             // the rebalance that comes with its first voice.
             let share = if counts(e) { share } else { e.request };
             let us = s.period_us * share;
-            h.set_budget(s.cal.fuel_for_us(us), Duration::from_secs_f64(us / 1e6));
+            h.set_budget_range(
+                s.cal.fuel_for_us(us),
+                s.cal.max_fuel_for_us(us),
+                Duration::from_secs_f64(us / 1e6),
+            );
         }
     }
 }

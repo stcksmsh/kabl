@@ -219,6 +219,16 @@ pub fn unregister(kind: &str) {
     }
 }
 
+/// Every registered group (for the control thread's health check).
+pub(crate) fn groups() -> Vec<Arc<CodeGroup>> {
+    REGISTRY
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .values()
+        .cloned()
+        .collect()
+}
+
 /// The running group with this key.
 pub fn group_by_key(key: &CodeHash) -> Option<Arc<CodeGroup>> {
     REGISTRY

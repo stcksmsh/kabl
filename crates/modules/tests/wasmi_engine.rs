@@ -283,13 +283,190 @@ fn an_infinite_loop_runs_out_of_fuel_and_eight_in_a_row_crash() {
     let mut loud = COEF;
     loud[0] = 3.0;
     let coef = loud;
+    let mut news = vec![];
     for k in 1..OVERRUN_LIMIT {
         block(&mut m, &inp, coef);
         assert!(!g.health().is_crashed(), "{k} overruns are not a crash");
+        news.extend(g.health().take_overrun_news());
     }
     block(&mut m, &inp, coef);
+    news.extend(g.health().take_overrun_news());
     assert_eq!(g.health().fault(), Some(Fault::Overrun));
     assert_eq!(g.health().overrun_count(), OVERRUN_LIMIT);
+    assert_eq!(
+        news,
+        [1, 2, 4, 8],
+        "told at first, then each time it doubles"
+    );
+}
+
+#[test]
+fn a_modules_measured_rate_moves_its_fuel_between_floor_and_ceiling() {
+    let us = Duration::from_micros;
+    let h = Health::new(1, Duration::ZERO);
+    // A 100 us share: floor at 1000 fuel/us, ceiling at 4000 fuel/us.
+    h.set_budget_range(100_000, 400_000, us(100));
+    assert_eq!(h.fuel_range(), (100_000, 400_000));
+    assert_eq!(
+        h.fuel_budget(),
+        400_000,
+        "a new module starts at the ceiling"
+    );
+
+    // One late call (10x slower, e.g. preempted) costs a quarter at most.
+    h.observe(4_000, us(10));
+    assert!(h.fuel_budget() >= 300_000, "{}", h.fuel_budget());
+    for _ in 0..64 {
+        h.observe(40_000, us(10));
+    }
+    assert!(h.fuel_budget() >= 390_000, "recovers: {}", h.fuel_budget());
+
+    // Code that burns fuel at the floor rate is reined in within a few calls.
+    for _ in 0..6 {
+        h.observe(10_000, us(10));
+    }
+    assert!(h.fuel_budget() < 160_000, "{}", h.fuel_budget());
+    // Slower than the floor: never below the floor (the old, worst-case budget).
+    for _ in 0..64 {
+        h.observe(1_000, us(10));
+    }
+    assert_eq!(h.fuel_budget(), 100_000);
+
+    // Faster than the ceiling: never above it (the hard cap). Calls too short to time count
+    // for nothing.
+    for _ in 0..256 {
+        h.observe(1_000_000, us(10));
+    }
+    assert_eq!(h.fuel_budget(), 400_000);
+    h.observe(1, Duration::from_nanos(500));
+    assert_eq!(h.fuel_budget(), 400_000);
+
+    // A new share (device change) keeps the measured rate: the fuel scales with the share.
+    for _ in 0..64 {
+        h.observe(20_000, us(10));
+    }
+    let before = h.fuel_budget();
+    h.set_budget_range(200_000, 800_000, us(200));
+    assert!(h.fuel_budget().abs_diff(before * 2) <= 2, "{before}");
+}
+
+#[test]
+fn slow_per_fuel_code_gets_less_fuel_than_dsp_code() {
+    let cal = Calibration::measure(&engine()).unwrap();
+    let cap = Duration::from_millis(1);
+    let (floor, ceil) = (cal.fuel_for_us(1000.0), cal.max_fuel_for_us(1000.0));
+    // Thousands of calls per block: the `call` probe's mix, the slowest per unit of fuel.
+    let leaf = "(func $leaf (param i32) (result i32) (i32.add (local.get 0) (i32.const 1)))";
+    let calls =
+        "(local $i i32) (block $d (loop $l (br_if $d (i32.ge_u (local.get $i) (i32.const 4000)))
+        (local.set $i (call $leaf (local.get $i))) (br $l)))";
+    let slow = group(&wasm(1, leaf, calls), 1, 1, cap);
+    let dsp = group(&wasm(1, "", BIQUAD), 1, 1, cap);
+    let mut seed = 1;
+    for g in [&slow, &dsp] {
+        g.health().set_budget_range(floor, ceil, cap);
+        let mut m = voice(g);
+        for _ in 0..32 {
+            block(&mut m, &noise(&mut seed), COEF);
+        }
+        assert!(!g.health().is_crashed());
+    }
+    let (s, d) = (slow.health().fuel_budget(), dsp.health().fuel_budget());
+    println!("fuel range {floor}..{ceil}: call-heavy {s}, biquad {d}");
+    // Release builds show the probes' full spread; a debug build's interpreter overhead narrows
+    // it, so only the order is checked.
+    assert!(s < d, "call-heavy {s} vs biquad {d}");
+    assert!(s >= floor && d <= ceil);
+}
+
+#[test]
+fn overruns_and_crashes_reach_the_user_as_notes() {
+    let spin = format!("{WHEN_LOUD} (loop $l (br $l))");
+    let g = group(&wasm(1, "", &spin), 1, 200_000, Duration::from_secs(5));
+    kabl_modules::code::register(Arc::clone(&g)).unwrap();
+    let mut m = voice(&g);
+    let mut loud = COEF;
+    loud[0] = 3.0;
+    let scope = kabl_modules::code::CodeScope::new();
+    let mut seed = 1;
+    block(&mut m, &noise(&mut seed), loud);
+    scope.collect();
+    let notes = scope.take_notes();
+    assert!(
+        notes
+            .iter()
+            .any(|n| n.contains("test.biquad") && n.contains("CPU time budget in 1 block")),
+        "{notes:?}"
+    );
+    for _ in 1..OVERRUN_LIMIT {
+        block(&mut m, &noise(&mut seed), loud);
+    }
+    scope.collect();
+    let notes = scope.take_notes();
+    assert!(
+        notes
+            .iter()
+            .any(|n| n.contains("test.biquad stopped: kept overrunning")),
+        "{notes:?}"
+    );
+    scope.collect();
+    assert!(scope
+        .take_notes()
+        .iter()
+        .all(|n| !n.contains("test.biquad")));
+    kabl_modules::code::unregister("test.biquad");
+}
+
+/// The capacity the budget policy is sized for: `demo.bitfilter` (a stereo resonant filter with
+/// drive) at 8 voices, at 48 kHz with 64-frame blocks, with the rates REAPER's calibration
+/// measured on an i7-13700H (PR #181: worst 927 fuel/us, fastest 4309).
+#[test]
+fn eight_code_filters_at_eight_voices_fit_the_budget() {
+    let ex = &kabl_modules::code::host::EXAMPLES[1];
+    assert_eq!(ex.kind, "demo.bitfilter");
+    let compiled = engine().compile(ex.wasm).unwrap();
+    let params: Vec<f32> = compiled.meta().params.iter().map(|p| p.default).collect();
+    let mut inst = compiled.instantiate(&cfg()).unwrap();
+    let layout = inst.layout();
+    inst.set_fuel(u64::MAX / 2);
+    inst.reset().unwrap();
+    let mut seed = 3;
+    let mut need = 0;
+    for _ in 0..16 {
+        let sig = noise(&mut seed);
+        let mem = inst.memory();
+        for s in 0..layout.in_slots as usize {
+            for (i, v) in sig.iter().enumerate() {
+                let at = layout.input_range(s).start + i * 4;
+                mem[at..at + 4].copy_from_slice(&v.to_le_bytes());
+            }
+        }
+        for (p, v) in params.iter().enumerate() {
+            mem[layout.param_range(p)].copy_from_slice(&v.to_le_bytes());
+        }
+        inst.set_fuel(u64::MAX / 2);
+        need = need.max(inst.call_block(N as u32).unwrap());
+    }
+    // Twice the cost measured here, for other settings and input than these defaults.
+    let voices = 8u64;
+    let need = 2 * need;
+    let cal = Calibration::range(927.2, 4309.0);
+    let period_us = N as f64 / SR as f64 * 1e6;
+    let fits = |modules: usize, fuel_for: &dyn Fn(f64) -> u64| {
+        let share = scaled_shares(&vec![PER_MODULE_SHARE; modules])[0];
+        voices * need <= fuel_for(period_us * share)
+    };
+    let capacity =
+        |fuel_for: &dyn Fn(f64) -> u64| (1..64).take_while(|&n| fits(n, fuel_for)).count();
+    let old = capacity(&|us| cal.fuel_for_us(us));
+    let new = capacity(&|us| cal.max_fuel_for_us(us));
+    println!(
+        "demo.bitfilter: {} fuel per voice-block (x2 margin {need}); at {voices} voices {old} fit \
+         the worst-case budget, {new} the measured-rate ceiling",
+        need / 2
+    );
+    assert!(new >= 8, "{new}");
+    assert!(new >= 4 * old, "old {old}, new {new}");
 }
 
 #[test]

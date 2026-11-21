@@ -34,10 +34,21 @@ pub struct Health {
     nonfinite: AtomicU32,
     sanitized: AtomicU32,
     overruns: AtomicU32,
-    fuel_budget: AtomicU64,
+    /// Overruns already told to the user (see [`Health::take_overrun_news`]).
+    overruns_told: AtomicU32,
+    /// The module's per-block fuel range: at the slowest and the fastest calibrated rate.
+    floor_fuel: AtomicU64,
+    ceil_fuel: AtomicU64,
+    /// Where in that range the module's measured rate puts it, in 1/65536 of the ceiling.
+    trust: AtomicU32,
     voices: AtomicU32,
     wall_cap_ns: AtomicU64,
 }
+
+/// `Health::trust` at the ceiling.
+const FULL_TRUST: u32 = 1 << 16;
+/// Calls shorter than this are not timed reliably enough to move the budget.
+const MIN_TIMED: Duration = Duration::from_micros(1);
 
 impl Health {
     pub fn new(fuel_budget: u64, wall_cap: Duration) -> Arc<Health> {
@@ -48,7 +59,10 @@ impl Health {
             nonfinite: AtomicU32::new(0),
             sanitized: AtomicU32::new(0),
             overruns: AtomicU32::new(0),
-            fuel_budget: AtomicU64::new(fuel_budget),
+            overruns_told: AtomicU32::new(0),
+            floor_fuel: AtomicU64::new(fuel_budget),
+            ceil_fuel: AtomicU64::new(fuel_budget),
+            trust: AtomicU32::new(FULL_TRUST),
             voices: AtomicU32::new(0),
             wall_cap_ns: AtomicU64::new(wall_cap.as_nanos() as u64),
         })
@@ -80,6 +94,7 @@ impl Health {
         self.fault.store(0, Relaxed);
         self.nonfinite.store(0, Relaxed);
         self.overruns.store(0, Relaxed);
+        self.overruns_told.store(0, Relaxed);
         self.crashed.store(false, Relaxed);
     }
 
@@ -100,10 +115,50 @@ impl Health {
         self.overruns.load(Relaxed)
     }
 
-    /// Per-block fuel and per-call wall-clock cap, rescaled by the controller (calibration and
-    /// the 50 % total cap come in a later PR).
+    /// The overrun count when it has doubled since it was last told (or is first non-zero), so
+    /// the user hears about a struggling module without a message per block.
+    pub fn take_overrun_news(&self) -> Option<u32> {
+        let n = self.overruns.load(Relaxed);
+        let told = self.overruns_told.load(Relaxed);
+        (n >= told.saturating_mul(2).max(1)).then(|| {
+            self.overruns_told.store(n, Relaxed);
+            n
+        })
+    }
+
+    /// The module's per-block fuel now: its measured rate's place between floor and ceiling.
     pub fn fuel_budget(&self) -> u64 {
-        self.fuel_budget.load(Relaxed)
+        let ceil = self.ceil_fuel.load(Relaxed);
+        let fit = ((u128::from(ceil) * u128::from(self.trust.load(Relaxed))) >> 16) as u64;
+        fit.max(self.floor_fuel.load(Relaxed))
+    }
+
+    /// The per-block fuel range set by the budget: (floor, ceiling).
+    pub fn fuel_range(&self) -> (u64, u64) {
+        (self.floor_fuel.load(Relaxed), self.ceil_fuel.load(Relaxed))
+    }
+
+    /// Feeds one call's cost back into the budget (audio thread; atomics only). `fuel` burned
+    /// in `took`: the rate it ran at, against the ceiling's rate, moves the trust down quickly
+    /// (a quarter of the way) and up slowly (a sixteenth), so a slow module is reined in within
+    /// a few calls and one late call (preemption) costs little.
+    pub fn observe(&self, fuel: u64, took: Duration) {
+        let ceil = self.ceil_fuel.load(Relaxed);
+        let cap = self.wall_cap_ns.load(Relaxed);
+        if took < MIN_TIMED || ceil == 0 || cap == 0 {
+            return;
+        }
+        // The rate this call ran at, relative to the ceiling's rate (ceil fuel per cap).
+        let sample = (u128::from(fuel) * u128::from(cap) * u128::from(FULL_TRUST)
+            / (took.as_nanos() * u128::from(ceil)))
+        .min(u128::from(FULL_TRUST)) as i64;
+        let old = i64::from(self.trust.load(Relaxed));
+        let step = if sample < old { 4 } else { 16 };
+        let delta = match (sample - old) / step {
+            0 => sample - old, // close enough: settle on it
+            d => d,
+        };
+        self.trust.store((old + delta) as u32, Relaxed);
     }
 
     pub fn wall_cap(&self) -> Duration {
@@ -126,8 +181,16 @@ impl Health {
         self.wall_cap() / self.voices().max(1)
     }
 
+    /// A fixed budget (floor = ceiling).
     pub fn set_budget(&self, fuel: u64, wall_cap: Duration) {
-        self.fuel_budget.store(fuel, Relaxed);
+        self.set_budget_range(fuel, fuel, wall_cap);
+    }
+
+    /// The fuel range for the module's share (`wall_cap`), from the slowest and the fastest
+    /// calibrated rate. The measured trust is kept: it is a rate, not an amount.
+    pub fn set_budget_range(&self, floor: u64, ceil: u64, wall_cap: Duration) {
+        self.floor_fuel.store(floor, Relaxed);
+        self.ceil_fuel.store(ceil.max(floor), Relaxed);
         self.wall_cap_ns.store(wall_cap.as_nanos() as u64, Relaxed);
     }
 }
@@ -348,6 +411,11 @@ impl Module for CodeModule {
         let inst = &mut self.inst;
         let result = no_alloc(|| inst.call_block(n as u32));
         let took = started.elapsed();
+        match result {
+            Ok(used) => self.health.observe(used, took),
+            Err(Fault::OutOfFuel) => self.health.observe(budget, took),
+            Err(_) => {}
+        }
 
         match result {
             Err(Fault::OutOfFuel) => {
