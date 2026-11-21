@@ -25,7 +25,7 @@ Categories are by role. The role is the preset's `category` in the Sounds browse
 | Pluck (plucks and mallets) | 10 | Poly. FM and sampled-feel mallets, marimbas, kalimbas, harp and guitar-like plucks, short synth plucks for pop and trap. |
 | Groove (grooves and arps) | 15 | Arpeggiators and sequences that play with a held chord or on their own, at a stated tempo: house and techno loops, pumping arps (signature), trap and breaks patterns, acid bass lines. Start on Run. |
 | Piece | 9 | Self-playing pieces with cues: build-ups and drops (filter house, techno), ambient evolutions, cinematic swells, a pop loop with sections. Cues move the preset's macros; the sequencers keep playing. |
-| Voice (voices and FX) | 10 | Vowel, formant, talkbox and robot voices, metal, glass and noise, risers and impacts. Vocoder presets when the module lands. `FX` becomes a category with the first FX preset. |
+| Voice (voices and FX) | 10 | Vowel, formant, talkbox and robot voices (category `Voice`, five presets); metal, glass, noise, risers and impacts (category `FX`, the first FX presets, five). Vocoder presets when the module lands. |
 
 `Groove`, `Voice` and `Pluck` were added to the category vocabulary (`CATEGORIES` in `crates/ui/src/library.rs`) for the bank.
 

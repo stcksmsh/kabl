@@ -1204,7 +1204,7 @@ fn presets() -> Vec<Preset> {
         Preset {
             slug: "temple-bowl",
             name: "Temple Bowl",
-            category: "Voice",
+            category: "FX",
             tags: &["poly", "fm", "metal", "struck", "ambient", "experimental"],
             description: "A struck metal bowl: an FM voice with an inharmonic ratio and a ring modulated partner, a mallet strike and a long ring in a hall. Play single notes and open fifths and let them ring. Strike goes from a soft mallet to a hard clang, Metal from a tuned bowl to an inharmonic clang, Ring from a short tap to a seven second ring, Space adds the echo and the hall.",
             listen: "Bowls that ring for seconds; Strike up for the clang, Metal up for a harsher, clanging tone.",
@@ -1216,7 +1216,7 @@ fn presets() -> Vec<Preset> {
         Preset {
             slug: "depth-charge",
             name: "Depth Charge",
-            category: "Voice",
+            category: "FX",
             tags: &["poly", "impact", "sub", "cinematic", "hip-hop"],
             description: "An impact: a sine that falls in pitch under a noise crack, with a long hall. Every key is a one-shot, so play low single notes and let the tail run. Boom sets how long the thud rings, Crack adds the noise crack on the front, Drop sets how far the pitch falls, Space adds the echo and the hall.",
             listen: "A low hit with a crack and a falling pitch; Boom up for a long thud, Drop up for a bigger fall, Space for the cinematic tail.",
@@ -1264,7 +1264,7 @@ fn presets() -> Vec<Preset> {
         Preset {
             slug: "chandelier",
             name: "Chandelier",
-            category: "Voice",
+            category: "FX",
             tags: &["poly", "fm", "bowed", "glass", "pop", "ambient"],
             description: "Bowed crystal: a sine with a high FM partial and a rubbed rim, bowed in slowly and left in a hall. Play slow, high notes and fifths. Rub brings in the friction of a wet rim with a hint of vibrato, Overtone brings forward the glassy partial, Bow goes from a struck ping to a slow bow, Space adds the echo and the hall.",
             listen: "Pure, glassy notes that bloom; Rub up for the singing rim, Overtone for glitter, Bow for how slowly each note arrives.",
@@ -1276,7 +1276,7 @@ fn presets() -> Vec<Preset> {
         Preset {
             slug: "whiteout",
             name: "Whiteout",
-            category: "Voice",
+            category: "FX",
             tags: &["poly", "noise", "wind", "comb", "experimental", "ambient"],
             description: "Wind you can play: noise through a comb filter that follows the keys, a filter that gusts and a long room. Play slow notes and fifths. Pitch goes from plain wind to a ringing note, Gust makes the filter open and close, deeper and faster, Grain brings in a bitcrusher, Space adds the echo and the room.",
             listen: "A wind that sings the notes you play; Pitch at 0 is a plain wash, at 1 it rings. Gust for slow breathing.",
@@ -1288,7 +1288,7 @@ fn presets() -> Vec<Preset> {
         Preset {
             slug: "updraft",
             name: "Updraft",
-            category: "Voice",
+            category: "FX",
             tags: &["poly", "riser", "noise", "build", "techno", "house"],
             description: "A riser: hold a key and the sound builds, a closed filter opening over seconds under a saw stack and noise. Hold a note for the whole build and let go to end it. Build sets how long the rise takes, from one and a half to ten seconds, Lift opens the filter further and raises the resonance with a very small pitch rise, Heat adds saturation and noise, Space adds the echo and the room.",
             listen: "Hold a note: a dark rumble that opens into a roaring wash. Build for time, Lift for how high it gets.",
