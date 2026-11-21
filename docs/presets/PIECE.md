@@ -46,16 +46,22 @@ patches and the tours.
 
 Idea: a four-on-the-floor build and drop with the music ducking to the kick. Sections: Intro (filter closed,
 bass out), Build (filter and riser open over 16 beats), Drop (rumble and acid in at once, no morph), Break
-(everything pulled back in 4 beats), Peak.
+(everything pulled back in 4 beats), Peak. The acid stab plays an octave above the pad (A4, not the pad's
+A3 and E4) and joins dry beside the rumble, so neither the kick duck nor Climb's level compensation pulls it
+under the mix: measured on the cue run (stab solo against the mix without it, 400 Hz to 3 kHz, stab hits),
+the stab sits +2 to +8 dB over the rest in every cue (+8 at 41 s in the Peak; it was 7 to 10 dB under in
+its old band, 200 Hz to 2 kHz, and 4 to 9 dB under in this one) and +1.4 dB or more at every macro's 0 and
+1 in the tour. The rumble tops out 1 dB lower (-9 dB) and the stab's resonance at 0.7, for headroom: the
+undocked stab now meets the kick.
 
 | Macro | Stored | 0 to 1 | Moves |
 |---|---|---|---|
 | Climb | 0.20 | muffled and dark, to open with a rising noise riser | master ladder cutoff 140 Hz to 12 kHz and its resonance, riser gain, hat/clap filter; level-compensated by 8 dB |
-| Rumble | 0.35 | the off-beat bass from out to full, and its notes lengthen | bass gain, gate length, its filter |
-| Acid | 0.15 | clipped stabs to squealing, ringing stabs | stab decay, resonance, gain |
+| Rumble | 0.35 | the off-beat bass from out to full, and its notes lengthen | bass gain -34 to -9 dB, gate length, its filter |
+| Acid | 0.15 | clipped stabs to squealing, ringing stabs | stab decay 40 to 320 ms, resonance 0.15 to 0.7, gain -21.5 to -20.5 dB |
 | Pump | 0.55 | music barely ducks to the kick hard pumping | ducker threshold and makeup |
 
-Flags: Pump and Rumble are level-type (pump, bass in). Louder drop: the Drop cue is about 2 dB louder than
+Flags: Pump and Rumble are level-type (pump, bass in). Louder drop: the Drop cue is about 1.6 dB louder than
 the Intro (Rumble at 1).
 
 ### 2. Dead Calm (66 BPM, cinematic)
@@ -209,7 +215,7 @@ Loudness and peak per piece (`presets_piece levels`; peak dBFS / loudness dB, at
 
 | Piece | normal | all at 1 | m1 | m2 | m3 | m4 |
 |---|---|---|---|---|---|---|
-| Gantry | -4.3 / -19.2 | -5.2 / -18.2 | -5.6 / -21.1 | -2.7 / -17.1 | -2.7 / -19.1 | -5.8 / -19.2 |
+| Gantry | -4.3 / -19.1 | -4.4 / -18.3 | -5.2 / -20.9 | -3.4 / -17.3 | -3.2 / -18.8 | -5.7 / -19.0 |
 | Dead Calm | -8.3 / -19.4 | -2.9 / -17.2 | -9.4 / -20.1 | -6.6 / -18.1 | -4.5 / -19.7 | -2.4 / -15.4 |
 | Pawn Shop | -1.8 / -18.8 | -1.8 / -19.1 | -1.8 / -18.7 | -1.8 / -18.6 | -1.8 / -19.1 | -1.8 / -19.3 |
 | Laundromat | -3.0 / -17.4 | -6.8 / -18.7 | -3.8 / -18.4 | -3.5 / -17.0 | -3.2 / -17.2 | -6.8 / -19.1 |

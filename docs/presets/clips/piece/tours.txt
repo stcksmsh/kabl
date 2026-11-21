@@ -1,9 +1,9 @@
 gantry-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
      0.0 s  macro 1: Climb
-    20.5 s  macro 2: Rumble
-    41.0 s  macro 3: Acid
-    61.5 s  macro 4: Pump
-  total 82.0 s
+    21.0 s  macro 2: Rumble
+    42.0 s  macro 3: Acid
+    63.0 s  macro 4: Pump
+  total 84.0 s
 
 pawn-shop-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
      0.0 s  macro 1: Swing

@@ -1096,18 +1096,20 @@ fn gantry() -> (Rack, Vec<CueDef>) {
                 post: true,
                 ..Line::new("- -3 - -3 - -3 - -3")
             },
-            // The acid stab: A minor, off the beat.
+            // The acid stab: A minor, off the beat, an octave above the pad so the two do not
+            // share notes, and dry beside the rumble: neither the kick duck nor Climb's level
+            // compensation pulls it under the rest.
             Line {
                 wave: 3.0,
                 pw: 30.0,
                 uni: 2.0,
                 det: 12.0,
-                oct: -1.0,
+                oct: 0.0,
                 gate: 40.0,
                 env: [1.0, 110.0, 0.0, 60.0],
                 db: -6.0,
                 lp: 900.0,
-                after: true,
+                post: true,
                 ..Line::new("9! - - 9 - 12 - - 9! - 16 - 12 - 7 -")
             },
             // The pad: a bar per step, A, A, F, G.
@@ -1193,7 +1195,7 @@ fn gantry() -> (Rack, Vec<CueDef>) {
     level_comp(&mut r, &h, 1, h.trim, 8.0);
     // Rumble: the bass part from out to full, and its notes lengthen.
     let rum = &h.lines[0];
-    rise(&mut r, k, 2, rum.gain, "gain", "gain_db", -34.0, -8.0);
+    rise(&mut r, k, 2, rum.gain, "gain", "gain_db", -34.0, -9.0);
     rise(&mut r, k, 2, rum.seq, "seq", "gate_len", 25.0, 90.0);
     rise(
         &mut r,
@@ -1217,9 +1219,9 @@ fn gantry() -> (Rack, Vec<CueDef>) {
         "filter.svf",
         "resonance",
         0.15,
-        0.78,
+        0.7,
     );
-    rise(&mut r, k, 3, acid.gain, "gain", "gain_db", -18.0, -15.0);
+    rise(&mut r, k, 3, acid.gain, "gain", "gain_db", -21.5, -20.5);
     // Pump: the kick ducks the music harder.
     let duck = h.duck.unwrap();
     rise(&mut r, k, 4, duck, "compressor", "threshold_db", 0.0, -45.0);
