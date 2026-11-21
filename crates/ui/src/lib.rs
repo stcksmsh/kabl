@@ -309,6 +309,10 @@ pub struct UiState {
     pub desktop: desktop::Hints,
     /// The reduced-motion state the active style was built for.
     style_reduced: bool,
+    /// Setting "Cable colours": `None` follows the skin's palette. Remembered with the theme.
+    pub cable_palette: Option<style::CablePalette>,
+    /// The cable palette setting the active style was built for.
+    style_cables: Option<style::CablePalette>,
     /// The settle spring of each cable, and when the pointer last let go (egui time).
     settle: cable_settle::Settle,
     released_at: f64,
@@ -516,6 +520,8 @@ impl Default for UiState {
             reduce_motion: Default::default(),
             desktop: Default::default(),
             style_reduced: false,
+            cable_palette: None,
+            style_cables: None,
             settle: Default::default(),
             released_at: f64::NEG_INFINITY,
             life: Default::default(),
@@ -910,6 +916,7 @@ impl UiState {
         };
         self.cable_life = p.cable_life;
         self.cable_intensity = p.cable_intensity;
+        self.cable_palette = p.cable_palette;
         // A remembered folder that is gone is dropped: its place starts in home again.
         self.folders = p.folders.clone();
         self.folders.retain(|_, d| d.is_dir());
@@ -937,6 +944,7 @@ impl UiState {
             folders: self.folders.clone(),
             cable_life: self.cable_life,
             cable_intensity: self.cable_intensity,
+            cable_palette: self.cable_palette,
             theme_mode: Some(self.theme_mode),
             reduce_motion: self.reduce_motion,
         };
@@ -983,11 +991,14 @@ pub fn show_with(
         || ui_state.style.id != ui_state.theme
         || ui_state.style.fonts_ready != ready
         || ui_state.style_reduced != reduced
+        || ui_state.style_cables != ui_state.cable_palette
     {
         let th = ui_state.themes.resolve(&ui_state.theme);
+        let base = th.style(ui_state.dark).clone();
+        let cables = ui_state.cable_palette.unwrap_or(base.cable_palette);
         let mut style = Style {
             fonts_ready: ready,
-            ..th.style(ui_state.dark).clone()
+            ..base.with_cables(cables)
         };
         if reduced {
             // No slides: drawer, view, toast and camera land at once. Glow and the step
@@ -996,6 +1007,7 @@ pub fn show_with(
             (m.drawer, m.view, m.glide) = (style::REDUCED_MS, style::REDUCED_MS, style::REDUCED_MS);
         }
         ui_state.style_reduced = reduced;
+        ui_state.style_cables = ui_state.cable_palette;
         ui_state.style = std::sync::Arc::new(style);
         ui_state.theme = ui_state.style.id.clone();
         ui_state.save_prefs();
@@ -1995,6 +2007,29 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
                         }
                     }
                 });
+                kit::paragraph(
+                    ui,
+                    st,
+                    style::Role::Caption,
+                    kit::Tone::Text2,
+                    "Cable colours",
+                );
+                let own = ui_state.themes.resolve(&ui_state.theme);
+                let own = own.style(ui_state.dark).cable_palette;
+                let skin = format!("Skin default ({})", own.name());
+                let choices = std::iter::once((None, skin, "cables:skin".to_string())).chain(
+                    style::CablePalette::ALL
+                        .into_iter()
+                        .map(|p| (Some(p), p.name().to_string(), format!("cables:{}", p.key()))),
+                );
+                for (v, label, key) in choices {
+                    let r = kit::menu_item(ui, st, &label, ui_state.cable_palette == v);
+                    ui_state.record(key, r.rect);
+                    if r.clicked() {
+                        // The style is rebuilt with it, and remembered, next frame.
+                        ui_state.cable_palette = v;
+                    }
+                }
                 kit::paragraph(
                     ui,
                     st,
