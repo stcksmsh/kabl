@@ -370,7 +370,7 @@ const FACTORY: &[(&str, &str, &str, &[&str], &str)] = &[
         "Lichen",
         "Piece",
         &["sequenced", "cues", "drums", "polymeter", "random", "experimental", "112bpm"],
-        "A self-playing experimental piece at 112 BPM: two random melodies held to D dorian that loop in 7 and 5 steps, each through a cable with its own step pattern, over a bass in 7, a stab in 5 and hats, open hats and toms looping in 5, 7 and 9 against a bar of 16. Press Run, then launch the four cues with the pads or CC 40-43: Spore, Colony, Bloom, Die-back. Mutate lets the random loops change as they come round, Reach widens their range from a third to two octaves, Gate turns the bass and stab from ticks into held notes, Echo sets the echo and the room and, with Mutate down, sinks the melodies into their own echo and room.",
+        "A self-playing experimental piece at 112 BPM: two random melodies held to D dorian that loop in 7 and 5 steps, each through a cable with its own step pattern, over a bass in 7, a stab in 5 and hats, open hats and toms looping in 5, 7 and 9 against a bar of 16. Press Run, then launch the four cues with the pads or CC 40-43: Spore, Colony, Bloom, Die-back. Mutate lets the random loops change as they come round, Reach widens their range from a third to two octaves, Gate turns the bass and stab from ticks into held notes, Echo sets the echo and the room and, with Mutate down, sinks the melodies into their own echo and room. Focus, a fifth macro, sets how many voices stand in front: few at Spore and Die-back, the rest dark and set back, every voice in its own band at Bloom.",
     ),
     (
         "presets/roller-rink",

@@ -6,7 +6,8 @@ cues as meant, and `<slug>-tour.mp3`, the four macros 20 s each; index in `tours
 
 Every piece: press Run, launch the cues with the pads or CC 40+. Cues move the macros only; the sequencers
 keep playing. The first cue is the stored macro values. Cue morphs are in beats; the "bar" column is where
-the clip run launches each cue (a player launches them whenever). All pieces have **4 macros** (the norm), no
+the clip run launches each cue (a player launches them whenever). All pieces have **4 macros** (the norm; Lichen
+has a fifth, Focus, on CC 24), no
 limiter (gain staging only), no hiss by default (texture is on a macro), peaks <= -1 dBFS at every macro
 position and in the all-at-1 check. No piece is in `LOUD_EXCEPTIONS`.
 
@@ -191,12 +192,31 @@ shared echo and room from 14 % to 32 % and the keys kept their level and tone (t
 -10.6 dB at Die-back, as at Spore). Now the 7-loop's share is -10.8 dB at Spore and -17.7 dB at Die-back,
 the 5-loop's -14.4 and -21.7 dB, most of it echo.
 
+Focus (owner: "the intro was good before, the peak is better now; only some stuff legible at the intro,
+outro and break, everything at the peak"). A fifth macro, Focus (CC 24, pinned after Echo), sets how many
+voices stand in front. The other four each have a job the cues need, and none of them reads as "clarity",
+so Focus is its own knob rather than folded into one (the macro module has eight slots; the factory
+level and peak tests move m1 to m4 and leave it at its stored value). At 0 the master filter is at
+2.5 kHz (the old 3 kHz darkness), the stab is 11 dB down and filtered to 1.2 kHz, the 5-loop 20 dB down,
+the toms 10, the snare 14.5 and the hats 16 dB down, and the pad is 2.5 dB down but brighter (1 kHz), a
+blurred bed; the bass, the kick and the 7-loop stay in front. At 1 it is the separated mix above, with
+the hats 3 dB and the snare 4.5 dB higher than before so they read at Bloom. Cues: Spore 0.1 (stored),
+Colony 0.35, Bloom 1, Die-back 0 (on top of Echo's sink of the keys).
+
+Legible voices per cue (each voice solo against the mix with it muted, band-weighted SNR in 1/3-octave
+bands, median over the frames it plays, on the cue run with the played chords left in the rest; voices:
+bass, stab, pad, 7-loop, 5-loop, kick, snare, hats, toms; legible above 0 dB). Before (cba55ac9): Spore
+7, Colony 6, Bloom 6, Die-back 6. Now: Spore 3 (bass +9.2, 7-loop +5.8, kick +5.1; stab -1.0, the rest
+-6 to -11), Colony 4 (bass, stab +2.4, 7-loop, kick; 5-loop -2.0), Bloom 8 (all but the pad, -4.1, a bed
+as before; snare +1.4, hats +0.6), Die-back 2 (bass +9.1, kick +4.4; pad -1.9, the keys -2.8 and -14.6).
+
 | Macro | Stored | 0 to 1 | Moves |
 |---|---|---|---|
 | Mutate | 0.05 | the random loops repeat exactly to changing as they come round | both random modules' change 0 to 70 % (and holds back Echo's sink of the keys) |
 | Reach | 0.30 | a third to two octaves of range | both random modules' range 4 to 30 semitones |
 | Gate | 0.40 | ticks to held notes on bass and stab | gate length 12 to 95 % |
 | Echo | 0.35 | dry to echo and room; high with Mutate low, the melodies sink into their own echo and room | echo and room mix; keys level, filters, echo and room by Echo x (Echo - Mutate) |
+| Focus | 0.10 | bass, kick and 7-loop in front, the rest dark and back, to every voice in its own band | master ladder 2.5 to 8 kHz; stab -24 to -13 dB and 1.2 to 2.8 kHz; 5-loop -28 to -8 dB; hats -22 to -6, snare -20 to -5.5, toms -20 to -10 dB; pad -20.5 to -18 dB and 1 kHz to 700 Hz |
 
 ### 9. Roller Rink (100 BPM, synthwave)
 
@@ -225,7 +245,7 @@ Loudness and peak per piece (`presets_piece levels`; peak dBFS / loudness dB, at
 | Spillway | -4.4 / -20.6 | -1.9 / -17.8 | -4.3 / -19.5 | -4.9 / -19.4 | -4.1 / -20.3 | -3.9 / -20.4 |
 | Balcony | -3.2 / -18.2 | -4.1 / -19.2 | -4.1 / -19.4 | -3.1 / -18.0 | -3.6 / -18.1 | -3.6 / -18.2 |
 | Estuary | -7.7 / -20.4 | -3.4 / -18.4 | -8.2 / -22.0 | -5.1 / -18.9 | -7.8 / -18.9 | -4.1 / -18.0 |
-| Lichen | -2.0 / -20.0 | -1.9 / -19.6 | -2.0 / -19.8 | -2.2 / -20.0 | -2.3 / -19.3 | -3.2 / -20.5 |
+| Lichen | -3.8 / -20.9 | -3.9 / -20.3 | -3.8 / -20.7 | -4.3 / -20.9 | -4.0 / -20.0 | -5.3 / -21.5 |
 | Roller Rink | -4.5 / -18.5 | -2.1 / -18.1 | -4.2 / -19.8 | -4.3 / -18.0 | -4.5 / -18.4 | -3.9 / -18.5 |
 
 Combination: all macros at 1 stays within about 2.5 dB of the stored loudness for every piece (Dead Calm
@@ -236,6 +256,14 @@ Clips (checked on the mp3s): cue runs 62-92 s at -14.1 to -17.2 LUFS, peaks -2.0
 (four 20 s clips and 1 s gaps) at -14.9 to -17.8 LUFS; no silence over 1.4 s (n=-45 dB) anywhere; tour hold
 levels (6 s at macro 0 against 6 s at macro 1) are within 3 dB for every macro of every piece except the
 level-type ones (Dead Calm Swell about -3 dB).
+
+Lichen with Focus: the table's m1 to m4 leave Focus at its stored 0.1, which is why the row is 1 to 2 dB
+quieter than before (still in the level window). Focus at 1 (others swept as in the test): -2.0 / -20.1;
+all five at 1: -1.9 / -19.6. The `macro_audit` renders (every macro at 8 steps, every pair at 1, all at 0
+and 1, the tour sweeps; 63 renders) peak at -2.1 dBFS at worst (Reach with Focus). Cue run 63.5 s at
+-18.0 LUFS (was -17.2: Spore and Die-back are sparser now), peak -2.5 dBFS; tour 105 s (five clips) at
+-18.8 LUFS, peak -2.8 dBFS; tour holds Mutate +0.7, Reach +0.4, Gate +2.1, Echo -0.9, Focus +1.4 dB; no
+silence over 1.4 s.
 
 Level compensation of the two space macros that added level: Dead Calm Hall (6 dB) and Estuary Wash
 (2.5 dB). Measured on the tour windows (6 s at 0, 6 s at 1): Hall +0.1 dB, Wash +1.6 dB; on steady renders
