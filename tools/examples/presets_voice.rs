@@ -1290,8 +1290,8 @@ fn presets() -> Vec<Preset> {
             name: "Updraft",
             category: "Voice",
             tags: &["poly", "riser", "noise", "build", "techno", "house"],
-            description: "A riser: hold a key and the sound builds, a closed filter opening over seconds under a saw stack and noise. Hold a note for the whole build and let go to end it. Build sets how long the rise takes, from one and a half to ten seconds, Lift opens the filter further and raises the resonance with a very small pitch rise, Heat adds saturation and noise, Space adds the echo and the room.",
-            listen: "Hold a note: a dark rumble that opens into a roaring wash. Build for time, Lift for how high it gets.",
+            description: "A riser: hold a key and the sound builds, a closed filter opening over seconds under a saw stack and noise. Hold a note for the whole build and let go to end it. Build sets how long the rise takes, from one and a half to ten seconds, Lift makes the pitch climb with it, up to an octave, Air turns the saws into a noise wash, Space adds the echo and the room.",
+            listen: "Hold a note: a dark rumble that opens into a roaring wash. Build for time, Lift for the pitch climb, Air for noise.",
             build: updraft,
             group: 2,
             phrase: riser_phrase,
@@ -1609,15 +1609,16 @@ fn whiteout() -> Rack {
     v.finish("m4", &echo(620.0, 45.0, 3000.0), 0.3, (7.0, 0.55), None)
 }
 
-/// Updraft: a riser. Hold a key and the sound builds: a filter that opens over seconds, noise and
-/// a saw stack, resonance and heat.
+/// Updraft: a riser. Hold a key and the sound builds: a filter that opens over seconds under a saw
+/// stack and noise. Each macro has its own dimension: Build the time, Lift the pitch climb, Air
+/// the noise against the tone, Space the tail.
 fn updraft() -> Rack {
     let mut v = Voice::new(Recipe {
         bass: false,
         macros: &[
             ("Build", 0.45),
-            ("Lift", 0.25),
-            ("Heat", 0.30),
+            ("Lift", 0.10),
+            ("Air", 0.30),
             ("Space", 0.40),
         ],
         midi: [0.0, 0.0, 120.0],
@@ -1628,7 +1629,8 @@ fn updraft() -> Rack {
         drive: [6.0, -3.0],
         lad: [250.0, 0.2, 0.0],
         fenv: [5000.0, 200.0, 1.0, 400.0],
-        fenv_amt: 0.0,
+        // The filter opens the same way at every macro position.
+        fenv_amt: 0.25,
         wheel_amt: 0.0,
         aenv: [200.0, 400.0, 1.0, 500.0],
         trim_db: 14.0,
@@ -1636,13 +1638,11 @@ fn updraft() -> Rack {
     let mix = v.mix;
     let noise = v.r.add("noise", &[("color", 0.2), ("level_db", -10.0)]);
     v.r.wire(noise, "out", mix, "in3");
-    v.r.e.set_param(mix, "level3", 0.25);
-    // Lift: how far the filter sweeps open (and the resonance with it), with a very small pitch rise.
-    let (fenv, lad) = (v.fenv, v.lad);
-    v.r.depth_route(fenv, "out", lad, "cutoff_hz", v.knob, "m2", 0.9);
-    span(&mut v, 2, 0.25, lad, "filter.ladder", "resonance", 0.1, 0.2);
+    // Lift: the pitch climbs with the filter, from none to an octave (base_hz is exponential over
+    // 20 Hz to 20 kHz, so 0.1 of its travel is an octave).
+    let fenv = v.fenv;
     for o in v.oscs.clone() {
-        v.r.depth_route(fenv, "out", o, "fine", v.knob, "m2", 0.3);
+        v.r.depth_route(fenv, "out", o, "base_hz", v.knob, "m2", 0.1);
     }
     // Build: how long the rise takes, 1.5 s to 10 s.
     span_lh(
@@ -1655,12 +1655,12 @@ fn updraft() -> Rack {
         5000.0,
         10000.0,
     );
-    // Heat: the saturation and the noise grow.
-    let drive = v.drive;
-    let s = span_lh(&mut v, 3, drive, "drive", "drive_db", 0.0, 6.0, 20.0);
-    comp_gain(&mut v, 3, s, 3.0);
-    span_hi(&mut v, 3, s, drive, "drive", "trim_db", -3.0, -10.0);
-    span(&mut v, 3, s, mix, "mixer", "level3", 0.15, 0.25);
+    // Air: the tone gives way to noise, the saws fall as the noise comes up.
+    span(&mut v, 3, 0.3, mix, "mixer", "level3", 0.05, 0.25);
+    span_hi(&mut v, 3, 0.3, mix, "mixer", "level1", 0.3, 0.05);
+    span_hi(&mut v, 3, 0.3, mix, "mixer", "level2", 0.12, 0.02);
+    span_hi(&mut v, 3, 0.3, noise, "noise", "level_db", -10.0, 0.0);
+    comp_gain(&mut v, 3, 0.3, -16.0);
     v.stage("compressor", &compressor(-20.0, 3.0, 8.0, 150.0, 3.0));
     v.finish("m4", &echo(480.0, 40.0, 3000.0), 0.3, (4.0, 0.45), None)
 }

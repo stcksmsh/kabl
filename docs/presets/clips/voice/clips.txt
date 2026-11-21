@@ -51,10 +51,10 @@ whiteout: A wind that sings the notes you play. Pitch at 0 is a plain wash, at 1
    42 s  macro 3: Grain
    63 s  macro 4: Space
 
-updraft: Hold a note: a dark rumble that opens into a roaring wash. Build for time, Lift for how high it gets, Heat for saturation.
+updraft: Hold a note: a dark rumble that opens into a roaring wash. Build for time, Lift for the pitch climb, Air for noise against tone.
     0 s  macro 1: Build
    21 s  macro 2: Lift
-   42 s  macro 3: Heat
+   42 s  macro 3: Air
    63 s  macro 4: Space
 
 maw: A mouth in the bass. Vowel moves the mouth, Growl turns it into a snarl, Grit for bite, Weight for the sub.

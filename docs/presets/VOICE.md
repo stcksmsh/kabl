@@ -15,7 +15,7 @@ Written from the patch recipes and the audit renders (`macro_audit`, 8 steps per
 | Temple Bowl | experimental and ambient | struck inharmonic FM bowl with a ring modulated partner | -21.2 / -3.7 | Space |
 | Chandelier | pop and ambient | bowed crystal: sine, high FM partial, rubbed rim | -20.7 / -5.3 | Space |
 | Whiteout | experimental | noise through a key-tracked comb: wind that sings the notes | -21.7 / -4.5 | Space |
-| Updraft | techno and house | riser: hold a key and a closed filter opens over seconds | -20.2 / -5.4 | Space |
+| Updraft | techno and house | riser: hold a key and a closed filter opens over seconds | -20.5 / -8.0 | Space |
 | Depth Charge | hip-hop and cinematic | one-shot impact: falling sine, noise crack, hall | -21.2 / -4.9 | Space |
 | Maw | drum and bass | mono growl bass voice, a formant mouth moved by a free LFO | -22.4 / -11.8 | none: dry and heavy |
 
@@ -88,12 +88,16 @@ Detail first moved the vocoder's band count; changing it while playing clicked (
 | Space | 0.50 | Dry to a long echo and a big room | echo and room mix |
 
 ### Updraft (poly; hold a note for the whole build)
+The filter opens the same way at every macro position (filter envelope on the cutoff, fixed 0.25). Each macro has its own dimension: time, pitch, texture, tail.
+
 | Macro | Stored | What you hear 0 to 1 | What it moves |
 |---|---|---|---|
-| Build | 0.64 | How long the rise takes: 1.5 s to 10 s | filter envelope attack 1.5 to 10 s |
-| Lift | 0.25 | How far the filter sweeps open (and how much it rings), with only a very small pitch rise (80 cents at most, so it reads as a riser, not a whistle slide) | envelope depth on the cutoff 0 to 0.9, resonance 0.1 to 0.5, envelope depth on fine tune 0 to 0.3 |
-| Heat | 0.30 | Clean to saturated, with more noise | drive 0 to 20 dB (trim -3 to -10), noise level 0.15 to 0.25 |
+| Build | 0.45 | How long the rise takes: 1.5 s to 10 s | filter envelope attack 1.5 to 10 s |
+| Lift | 0.10 | The pitch climbs with the rise: none to an octave (about a whole tone stored) | filter envelope depth on the oscillators' base pitch, 0 to 0.1 of its travel (an octave) |
+| Air | 0.30 | The saws give way to a noise wash (level held by a trim) | noise mixer level 0.05 to 0.72 and noise source -14 to 0 dB, saw levels 0.41 / 0.16 to 0.05 / 0.02, trim -4.8 to +11.2 dB |
 | Space | 0.40 | Dry to an echo and a room | echo and room mix |
+
+Distinctness (owner: "the macros might be similar"). Change vectors from the audit's steps 0 against 7 (third-octave levels over bands above the floor plus 40 dB, stereo width, the level and centroid curves over the held note, flatness, centroid rise time, pitch). Before, Lift (filter depth, resonance) was Build (time) backwards: cosine -0.84, and Heat (drive, noise) moved little. Now no pair is over 0.45: Build/Lift -0.32, Build/Air -0.42 (a ten second build is darker over the held note, the noise brighter), Build/Space +0.10, Lift/Air +0.20, Lift/Space -0.10, Air/Space +0.00.
 
 ### Depth Charge (poly; every key is a one-shot)
 | Macro | Stored | What you hear 0 to 1 | What it moves |
@@ -115,11 +119,11 @@ Growl and Vowel move the mouth, not the pitch (nothing here modulates the pitch 
 
 ## Checks (`macro_audit` with the combination renders, the level test, the tours)
 
-Peaks: every step, sweep and combination render of the audit is at or under -1 dBFS. The factory level test (`factory_levels_hold_the_target`) passes for all ten with no `LOUD_EXCEPTIONS` entry. It sets every macro to 0.65, then 0.15, mid-note, and each macro alone to 1, and the generator's `testlevel` command replays it so a preset can be levelled without the four-minute test (`PP_SEGMENTS=1` prints the peak per stretch, to see which macro setting peaks). Worst peak over those renders, dBFS: Sock Puppet -6.9, Automaton -6.1, Vox Chop -4.0, Oracle -1.9, Temple Bowl -2.7, Chandelier -3.8, Whiteout -4.0, Updraft -4.8, Depth Charge -1.5, Maw -6.1. No click in any render. No limiter anywhere. The phrase clips pass `audio_defects.py` (clean).
+Peaks: every step, sweep and combination render of the audit is at or under -1 dBFS. The factory level test (`factory_levels_hold_the_target`) passes for all ten with no `LOUD_EXCEPTIONS` entry. It sets every macro to 0.65, then 0.15, mid-note, and each macro alone to 1, and the generator's `testlevel` command replays it so a preset can be levelled without the four-minute test (`PP_SEGMENTS=1` prints the peak per stretch, to see which macro setting peaks). Worst peak over those renders, dBFS: Sock Puppet -6.9, Automaton -6.1, Vox Chop -4.0, Oracle -1.9, Temple Bowl -2.7, Chandelier -3.8, Whiteout -4.0, Updraft -6.4, Depth Charge -1.5, Maw -6.1. No click in any render. No limiter anywhere. The phrase clips pass `audio_defects.py` (clean).
 
-**Presence (second round).** The phrase means (ffmpeg `mean_volume` of the committed clips) were -23 to -27 dB for five presets. The ceiling was the test's all-macros-at-0.65-then-0.15 case, not the phrases (phrase peaks sat at -8 to -11), so: the macro settings that peaked were compensated instead of the whole preset, a gentle compressor (threshold -22 to -26, ratio 3 to 4, no limiter) went after the voice of Oracle, Temple Bowl and Whiteout to take the crest down, Maw and Vox Chop got compressor makeup, Chandelier and Depth Charge were retrimmed, and the Depth Charge and Temple Bowl phrases got more hits (a one-shot phrase has silence between hits, which the mean counts). Phrase means now: Maw -19.2, Chandelier -19.2, Vox Chop -19.4, Automaton -20.4, Whiteout -20.9, Sock Puppet -21.6, Oracle -21.1, Updraft -21.3, Depth Charge -22.0, Temple Bowl -22.5. The last two sit a little under the -22 line: their level test peaks are at -1.5 and -2.7 dBFS and more gain would break the peak rule.
+**Presence (second round).** The phrase means (ffmpeg `mean_volume` of the committed clips) were -23 to -27 dB for five presets. The ceiling was the test's all-macros-at-0.65-then-0.15 case, not the phrases (phrase peaks sat at -8 to -11), so: the macro settings that peaked were compensated instead of the whole preset, a gentle compressor (threshold -22 to -26, ratio 3 to 4, no limiter) went after the voice of Oracle, Temple Bowl and Whiteout to take the crest down, Maw and Vox Chop got compressor makeup, Chandelier and Depth Charge were retrimmed, and the Depth Charge and Temple Bowl phrases got more hits (a one-shot phrase has silence between hits, which the mean counts). Phrase means now: Maw -19.2, Chandelier -19.2, Vox Chop -19.4, Automaton -20.4, Whiteout -20.9, Sock Puppet -21.6, Oracle -21.1, Updraft -20.9, Depth Charge -22.0, Temple Bowl -22.5. The last two sit a little under the -22 line: their level test peaks are at -1.5 and -2.7 dBFS and more gain would break the peak rule.
 
-**Level drift of the non-level macros (second round).** Measured on the tours (RMS of 6 s at macro 0 against 6 s at macro 1, the others at their stored values): Sock Puppet within 0.5 dB, Automaton 1.1, Updraft 0.8, Whiteout 1.5 (Space), Maw 1.0, Vox Chop 1.1, Oracle 1.4 (Space; Vowel, Breath and Choir are within 0.7), Depth Charge 0.7. Each macro that moved the level has its own `gain` stage (`comp_gain`). Level-type, with the reason: **Temple Bowl Ring** (+4 dB: a seven second ring is more sound than a tap), **Chandelier Rub** (+4.5 dB: it adds a layer of hum; a compensating trim made it a plain level change that the audit read as the same gesture as Bow), **Chandelier Bow** (about 0 on the tour, -6 dB in the 10 s audit window: a 2.6 s attack is quiet at the start of a short note). The audit's first-10-seconds window and the tour's looped 20 s do not agree for the slow macros (Bow, Rub, Ring); the tour numbers are the ones above.
+**Level drift of the non-level macros (second round).** Measured on the tours (RMS of 6 s at macro 0 against 6 s at macro 1, the others at their stored values): Sock Puppet within 0.5 dB, Automaton 1.1, Updraft 1.7 (Space; Build, Lift and Air are within 0.6), Whiteout 1.5 (Space), Maw 1.0, Vox Chop 1.1, Oracle 1.4 (Space; Vowel, Breath and Choir are within 0.7), Depth Charge 0.7. Each macro that moved the level has its own `gain` stage (`comp_gain`). Level-type, with the reason: **Temple Bowl Ring** (+4 dB: a seven second ring is more sound than a tap), **Chandelier Rub** (+4.5 dB: it adds a layer of hum; a compensating trim made it a plain level change that the audit read as the same gesture as Bow), **Chandelier Bow** (about 0 on the tour, -6 dB in the 10 s audit window: a 2.6 s attack is quiet at the start of a short note). The audit's first-10-seconds window and the tour's looped 20 s do not agree for the slow macros (Bow, Rub, Ring); the tour numbers are the ones above.
 
 | Preset | All at 0 (peak / loudness) | All at 1 | Flags that are left, honestly |
 |---|---|---|---|
@@ -131,7 +135,7 @@ Peaks: every step, sweep and combination render of the audit is at or under -1 d
 | Vox Chop | -5.8 / -18.5 | -4.5 / -18.1 | Vowels `jump` |
 | Chandelier | -3.4 / -15.9 | -13.9 / -29.3 | Overtone and Bow `jump`; Bow and Rub level-type (above). All at 1 is quiet because Bow at 1 is a 2.6 s attack |
 | Whiteout | -6.7 / -20.1 | -10.7 / -26.0 | Pitch `jump` (the comb starts ringing) |
-| Updraft | -13.6 / -21.3 | -8.0 / -22.2 | clean |
+| Updraft | -13.7 / -22.9 | -9.3 / -23.2 | clean |
 | Maw | -7.4 / -22.3 | -8.5 / -22.6 | clean |
 
 ## Gain staging notes
@@ -144,4 +148,4 @@ Peaks: every step, sweep and combination render of the audit is at or under -1 d
 
 In `docs/presets/clips/voice/`: `<slug>.mp3` per preset (the phrase, 10 to 20 s, played as meant; committed) and `<slug>-tour.mp3` (git-ignored, on disk only: macro 1 to 4 back to back, each 20 s: 6 s at 0, 4 s up, 6 s at 1, 4 s down, 1 s of silence between, 84 s per file), and `clips.txt` with the start second of every tour clip and what to listen for. Gap guard on (no silence over 1 s under -45 dBFS in a clip after its first second); Depth Charge needs `--max-gap 3` (its Space at 0 is a dry one-shot with a gap between hits, as Tar Pit's Body at 0). Regenerate: `presets_voice write patches`, `presets_voice phrases <phrases.json>`, `MACRO_TOUR_BPM=124 macro_audit patches <phrases.json> <renders> <slug>`, `docs/presets/scripts/macro_tour_ab.py --patches patches --renders <renders> --out <dir> <slug>`.
 
-Listen first: Sock Puppet Mouth and Chatter (the vocoder is new ground: do the vowels read as vowels), Temple Bowl Metal (the top rises 28 dB at 1: a clang, or harsh?), Whiteout Pitch (does the wind sing the key), Updraft Lift (a riser, not a whistle).
+Listen first: Sock Puppet Mouth and Chatter (the vocoder is new ground: do the vowels read as vowels), Temple Bowl Metal (the top rises 28 dB at 1: a clang, or harsh?), Whiteout Pitch (does the wind sing the key), Updraft Lift (an octave climb at 1: a riser, not a whistle).
