@@ -427,6 +427,7 @@ pub fn param_help(kind: &str, param: &str) -> Option<&'static str> {
         ("vocoder", "hf") => "Adds hiss on the s, t and f sounds of the voice so consonants survive. Zero is clean: no hiss at all. Higher is crisper, then hissy.",
         ("vocoder", "drive_db") => "Gain of the voice into the bands. A quiet voice needs more; too much makes the result loud.",
         ("vocoder", "mix") => "The synth alone (0) to the vocoded sound alone (1).",
+        ("vocoder", "thru") => "Lets the voice's own top end (above 5 kHz) through, mostly on the s, t and f sounds, so words stay clear. Zero is the pure robot.",
         ("audio.in", "gain_db") => "Gain of the incoming sound.",
         ("drum.kick" | "drum.tom", "tune_hz") => {
             "The pitch the drum settles on, in Hz. Lower is deeper and longer to hear."

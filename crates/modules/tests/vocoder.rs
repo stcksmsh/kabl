@@ -166,7 +166,7 @@ fn output_follows_the_voice_level() {
     // default drive: saw carrier at 0.3 peak, a noisy voice at -20 dBFS RMS.
     let car: Vec<f32> = saw(110.0, SR, N).iter().map(|v| v * 0.3).collect();
     let level = |amp: f32, bands: f32| {
-        let (mut m, p) = vocoder(&[("hf", 0.0), ("bands", bands)], SR);
+        let (mut m, p) = vocoder(&[("hf", 0.0), ("thru", 0.0), ("bands", bands)], SR);
         rms(&run(&mut *m, &p, &car, Some(&noise(7, N, amp)), 64)[0][SKIP..])
     };
     let spread = [8.0, 16.0, 32.0].map(|b| 20.0 * level(0.17, b).log10());
@@ -205,7 +205,7 @@ fn unvoiced_path_adds_hiss_only_with_a_hissing_voice() {
     let hiss = noise(5, N, 0.3);
     let hum = sine(300.0, SR, N, 0.3);
     let at8k = |md: &[f32], hf: f32| {
-        let (mut m, p) = vocoder(&[("hf", hf), ("bands", 8.0)], SR);
+        let (mut m, p) = vocoder(&[("hf", hf), ("thru", 0.0), ("bands", 8.0)], SR);
         let o = run(&mut *m, &p, &car, Some(md), 64);
         [7000.0, 8123.0, 9500.0, 11000.0]
             .map(|f| power(&o[0][SKIP..], f, SR))
@@ -219,8 +219,36 @@ fn unvoiced_path_adds_hiss_only_with_a_hissing_voice() {
 }
 
 #[test]
+fn thru_passes_the_voices_highs_and_mostly_on_consonants() {
+    // A 200 Hz sine carrier has nothing at 8 kHz: any energy there is the voice passed through.
+    let car = sine(200.0, SR, N, 0.3);
+    let at8k = |md: &[f32], thru: f32| {
+        let (mut m, p) = vocoder(&[("hf", 0.0), ("thru", thru), ("bands", 8.0)], SR);
+        let o = run(&mut *m, &p, &car, Some(md), 64);
+        [7000.0, 8123.0, 9500.0, 11000.0]
+            .map(|f| power(&o[0][SKIP..], f, SR))
+            .iter()
+            .sum::<f32>()
+    };
+    let hiss = noise(5, N, 0.3);
+    let (off, on) = (at8k(&hiss, 0.0), at8k(&hiss, 1.0));
+    // A vowel with the same 8 kHz content under a loud 300 Hz fundamental passes less of it.
+    let vowel: Vec<f32> = sine(300.0, SR, N, 0.9)
+        .iter()
+        .zip(&hiss)
+        .map(|(a, b)| a + 0.05 * b)
+        .collect();
+    let voiced = at8k(&vowel, 1.0) / (0.05f32 * 0.05);
+    println!(
+        "energy above 7 kHz: thru 0 {off:.2e}, thru 1 {on:.2e}; voiced, per unit hiss {voiced:.2e}"
+    );
+    assert!(on > 100.0 * off);
+    assert!(voiced < 0.1 * on, "a vowel's highs pass in full");
+}
+
+#[test]
 fn a_hissing_voice_with_no_synth_under_it_is_silent() {
-    let (mut m, p) = vocoder(&[("hf", 1.0)], SR);
+    let (mut m, p) = vocoder(&[("hf", 1.0), ("thru", 1.0)], SR);
     let out = run(&mut *m, &p, &vec![0.0; N], Some(&noise(5, N, 0.3)), 64);
     assert!(rms(&out[0]) < 1e-6 && rms(&out[1]) < 1e-6);
 }
@@ -310,7 +338,7 @@ fn processing_does_not_allocate() {
 }
 
 fn run_noalloc(m: &mut dyn Module, p: &[f32], car: &[f32], md: &[f32]) {
-    let ps: [Signal; 10] = std::array::from_fn(|i| Signal::Scalar(p[i]));
+    let ps: [Signal; 11] = std::array::from_fn(|i| Signal::Scalar(p[i]));
     let ins = [Signal::Buffer(car), Signal::Buffer(car), Signal::Buffer(md)];
     let (mut l, mut r) = ([0.0f32; 64], [0.0f32; 64]);
     let mut outs: [&mut [f32]; 2] = [&mut l, &mut r];
@@ -361,16 +389,17 @@ fn a_voiced_voice_with_a_little_top_end_stays_clean() {
     assert!(rms(&diff) < 0.03 * rms(&off), "voiced speech gets hiss");
     // A hissing voice does open it.
     let hiss = noise(3, N, 0.1);
-    let (mut m, p) = vocoder(&[("hf", 1.0)], SR);
+    let (mut m, p) = vocoder(&[("hf", 1.0), ("thru", 0.0)], SR);
     let with = run(&mut *m, &p, &car, Some(&hiss), 64)[0][SKIP..].to_vec();
-    let (mut m, p) = vocoder(&[("hf", 0.0)], SR);
+    let (mut m, p) = vocoder(&[("hf", 0.0), ("thru", 0.0)], SR);
     let without = run(&mut *m, &p, &car, Some(&hiss), 64)[0][SKIP..].to_vec();
     assert!(rms(&with) > 1.5 * rms(&without), "a hiss gets none");
 }
 
 #[test]
 fn the_unvoiced_noise_is_a_sibilant_band_not_full_band_hiss() {
-    // A hissing voice, the noise layer alone (Hf 1 minus Hf 0). Power per 500 Hz step.
+    // A hissing voice, the noise layer alone (Hf 1 minus Hf 0). Power per 500 Hz step. The band
+    // is 3 to 10 kHz with 24 dB/octave sides.
     let car = saw(110.0, SR, N);
     let hiss = noise(3, N, 0.1);
     let go = |hf: f32| {
@@ -384,9 +413,9 @@ fn the_unvoiced_noise_is_a_sibilant_band_not_full_band_hiss() {
             .map(|f| power(&layer, f as f32, SR))
             .sum::<f32>()
     };
-    let (core, below, above) = (band(4000, 7500), band(500, 3000), band(11000, 20000));
+    let (core, below, above) = (band(3500, 9000), band(500, 1500), band(17000, 22000));
     println!(
-        "noise layer: below 3 kHz {:.1} dB, above 11 kHz {:.1} dB under the 4 to 7.5 kHz core",
+        "noise layer: below 1.5 kHz {:.1} dB, above 17 kHz {:.1} dB under the 3.5 to 9 kHz core",
         db(below, core),
         db(above, core)
     );
@@ -474,9 +503,9 @@ fn moving_any_parameter_while_sounding_does_not_drop_out_or_click() {
         // steadiest run's (the held saw has steps of its own).
         let step = max_step(out);
         println!("{name}: lowest block / level {drop:.2}, largest step / rms {step:.1} (steady {steady:.1})");
-        // Sweeping these to their quiet ends (no unvoiced noise, no drive, all dry) is a level
+        // Sweeping these to their quiet ends (no consonants, no drive, all dry) is a level
         // change, not a dropout.
-        if !["hf", "drive_db", "mix"].contains(&name) {
+        if !["hf", "thru", "drive_db", "mix"].contains(&name) {
             assert!(drop > 0.25, "{name}: dropout, block at {drop} of the level");
         }
         assert!(
