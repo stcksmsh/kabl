@@ -2,22 +2,24 @@
 
 Ten presets of the `Voice` role (BRIEF.md, Roles table): vowel, formant, talkbox and robot voices; metal, glass and noise; a riser and an impact. Generator: `tools/examples/presets_voice.rs` (helpers copied from `presets_pad.rs`; no other generator, module or preset changed). Method as in `MACRO-REDESIGN.md`: each macro is a different kind of change, clean by default, texture on a macro, no limiter, no drum module, peaks at or under -1 dBFS at every macro position.
 
+Split by category: the five voices (Sock Puppet, Automaton, Vox Chop, Oracle, Maw) are `Voice`; the five FX (Temple Bowl, Chandelier, Whiteout, Updraft, Depth Charge) are `FX`, a new category that shows under the Voice shelf in the Sounds scene. Sound unchanged; only the category in each `sound.toml` moved.
+
 Written from the patch recipes and the audit renders (`macro_audit`, 8 steps per macro and the combination renders). Nobody has listened yet except through the meters; the "what you hear" columns are what the parameters and the measures say. The tours are the test (see Clips).
 
 ## The list
 
-| Preset | Genre | What it is | Loudness / peak, dBFS (level test: all macros at the stored value) | Space macro |
+| Preset (category) | Genre | What it is | Loudness / peak, dBFS (level test: all macros at the stored value) | Space macro |
 |---|---|---|---|---|
-| Sock Puppet | French touch (signature) | mono saw lead through a vocoder; the "voice" is a formant mouth built into the patch | -21.2 / -6.9 | none: close and dry |
-| Automaton | French touch (signature) | poly robot choir: a vocoder whose voice is a monotone buzz speaking a looping sentence | -20.4 / -6.7 | none: close and dry |
-| Vox Chop | house | chord stabs through a formant filter, vowel hops on the host clock, clock chop | -22.3 / -8.1 | Space |
-| Oracle | ambient and cinematic | wordless choir, clear vowels, slow bloom, long room | -20.7 / -6.2 | Space |
-| Temple Bowl | experimental and ambient | struck inharmonic FM bowl with a ring modulated partner | -21.2 / -3.7 | Space |
-| Chandelier | pop and ambient | bowed crystal: sine, high FM partial, rubbed rim | -20.7 / -5.3 | Space |
-| Whiteout | experimental | noise through a key-tracked comb: wind that sings the notes | -21.7 / -4.5 | Space |
-| Updraft | techno and house | riser: hold a key and a closed filter opens over seconds | -20.5 / -8.0 | Space |
-| Depth Charge | hip-hop and cinematic | one-shot impact: falling sine, noise crack, hall | -21.2 / -4.9 | Space |
-| Maw | drum and bass | mono growl bass voice, a formant mouth moved by a free LFO | -22.4 / -11.8 | none: dry and heavy |
+| Sock Puppet (Voice) | French touch (signature) | mono saw lead through a vocoder; the "voice" is a formant mouth built into the patch | -21.2 / -6.9 | none: close and dry |
+| Automaton (Voice) | French touch (signature) | poly robot choir: a vocoder whose voice is a monotone buzz speaking a looping sentence | -20.4 / -6.7 | none: close and dry |
+| Vox Chop (Voice) | house | chord stabs through a formant filter, vowel hops on the host clock, clock chop | -22.3 / -8.1 | Space |
+| Oracle (Voice) | ambient and cinematic | wordless choir, clear vowels, slow bloom, long room | -20.7 / -6.2 | Space |
+| Temple Bowl (FX) | experimental and ambient | struck inharmonic FM bowl with a ring modulated partner | -21.2 / -3.7 | Space |
+| Chandelier (FX) | pop and ambient | bowed crystal: sine, high FM partial, rubbed rim | -19.3 / -4.5 | Space |
+| Whiteout (FX) | experimental | noise through a key-tracked comb: wind that sings the notes | -21.7 / -4.5 | Space |
+| Updraft (FX) | techno and house | riser: hold a key and a closed filter opens over seconds | -20.5 / -8.0 | Space |
+| Depth Charge (FX) | hip-hop and cinematic | one-shot impact: falling sine, noise crack, hall | -21.2 / -4.9 | Space |
+| Maw (Voice) | drum and bass | mono growl bass voice, a formant mouth moved by a free LFO | -22.4 / -11.8 | none: dry and heavy |
 
 Two signature presets (Sock Puppet, Automaton; the brief allows three). Sock Puppet, Automaton and Maw have no space macro on purpose: their sound is close and dry (signature rule, and a bass), so they carry no echo or room at all and their four macros are all about the voice. Sock Puppet and Vox Chop need Run for their clock-driven macros (Chatter, and Vowels and Chop): both descriptions say so; without Run they are plain sounds and the no-MIDI check renders near silence (nothing sounds without a note; the clock only moves a formant and a duck).
 
@@ -75,8 +77,8 @@ Detail first moved the vocoder's band count; changing it while playing clicked (
 | Macro | Stored | What you hear 0 to 1 | What it moves |
 |---|---|---|---|
 | Rub | 0.00 | Clean glass, then a low wet-finger hum comes in (noise low-passed at 700 Hz, under the glass) with a very small vibrato (a few cents: the motion is the friction, not the pitch). Level-type: it adds a layer of sound, and compensating it made it a plain level change that the audit read as the same gesture as Bow | rim noise level 0 to 1, vibrato depth 0 to 4 ct |
-| Overtone | 0.35 | The glassy FM partial comes forward | partial level 0 to 0.14, a trim keeps the level |
-| Bow | 0.63 | A struck ping to a slow bow-in (level-type: a slow attack is quieter over a short note) | amp attack 8 ms to 2.6 s |
+| Overtone | 0.35 | The glassy FM partial comes forward and bends from the octave to the inharmonic glass mode (2.76 times the pitch): timbre, not level | partial level 0 to 0.14, partial tune 0 to +557 ct, a trim keeps the level |
+| Bow | 0.63 | A struck ping that dies away to a slow bow-in that holds: the envelope (level-type: a slow attack is quieter over a short note) | amp attack 8 ms to 2.6 s, sustain 0.5 to 0.98 |
 | Space | 0.60 | Dry to a long echo and a hall | echo mix 0 to 25 %, room mix 0 to 45 %; a trim keeps the level |
 
 ### Whiteout (poly)
@@ -119,7 +121,7 @@ Growl and Vowel move the mouth, not the pitch (nothing here modulates the pitch 
 
 ## Checks (`macro_audit` with the combination renders, the level test, the tours)
 
-Peaks: every step, sweep and combination render of the audit is at or under -1 dBFS. The factory level test (`factory_levels_hold_the_target`) passes for all ten with no `LOUD_EXCEPTIONS` entry. It sets every macro to 0.65, then 0.15, mid-note, and each macro alone to 1, and the generator's `testlevel` command replays it so a preset can be levelled without the four-minute test (`PP_SEGMENTS=1` prints the peak per stretch, to see which macro setting peaks). Worst peak over those renders, dBFS: Sock Puppet -6.9, Automaton -6.1, Vox Chop -4.0, Oracle -1.9, Temple Bowl -2.7, Chandelier -3.8, Whiteout -4.0, Updraft -6.4, Depth Charge -1.5, Maw -6.1. No click in any render. No limiter anywhere. The phrase clips pass `audio_defects.py` (clean).
+Peaks: every step, sweep and combination render of the audit is at or under -1 dBFS. The factory level test (`factory_levels_hold_the_target`) passes for all ten with no `LOUD_EXCEPTIONS` entry. It sets every macro to 0.65, then 0.15, mid-note, and each macro alone to 1, and the generator's `testlevel` command replays it so a preset can be levelled without the four-minute test (`PP_SEGMENTS=1` prints the peak per stretch, to see which macro setting peaks). Worst peak over those renders, dBFS: Sock Puppet -6.9, Automaton -6.1, Vox Chop -4.0, Oracle -1.9, Temple Bowl -2.7, Chandelier -3.5, Whiteout -4.0, Updraft -6.4, Depth Charge -1.5, Maw -6.1. No click in any render. No limiter anywhere. The phrase clips pass `audio_defects.py` (clean).
 
 **Presence (second round).** The phrase means (ffmpeg `mean_volume` of the committed clips) were -23 to -27 dB for five presets. The ceiling was the test's all-macros-at-0.65-then-0.15 case, not the phrases (phrase peaks sat at -8 to -11), so: the macro settings that peaked were compensated instead of the whole preset, a gentle compressor (threshold -22 to -26, ratio 3 to 4, no limiter) went after the voice of Oracle, Temple Bowl and Whiteout to take the crest down, Maw and Vox Chop got compressor makeup, Chandelier and Depth Charge were retrimmed, and the Depth Charge and Temple Bowl phrases got more hits (a one-shot phrase has silence between hits, which the mean counts). Phrase means now: Maw -19.2, Chandelier -19.2, Vox Chop -19.4, Automaton -20.4, Whiteout -20.9, Sock Puppet -21.6, Oracle -21.1, Updraft -20.9, Depth Charge -22.0, Temple Bowl -22.5. The last two sit a little under the -22 line: their level test peaks are at -1.5 and -2.7 dBFS and more gain would break the peak rule.
 
@@ -127,16 +129,16 @@ Peaks: every step, sweep and combination render of the audit is at or under -1 d
 
 | Preset | All at 0 (peak / loudness) | All at 1 | Flags that are left, honestly |
 |---|---|---|---|
-| Sock Puppet | -7.9 / -20.6 | -9.3 / -22.1 | Weight and Bite `jump` (a new layer and the crusher come in from nothing) |
-| Temple Bowl | -3.6 / -27.5 | -7.8 / -22.8 | Metal `jump` (the ring modulated partner comes in from nothing); Ring level-type (above). No pair over 0.8 (Strike and Metal read 0.92 until Strike became an envelope change) |
-| Depth Charge | -8.4 / -24.4 | -11.9 / -25.5 | Boom and Crack read as opposite (cosine -0.90: a longer boom is darker, the crack is the bright top; two different gestures, hardness against length) |
-| Oracle | -10.6 / -21.0 | -3.2 / -17.6 | clean |
-| Automaton | -7.2 / -20.3 | -9.9 / -21.1 | Speech `jump`; no pair over 0.8 (Speech and Crush read 0.97 until Crush became Weight) |
-| Vox Chop | -5.8 / -18.5 | -4.5 / -18.1 | Vowels `jump` |
-| Chandelier | -3.4 / -15.9 | -13.9 / -29.3 | Overtone and Bow `jump`; Bow and Rub level-type (above). All at 1 is quiet because Bow at 1 is a 2.6 s attack |
-| Whiteout | -6.7 / -20.1 | -10.7 / -26.0 | Pitch `jump` (the comb starts ringing) |
-| Updraft | -13.7 / -22.9 | -9.3 / -23.2 | clean |
-| Maw | -7.4 / -22.3 | -8.5 / -22.6 | clean |
+| Sock Puppet (Voice) | -7.9 / -20.6 | -9.3 / -22.1 | Weight and Bite `jump` (a new layer and the crusher come in from nothing) |
+| Temple Bowl (FX) | -3.6 / -27.5 | -7.8 / -22.8 | Metal `jump` (the ring modulated partner comes in from nothing); Ring level-type (above). No pair over 0.8 (Strike and Metal read 0.92 until Strike became an envelope change) |
+| Depth Charge (FX) | -8.4 / -24.4 | -11.9 / -25.5 | Boom and Crack read as opposite (cosine -0.90: a longer boom is darker, the crack is the bright top; two different gestures, hardness against length) |
+| Oracle (Voice) | -10.6 / -21.0 | -3.2 / -17.6 | clean |
+| Automaton (Voice) | -7.2 / -20.3 | -9.9 / -21.1 | Speech `jump`; no pair over 0.8 (Speech and Crush read 0.97 until Crush became Weight) |
+| Vox Chop (Voice) | -5.8 / -18.5 | -4.5 / -18.1 | Vowels `jump` |
+| Chandelier (FX) | -5.8 / -19.6 | -14.4 / -29.7 | Overtone and Bow `jump`; Bow and Rub level-type (above). All at 1 is quiet because Bow at 1 is a 2.6 s attack. Third round (owner: "the macros might be a tad similar"): each macro now has its own dimension, Rub texture (noise), Overtone timbre (the partial bends inharmonic), Bow envelope (attack and sustain), Space room (width). Change-vector cosines (third-octave bands within 40 dB of the top, width, onset, attack, sustain, tail, flatness; macro alone 0 against 1) at most 0.32, was 0.39 (Bow and Space) and -0.49 (Overtone and Bow) with Bow barely moving |
+| Whiteout (FX) | -6.7 / -20.1 | -10.7 / -26.0 | Pitch `jump` (the comb starts ringing) |
+| Updraft (FX) | -13.7 / -22.9 | -9.3 / -23.2 | clean |
+| Maw (Voice) | -7.4 / -22.3 | -8.5 / -22.6 | clean |
 
 ## Gain staging notes
 
