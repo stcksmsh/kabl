@@ -125,16 +125,24 @@ chorus. Sections: Verse, Pre (8-beat morph), Chorus, Bridge, Last Chorus.
 ### 7. Estuary (60 BPM, ambient, no drums)
 
 Idea: slow pads, three bells cycling in 5, 7 and 11 steps with some steps by chance, a sine drone and a sea
-of noise. Sections: Low Tide, Rising, High Tide (both 16-beat morphs), Ebb.
+of noise. Sections: Low Tide, Rising, High Tide (both 16-beat morphs), Ebb. High Tide is the climax by size,
+not level: a crest that only opens when Tide and a second macro are both high (Tide x (m - c) / (1 - c),
+c = 0.4 for Glitter, 0.2 for Depth) brings in a triangle shimmer two octaves over the pads on the added
+ninths (Dm9, Bbadd9, Cadd9, Gadd9), a fourth bell cycling in 13 sixteenths, the pad roots an octave down, a
+slow chorus (0.15 Hz, to 70 %), and a wider (60 to 100 %), longer (12 to 18 s), brighter (damp 3 to 6 kHz)
+room at 20 points less mix; the master filter's output comes down to 0.25 of its level at the top. At the
+stored sound, Low Tide and Ebb the crest is closed (Glitter under 0.4), so those cues are as before.
 
 | Macro | Stored | 0 to 1 | Moves |
 |---|---|---|---|
-| Tide | 0.20 | dark pads to open pads with the sea rising | master ladder 300 Hz to 8 kHz, riser, level-compensated by 4 dB |
-| Glitter | 0.30 | bells out to bells up, ringing longer | bell gains -40 to -10 dB, gate length 15 to 70 % |
-| Depth | 0.25 | nothing to a drone from far below | drone gain -40 to -4 dB |
+| Tide | 0.20 | dark pads to open pads with the sea rising | master ladder 300 Hz to 8 kHz, riser, level-compensated by 4 dB; opens the crest |
+| Glitter | 0.30 | bells out to bells up, ringing longer | bell gains -40 to -10 dB, gate length 15 to 70 %; past 0.4 with Tide: shimmer, fourth bell, chorus, wider and longer room, crest level compensation |
+| Depth | 0.25 | nothing to a drone from far below | drone gain -40 to -4 dB; past 0.2 with Tide: the low pad |
 | Wash | 0.60 | dry to long echo and 12 s room | echo and room mix, **level-compensated by 2.5 dB** |
 
-Flags: the output trim is +2 dB. At +4 the cue run peaked at -0.9 dBFS; at 0 the factory level test (`factory_levels_hold_the_target`) read -24.6 dBFS, below its -19 +- 5.5 window. The whole run is louder than the first cue (-14.1 LUFS over the run, -20.4 dB at the stored sound) because High Tide opens everything: say so in the description.
+Flags: the output trim is +2 dB. At +4 the cue run peaked at -0.9 dBFS; at 0 the factory level test (`factory_levels_hold_the_target`) read -24.6 dBFS, below its -19 +- 5.5 window. The whole run is louder than the first cue (-14.3 LUFS over the run, -20.4 dB at the stored sound) because High Tide opens everything: say so in the description.
+
+High Tide, bigger (owner: "not louder, just bigger"), measured on the cue run's steady High Tide (54.5-62.5 s), before and after the crest: integrated loudness -13.5 to -14.4 LUFS, peak -3.0 to -4.5 dBFS; L/R correlation 0.59 to 0.39, side/mid -5.8 to -3.6 dB; 95 % energy edge 1172 to 1758 Hz, spectral spread 1.45 to 1.58 octaves (log-frequency standard deviation); onsets 1.25 to 1.62 per second (400 Hz-8 kHz bands rising 10 dB). Low Tide and Ebb are unchanged (within 0.1 dB, correlation 0.63 and 0.56); Rising gets a little of the crest (-13.7 LUFS, correlation 0.53 to 0.49).
 
 ### 8. Lichen (112 BPM, experimental)
 
@@ -175,13 +183,14 @@ Loudness and peak per piece (`presets_piece levels`; peak dBFS / loudness dB, at
 | Laundromat | -3.0 / -17.4 | -6.8 / -18.7 | -3.8 / -18.4 | -3.5 / -17.0 | -3.2 / -17.2 | -6.8 / -19.1 |
 | Spillway | -4.5 / -20.4 | -2.4 / -17.9 | -3.8 / -19.3 | -4.9 / -19.0 | -4.3 / -20.1 | -4.3 / -20.2 |
 | Balcony | -3.2 / -18.2 | -4.1 / -19.2 | -4.1 / -19.4 | -3.1 / -18.0 | -3.6 / -18.1 | -3.6 / -18.2 |
-| Estuary | -7.7 / -20.4 | -3.4 / -18.4 | -8.2 / -22.0 | -5.1 / -18.9 | -7.8 / -18.9 | -4.1 / -18.0 |
+| Estuary | -7.6 / -20.4 | -2.1 / -16.5 | -8.0 / -21.7 | -4.3 / -19.1 | -7.6 / -18.9 | -4.2 / -18.1 |
 | Lichen | -4.0 / -19.4 | -3.9 / -18.8 | -4.2 / -19.4 | -3.8 / -19.3 | -4.2 / -18.6 | -4.1 / -19.5 |
 | Roller Rink | -4.5 / -18.5 | -2.1 / -18.1 | -4.2 / -19.8 | -4.3 / -18.0 | -4.5 / -18.4 | -3.9 / -18.5 |
 
-Combination: all macros at 1 stays within about 2.5 dB of the stored loudness for every piece (Dead Calm
-+1.8, where the swell and the impact are meant to build; Estuary +2.0; Spillway +2.5, the sub and the reese
-at full); no combination clips. The factory level test (`factory_levels_hold_the_target`) passes.
+Combination: all macros at 1 stays within about 2.5 dB of the stored loudness for every piece but Estuary
+(Dead Calm +1.8, where the swell and the impact are meant to build; Spillway +2.5, the sub and the reese at
+full); Estuary is +3.9, the crest fully open with the room at full (its High Tide cue is -0.9 dB under the
+old one); no combination clips. The factory level test (`factory_levels_hold_the_target`) passes.
 
 Clips (checked on the mp3s): cue runs 62-92 s at -14.1 to -17.2 LUFS, peaks -2.0 to -3.9 dBFS; tours 84 s
 (four 20 s clips and 1 s gaps) at -14.9 to -17.8 LUFS; no silence over 1.4 s (n=-45 dB) anywhere; tour hold

@@ -2101,6 +2101,33 @@ fn estuary() -> (Rack, Vec<CueDef>) {
                 div: 16.0,
                 ..Line::new("2 2 -2 -2 0 0 -5 -5")
             },
+            // The crest, silent until Tide and Glitter are both high: a shimmer two octaves over
+            // the pads on the added ninths (Dm9, Bbadd9, Cadd9, Gadd9) ...
+            Line {
+                wave: 1.0,
+                uni: 3.0,
+                det: 8.0,
+                gate: 100.0,
+                env: [3000.0, 800.0, 0.9, 3000.0],
+                db: -60.0,
+                lp: 5000.0,
+                div: 16.0,
+                ..Line::new("16 16 12 12 14 14 9 9")
+            },
+            // ... a fourth bell, 13 sixteenths, above the others ...
+            bell("21? - - 14 - 17? - - 26? - 19 - -", 1.0, 1.0, -60.0),
+            // ... and, with Depth, the pad roots an octave down.
+            Line {
+                uni: 2.0,
+                det: 6.0,
+                oct: -2.0,
+                gate: 100.0,
+                env: [3000.0, 800.0, 0.9, 3000.0],
+                db: -60.0,
+                lp: 500.0,
+                div: 16.0,
+                ..Line::new("2 2 -2 -2 0 0 -5 -5")
+            },
         ],
         kit: None,
         play: [2.0, 3.0, 12.0, 0.0, 1800.0, -12.0],
@@ -2119,7 +2146,7 @@ fn estuary() -> (Rack, Vec<CueDef>) {
         }),
         space_macro: 4,
         crush: false,
-        chorus: false,
+        chorus: true,
         extra: None,
     };
     let (mut r, h) = assemble(&s);
@@ -2155,6 +2182,91 @@ fn estuary() -> (Rack, Vec<CueDef>) {
         -40.0,
         -4.0,
     );
+    // The crest: what Tide brings in, scaled by how far a second macro is past `c`. It is nothing
+    // until that macro passes `c` (Low Tide, Ebb and the stored sound do not hear it) and only
+    // High Tide hears most of it. Size, not level: the master stage comes down by what it adds.
+    // Every crest param starts at the end of its range (or a value that only gets darker or
+    // drier below it), so the clamp holds it there while the second macro is under `c`.
+    #[allow(clippy::too_many_arguments)]
+    fn crest(
+        r: &mut Rack,
+        k: ModuleId,
+        mac: &str,
+        c: f32,
+        id: ModuleId,
+        kind: &str,
+        param: &str,
+        lo: f32,
+        hi: f32,
+    ) {
+        let i = param_of(kind, param);
+        let a = (i.to_norm(hi) - i.to_norm(lo)) / (1.0 - c);
+        r.e.set_param(id, param, lo);
+        depth_route(r, k, "m1", id, param, k, mac, a);
+        r.route(k, "m1", id, param, -a * c);
+    }
+    crest(
+        &mut r,
+        k,
+        "m2",
+        0.4,
+        h.lines[7].gain,
+        "gain",
+        "gain_db",
+        -60.0,
+        -2.0,
+    );
+    crest(
+        &mut r,
+        k,
+        "m2",
+        0.4,
+        h.lines[8].gain,
+        "gain",
+        "gain_db",
+        -60.0,
+        -4.0,
+    );
+    crest(
+        &mut r,
+        k,
+        "m3",
+        0.2,
+        h.lines[9].gain,
+        "gain",
+        "gain_db",
+        -60.0,
+        20.0,
+    );
+    let chorus = h.chorus.unwrap();
+    r.e.set_param(chorus, "rate_hz", 0.15);
+    let verb =
+        *r.e.state()
+            .modules
+            .iter()
+            .find(|(_, m)| m.kind == "reverb")
+            .unwrap()
+            .0;
+    crest(&mut r, k, "m2", 0.4, chorus, "chorus", "mix", 0.0, 70.0);
+    crest(&mut r, k, "m2", 0.4, verb, "reverb", "width", 60.0, 100.0);
+    crest(
+        &mut r, k, "m2", 0.4, verb, "reverb", "damp_hz", 3000.0, 6000.0,
+    );
+    crest(&mut r, k, "m2", 0.4, verb, "reverb", "decay_s", 12.0, 18.0);
+    // A longer, wider room for less of the stage: the space grows, its energy does not.
+    // (Wash sets the mix from 0 by a route, so this is a route of its own: 20 points down.)
+    depth_route(&mut r, k, "m1", verb, "mix", k, "m2", -0.2 / 0.6);
+    r.route(k, "m1", verb, "mix", 0.2 * 0.4 / 0.6);
+    // The level: the master filter's output (pads, drone, sea, shimmer, low pad) into the sum
+    // before the trim, from unity down. The bells after the filter keep theirs.
+    let lad_sum =
+        r.e.state()
+            .cables
+            .values()
+            .find(|c| c.from.module_id() == Some(h.lad))
+            .and_then(|c| c.to.module_id())
+            .expect("the master filter feeds a sum");
+    crest(&mut r, k, "m2", 0.4, lad_sum, "mixer", "level1", 1.0, 0.25);
     let cues = vec![
         CueDef {
             name: "Low Tide",
