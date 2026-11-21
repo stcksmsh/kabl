@@ -1266,8 +1266,8 @@ fn presets() -> Vec<Preset> {
             name: "Chandelier",
             category: "Voice",
             tags: &["poly", "fm", "bowed", "glass", "pop", "ambient"],
-            description: "Bowed crystal: a sine with a high FM partial and a rubbed rim, bowed in slowly and left in a hall. Play slow, high notes and fifths. Rub brings in the friction of a wet rim with a hint of vibrato, Overtone brings forward the glassy partial, Bow goes from a struck ping to a slow bow, Space adds the echo and the hall.",
-            listen: "Pure, glassy notes that bloom; Rub up for the singing rim, Overtone for glitter, Bow for how slowly each note arrives.",
+            description: "Bowed crystal: a sine with a high FM partial and a rubbed rim, bowed in slowly and left in a hall. Play slow, high notes and fifths. Rub brings in the friction of a wet rim with a hint of vibrato, Overtone brings forward the glassy partial and bends it from the octave to an inharmonic glass tone, Bow goes from a struck ping that dies away to a slow bow that holds, Space adds the echo and the hall.",
+            listen: "Pure, glassy notes that bloom; Rub up for the singing rim, Overtone for an inharmonic glitter, Bow from a ping to a slow, held bow.",
             build: chandelier,
             group: 2,
             phrase: glass_phrase,
@@ -1540,13 +1540,16 @@ fn chandelier() -> Rack {
     for o in v.oscs.clone() {
         v.r.depth_route(lfo, "out", o, "fine", v.knob, "m1", 0.02);
     }
-    // Overtone: the glass partial comes forward.
+    // Overtone: the glass partial comes forward and slides from the octave up to the glass mode
+    // (2.76 times the pitch, +557 ct): the timbre turns from harmonic to inharmonic.
     span(&mut v, 2, 0.35, mix, "mixer", "level3", 0.0, 0.05);
+    rise(&mut v, 2, top, "osc.fm", "fine", 0.0, 557.0);
     comp_gain(&mut v, 2, 0.35, 3.2);
     comp_gain(&mut v, 4, 0.6, 5.4);
-    // Bow: from a struck ping to a slow bow.
+    // Bow: from a struck ping that dies away to a slow bow that holds (attack and sustain).
     let aenv = v.aenv;
     let s = span_lh(&mut v, 3, aenv, "env.adsr", "attack_ms", 8.0, 300.0, 2600.0);
+    span(&mut v, 3, s, aenv, "env.adsr", "sustain", 0.5, 0.8);
     comp_gain(&mut v, 3, s, 1.3);
     v.stage(
         "chorus",

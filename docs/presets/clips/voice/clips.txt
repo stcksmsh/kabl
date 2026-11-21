@@ -39,7 +39,7 @@ vox-chop: Stabs whose vowel jumps on every sixteenth (needs Run). Vowels at 0 is
    42 s  macro 3: Shift
    63 s  macro 4: Space
 
-chandelier: Pure, glassy notes that bloom. Rub for the rim, Overtone for glitter, Bow for how slowly each note arrives.
+chandelier: Pure, glassy notes that bloom. Rub for the rim, Overtone for an inharmonic glitter, Bow from a ping to a slow, held bow.
     0 s  macro 1: Rub
    21 s  macro 2: Overtone
    42 s  macro 3: Bow
