@@ -2303,6 +2303,10 @@ fn lichen_voices(r: &mut Rack, clock: ModuleId) -> Vec<(ModuleId, &'static str)>
         r.route(env, "out", lad, "cutoff_hz", 0.3);
         r.pattern(gain, "out", mixer, &format!("in{pos}"), &pat);
         ladders.push((lad, cutoff));
+        if pos == 2 {
+            // Focus: the 5-loop's bell sits back until the mix opens.
+            rise(r, knob, 5, gain, "gain", "gain_db", -28.0, db);
+        }
     }
     // The keys stage: level, then their own dotted-eighth echo and long room, summed to mono.
     let keys = r.add("gain", &[("gain_db", 0.0)]);
@@ -2462,6 +2466,60 @@ fn lichen() -> (Rack, Vec<CueDef>) {
     for l in &h.lines[..2] {
         rise(&mut r, k, 3, l.seq, "seq", "gate_len", 12.0, 95.0);
     }
+    // Focus (m5, CC 24): how many voices stand in front. At 0 only the bass, the kick and the
+    // 7-loop are clear: the master filter is dark, the stab, the 5-loop, the toms, the snare and
+    // the hats sit back and the pad opens into a blurred bed. At 1 every voice has its own band.
+    let by_kind = |r: &Rack, kind: &str| {
+        *r.e.state()
+            .modules
+            .iter()
+            .find(|(_, m)| m.kind == kind)
+            .expect(kind)
+            .0
+    };
+    for (kind, lo, hi) in [
+        ("drum.hat", -22.0, -6.0),
+        ("drum.snare", -20.0, -5.5),
+        ("drum.tom", -20.0, -10.0),
+    ] {
+        let id = by_kind(&r, kind);
+        rise(&mut r, k, 5, id, kind, "level_db", lo, hi);
+    }
+    rise(
+        &mut r,
+        k,
+        5,
+        h.lad,
+        "filter.ladder",
+        "cutoff_hz",
+        2500.0,
+        8000.0,
+    );
+    let (stab, pad) = (&h.lines[1], &h.lines[2]);
+    rise(&mut r, k, 5, stab.gain, "gain", "gain_db", -24.0, -13.0);
+    rise(
+        &mut r,
+        k,
+        5,
+        stab.tone.unwrap(),
+        "filter.svf",
+        "cutoff_hz",
+        1200.0,
+        2800.0,
+    );
+    rise(&mut r, k, 5, pad.gain, "gain", "gain_db", -20.5, -18.0);
+    rise(
+        &mut r,
+        k,
+        5,
+        pad.tone.unwrap(),
+        "filter.svf",
+        "cutoff_hz",
+        1000.0,
+        700.0,
+    );
+    r.e.set_label(k, "name.m5", Some("Focus".into()));
+    r.e.set_param(k, "m5", FOCUS[0]);
     let cues = vec![
         CueDef {
             name: "Spore",
@@ -2489,8 +2547,19 @@ fn lichen() -> (Rack, Vec<CueDef>) {
         },
     ];
     finish(&mut r, &h, &cues);
+    // Focus is the fifth macro: pinned after the other four, on CC 24, set by every cue.
+    r.e.set_presentation(&[
+        (k, format!("{PIN_PREFIX}m5"), Some(6.0)),
+        (k, format!("{CC_PREFIX}m5"), Some(24.0)),
+    ]);
+    for (n, v) in (1..).zip(FOCUS) {
+        cues::set_macro(&mut r.e, h.cue, n, k, 4, Some(v));
+    }
     (r, cues)
 }
+
+/// Lichen's Focus per cue: Spore (stored), Colony, Bloom, Die-back.
+const FOCUS: [f32; 4] = [0.1, 0.35, 1.0, 0.0];
 
 fn lichen_phrase() -> Vec<Hit> {
     let bar = 240.0 / 112.0;
@@ -2781,7 +2850,7 @@ fn presets() -> Vec<Preset> {
         slug: "lichen",
         name: "Lichen",
         tags: &["sequenced", "cues", "drums", "polymeter", "random", "experimental", "112bpm"],
-        description: "A self-playing experimental piece at 112 BPM: two random melodies held to D dorian that loop in 7 and 5 steps, each through a cable with its own step pattern, over a bass in 7, a stab in 5 and hats, open hats and toms looping in 5, 7 and 9 against a bar of 16. Press Run, then launch the four cues with the pads or CC 40-43: Spore, Colony, Bloom, Die-back. Mutate lets the random loops change as they come round, Reach widens their range from a third to two octaves, Gate turns the bass and stab from ticks into held notes, Echo sets the echo and the room and, with Mutate down, sinks the melodies into their own echo and room.",
+        description: "A self-playing experimental piece at 112 BPM: two random melodies held to D dorian that loop in 7 and 5 steps, each through a cable with its own step pattern, over a bass in 7, a stab in 5 and hats, open hats and toms looping in 5, 7 and 9 against a bar of 16. Press Run, then launch the four cues with the pads or CC 40-43: Spore, Colony, Bloom, Die-back. Mutate lets the random loops change as they come round, Reach widens their range from a third to two octaves, Gate turns the bass and stab from ticks into held notes, Echo sets the echo and the room and, with Mutate down, sinks the melodies into their own echo and room. Focus, a fifth macro, sets how many voices stand in front: few at Spore and Die-back, the rest dark and set back, every voice in its own band at Bloom.",
         listen: "The loops that repeat at Spore, then mutate and spread through Colony and Bloom; the Die-back settling into a wet echo.",
         build: lichen,
         phrase: lichen_phrase,
@@ -2944,7 +3013,8 @@ fn level_of(state: &kabl_core::PatchState, hot: u8) -> (f64, f64) {
         }
         if t.is_multiple_of(48000) && [3, 7, 19].contains(&(t / 48000)) {
             for &id in &macros {
-                for n in 1..=4u16 {
+                // A fifth macro (Lichen's Focus) moves only when hot; the test leaves it stored.
+                for n in (1..=5u16).filter(|&n| n < 5 || hot & 16 != 0) {
                     let v = if hot & (1 << (n - 1)) != 0 {
                         1.0
                     } else if t == 3 * 48000 {
@@ -3126,6 +3196,8 @@ fn main() {
                     ("m2", 2),
                     ("m3", 4),
                     ("m4", 8),
+                    ("all5", 0b11111),
+                    ("m5", 16),
                 ] {
                     let (peak, loud) = level_of(log.state(), hot);
                     line += &format!("  {label}: {peak:6.1}/{loud:6.1}");

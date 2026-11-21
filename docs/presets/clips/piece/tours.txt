@@ -47,12 +47,13 @@ estuary-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 
     63.0 s  macro 4: Wash
   total 84.0 s
 
-lichen-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
+lichen-tour.mp3 (new macros 1 to 5; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
      0.0 s  macro 1: Mutate
     21.0 s  macro 2: Reach
     42.0 s  macro 3: Gate
     63.0 s  macro 4: Echo
-  total 84.0 s
+    84.0 s  macro 5: Focus
+  total 105.0 s
 
 roller-rink-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
      0.0 s  macro 1: Glow
