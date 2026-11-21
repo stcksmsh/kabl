@@ -142,6 +142,19 @@ pub fn arc_knob(
     (resp, out)
 }
 
+/// The colour of what you play in Perform: the macro dials' value arcs and the playing scene.
+/// The mockup shows it amber (the accent), on the reasoning that Perform's primary thing is
+/// what you play. Kosta's open item: if one rule everywhere is wanted, return `st.roles.cv`
+/// (the modulation colour) here and nowhere else.
+pub fn perform_ink(st: &Style) -> Color32 {
+    st.roles.accent
+}
+
+/// Whether the style paints cards and pads as look B does (a family stripe, solid panels).
+pub fn is_look_b(st: &Style) -> bool {
+    st.slots.face.family == crate::style::FamilyMarker::Stripe
+}
+
 /// The Perform macro knob, drawn as in the mockup: a raised body with a soft shadow, a pointer
 /// line, and a 6 px value arc around it. `size` is the whole square; the body is 11 px smaller
 /// than the arc ring on each side. The caller paints the value inside it. Same drag as
@@ -152,6 +165,7 @@ pub fn macro_knob(
     value: f32,
     size: f32,
     mod_span: Option<(f32, f32)>,
+    live: Option<f32>,
 ) -> (Response, Option<f32>) {
     let enabled = ui.is_enabled();
     let (rect, resp) = ui.allocate_exact_size(
@@ -194,13 +208,23 @@ pub fn macro_knob(
             Stroke::new(2.0, alpha(r.cv, 220)),
         ));
     }
+    let ink = perform_ink(st);
     if value > 0.004 {
         p.add(Shape::line(
             arc_points(c, ring, 0.0, value),
-            Stroke::new(6.0, r.accent),
+            Stroke::new(6.0, ink),
         ));
-        cap(p, 0.0, r.accent);
-        cap(p, value, r.accent);
+        cap(p, 0.0, ink);
+        cap(p, value, ink);
+    }
+    if let Some(n) = live {
+        // Where the modulation has the macro right now: a dot on the ring, in the modulation
+        // colour (the mockup's live dot).
+        let a = A0 + SWEEP * n.clamp(0.0, 1.0);
+        let at = c + vec2(a.cos(), a.sin()) * ring;
+        p.circle_filled(at, 8.0, r.cv.gamma_multiply(0.4));
+        p.circle_filled(at, 5.0, r.knob_ink);
+        p.circle_stroke(at, 5.0, Stroke::new(2.0, r.cv));
     }
     p.circle_filled(
         c + vec2(0.0, 3.0),
@@ -349,32 +373,54 @@ pub fn scene_pad(
     let hover = ease_to(ui, resp.id.with("hover"), resp.hovered(), st.motion.hover);
     let radius = st.radius(crate::style::Rad::Md);
     let down = resp.is_pointer_button_down_on();
+    let b = is_look_b(st);
+    let hot = perform_ink(st);
     let (fill, ink, ink2) = match state {
-        PadState::Playing => (r.accent, r.on_accent, alpha(r.on_accent, 200)),
+        PadState::Playing => (hot, r.on_accent, alpha(r.on_accent, 200)),
         _ => (
+            // Look B: the pad sits darker than its card, as in the mockup.
             mix(
-                r.raised,
+                if b {
+                    // The card's own face, darkened: the mockup's #1D1F23 on a #2A2D33 card.
+                    crate::theme::panel_theme(st, "cues")
+                        .panel
+                        .lerp_to_gamma(Color32::BLACK, 0.35)
+                } else {
+                    r.raised
+                },
                 r.text,
-                0.03 + hover * 0.05 + if down { 0.05 } else { 0.0 },
+                if b { 0.0 } else { 0.03 } + hover * 0.05 + if down { 0.05 } else { 0.0 },
             ),
             r.text,
             r.text2,
         ),
     };
     let stroke = match state {
+        PadState::Queued if b => Stroke::new(1.8, hot),
         PadState::Queued => {
             let t = ui.input(|i| i.time);
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(100));
             let pulse = 0.55 + 0.45 * ((t * 5.0).sin() as f32 * 0.5 + 0.5);
-            Stroke::new(2.5, alpha(r.accent, (255.0 * pulse) as u8))
+            Stroke::new(2.5, alpha(hot, (255.0 * pulse) as u8))
         }
-        PadState::Playing => Stroke::new(1.0, r.accent),
+        PadState::Playing => Stroke::new(1.0, hot),
+        PadState::Idle if b => Stroke::new(1.0, alpha(Color32::BLACK, 128)),
         PadState::Idle => Stroke::new(st.slots.controls.outline, r.line),
     };
     let p = ui.painter();
     p.rect_filled(rect, radius, fill);
     p.rect_stroke(rect, radius, stroke, egui::StrokeKind::Inside);
+    if b && state != PadState::Playing {
+        // The mockup's top highlight.
+        p.line_segment(
+            [
+                rect.left_top() + vec2(7.0, 1.5),
+                rect.right_top() + vec2(-7.0, 1.5),
+            ],
+            Stroke::new(1.0, alpha(Color32::WHITE, 15)),
+        );
+    }
     let pad = st.sp(2);
     let avail = rect.width() - pad * 2.0 - st.sp(3);
     let mut tr = p.layout(title.to_string(), st.font(Role::H3), ink, f32::INFINITY);
@@ -413,12 +459,23 @@ pub fn scene_pad(
         p.rect_filled(
             Rect::from_min_size(bar.min, vec2(bar.width() * f.clamp(0.0, 1.0), h)),
             h / 2.0,
-            if state == PadState::Playing {
-                ink
-            } else {
-                r.accent
-            },
+            if state == PadState::Playing { ink } else { hot },
         );
+    } else if state == PadState::Playing {
+        // Four bars that move while the scene plays (the mockup's sound bars).
+        let t = ui.input(|i| i.time);
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(33));
+        for k in 0..4 {
+            let h = 16.0 * (0.3 + 0.7 * ((t * 6.3 + k as f64 * 1.07).sin().abs() as f32));
+            let x = rect.right() - pad - 22.0 + k as f32 * 6.0;
+            let y = rect.bottom() - pad;
+            p.rect_filled(
+                Rect::from_min_max(pos2(x, y - h), pos2(x + 3.6, y)),
+                1.5,
+                ink,
+            );
+        }
     }
     resp
 }
@@ -523,6 +580,18 @@ pub fn step_lane(
     }
 }
 
+/// How bright step `i` of a lane of `n` steps is drawn: a lane longer than one page of 8 shows
+/// the page the playhead is on at full strength and the others at 55 % (the mockup's second
+/// half), so a long pattern reads as pages. Stopped, the first page is the bright one.
+pub fn lane_page_dim(i: usize, playing: Option<usize>, n: usize) -> f32 {
+    const PAGE: usize = 8;
+    if n <= PAGE || i / PAGE == playing.unwrap_or(0) / PAGE {
+        1.0
+    } else {
+        0.55
+    }
+}
+
 /// The Perform step lane, as in the mockup: each step a dim well with a bar rising from the
 /// bottom to its level (brighter with its probability, a stub when its gate is off), a 4 px gap
 /// between steps, cells at most 48 px wide, and the playing step outlined by a column a little
@@ -564,17 +633,20 @@ pub fn seq_lane(
         ui.painter().rect_filled(
             Rect::from_min_max(pos2(well.left(), well.bottom() - h), well.max),
             3.0,
-            col,
+            col.gamma_multiply(lane_page_dim(i, playing, steps.len())),
         );
         if playing == Some(i) {
             let col_rect = Rect::from_min_size(
                 pos2(x + 0.5, rect.top() + 6.0),
                 vec2(pitch - 1.0, rect.height() - 12.0),
             );
+            // The mockup's playhead: a faint fill and a 1.6 px outline.
+            ui.painter()
+                .rect_filled(col_rect, 4.0, alpha(Color32::WHITE, 26));
             ui.painter().rect_stroke(
                 col_rect,
                 4.0,
-                Stroke::new(1.0, alpha(r.text, 130)),
+                Stroke::new(1.6, r.knob_ink),
                 egui::StrokeKind::Inside,
             );
         }

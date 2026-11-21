@@ -14,10 +14,15 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 33] = [
+const SCENES: [&str; 38] = [
     "rack",
     "perform",
     "sounds",
+    "sounds-preview",
+    "first-run-sounds",
+    "first-run-flows",
+    "first-run",
+    "first-run-own",
     "drawer",
     "wavetable-editor",
     "seq-pattern-editor",
@@ -120,6 +125,9 @@ fn perform_mockup_patch() -> PatchEditor {
         id,
         port: port.to_string(),
     };
+    // Bite is modulated: an LFO into the macro, so its dial shows a live dot.
+    let lfo = e.add_module("lfo", at(1184.0, 320.0));
+    e.connect_route(m(lfo, "out"), mac, "m1");
     let macros = [
         ("Bite", 0.62, [(svf, "cutoff_hz"), (adsr, "decay_ms")]),
         ("Wash", 0.35, [(verb, "decay_s"), (delay, "mix")]),
@@ -136,7 +144,8 @@ fn perform_mockup_patch() -> PatchEditor {
         }
         toggle_pin(&mut e, mac, &out);
     }
-    // Step levels (percent) of the first eight steps of each lane in the mockup.
+    // Step levels (percent) of the first eight steps of each lane in the mockup; the second
+    // eight repeat them at 85 % (the mockup's 16 steps).
     let lanes: [(&str, [f32; 8]); 3] = [
         ("Bass", [90.0, 50.0, 0.0, 70.0, 100.0, 30.0, 0.0, 80.0]),
         ("Drums", [100.0, 0.0, 60.0, 0.0, 100.0, 0.0, 60.0, 30.0]),
@@ -145,7 +154,9 @@ fn perform_mockup_patch() -> PatchEditor {
     for (&s, (name, levels)) in seqs.iter().zip(lanes) {
         // Every bank plays the lane (the playing bank is the one the lane shows).
         for prefix in ["", "b.", "c.", "d."] {
-            for (k, &v) in levels.iter().enumerate() {
+            e.set_param(s, &format!("{prefix}length"), 16.0);
+            for k in 0..16 {
+                let v = levels[k % 8] * if k < 8 { 1.0 } else { 0.85 };
                 e.set_param(s, &format!("{prefix}v{}", k + 1), v);
                 e.set_param(
                     s,
@@ -265,20 +276,52 @@ impl App {
         ));
         // The file browser's Sounds place needs the user's sounds folder.
         std::fs::create_dir_all(self._user.path().join("sounds")).unwrap();
-        if j.scene == "sounds" {
+        if j.scene == "sounds-preview" {
+            // A player whose audio end nobody listens to: the clip renders for real, the
+            // playing state is driven by hand in `update`.
+            let collector: &'static basedrop::Collector =
+                Box::leak(Box::new(basedrop::Collector::new()));
+            let (player, voice) = kabl_ui::sound_preview::channel(collector.handle());
+            std::mem::forget(voice);
+            ui.browser.clips.attach(Some(player));
+            ui.sample_rate = 48000.0;
+        }
+        if j.scene == "sounds" || j.scene == "sounds-preview" {
             ui.browser.selected = Some("factory:presets/acid-line".into());
             // The mockup narrows the Factory shelf to Bass; Acid Line is a Groove sound here.
             ui.browser.filter = kabl_ui::browser::Filter::Factory;
             ui.browser.category = Some("Groove".into());
         }
-        let mut doc = kabl_ui::browser::Doc::new(
-            "Acid Line",
-            kabl_ui::browser::DocOrigin::Library("factory:acid-line".into()),
-            self.editor.state(),
-        );
+        // The first-run scenes start on the unsaved start patch: a library origin would tell the
+        // tour that a sound was already loaded.
+        let origin = if j.scene == "first-run-sounds" {
+            kabl_ui::browser::DocOrigin::New
+        } else {
+            kabl_ui::browser::DocOrigin::Library("factory:acid-line".into())
+        };
+        let mut doc = kabl_ui::browser::Doc::new("Acid Line", origin, self.editor.state());
         doc.meta.category = "Bass".into();
         ui.doc = Some(doc);
-        ui.browser_open = j.scene == "sounds";
+        ui.browser_open = j.scene == "sounds" || j.scene == "sounds-preview";
+        // The first-run tour, one scene per step, over the start patch.
+        if let Some(step) = match j.scene {
+            "first-run-sounds" => Some(kabl_ui::tour::Step::Sounds),
+            "first-run-flows" => Some(kabl_ui::tour::Step::Flows),
+            "first-run" => Some(kabl_ui::tour::Step::Knob),
+            "first-run-own" => Some(kabl_ui::tour::Step::Own),
+            _ => None,
+        } {
+            self.editor = kabl_ui::first_run::start_patch();
+            // The start patch's own document: its name in the header, clean.
+            ui.doc = Some(kabl_ui::browser::Doc::new(
+                kabl_ui::first_run::start_name(),
+                kabl_ui::browser::DocOrigin::New,
+                self.editor.state(),
+            ));
+            ui.first_run = Some(kabl_ui::tour::begin_at(step));
+            ui.browser_open = step == kabl_ui::tour::Step::Sounds;
+            ui.browser.selected = Some("factory:presets/acid-line".into());
+        }
         ui.drawer_open = matches!(
             j.scene,
             "rack"
@@ -302,7 +345,9 @@ impl App {
             .map(|(&id, _)| id)
             .collect();
         for s in seqs {
-            ui.seq_steps.insert(s, 4);
+            // The mockup's playhead sits on step 5 (index 4); the Perform mockup's on step 1.
+            ui.seq_steps
+                .insert(s, if j.scene == "perform" { 0 } else { 4 });
         }
         if j.scene.starts_with("file-") {
             use kabl_ui::filebrowser::{self as fb, Mode, Purpose};
@@ -519,7 +564,7 @@ impl App {
                 ui.clock_pos.insert(c, 16.0 * 16.0 + 2.0 * 4.0 + 1.0);
             }
             for s in ids("seq") {
-                ui.seq_steps.insert(s, 5);
+                ui.seq_steps.insert(s, 0);
             }
             for cues in ids("cues") {
                 let all = kabl_ui::cues::cues(state, cues);
@@ -968,7 +1013,84 @@ impl eframe::App for App {
             });
         }
         // The lanes' animation runs on the clock: give the routes scenes time to settle.
-        let shot = if self.jobs[self.i].scene.starts_with("cable-routes")
+        if self.jobs[self.i].scene == "sounds-preview" {
+            use kabl_ui::sound_preview::ClipLook;
+            use std::sync::atomic::Ordering;
+            let id = "factory:presets/acid-line";
+            let clips = &mut self.ui.browser.clips;
+            if matches!(clips.look(id), ClipLook::Ready(_)) && clips.playing().is_none() {
+                clips.play(id);
+            }
+            // Playing, 40 % through, at a lively level.
+            if let Some(status) = clips.status() {
+                status.gen.store(1, Ordering::Relaxed);
+                status.active.store(true, Ordering::Relaxed);
+                status.len.store(192_000, Ordering::Relaxed);
+                status.pos.store(76_800, Ordering::Relaxed);
+                for l in &status.level {
+                    l.store(0.55f32.to_bits(), Ordering::Relaxed);
+                }
+            }
+        }
+        if self.jobs[self.i].scene == "perform" {
+            // The engine's face tap for the LFO that modulates Bite: a steady 0.2 above rest.
+            let lfo = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "lfo")
+                .map(|(&id, _)| id);
+            if let Some(id) = lfo {
+                let t = ctx.input(|i| i.time);
+                self.ui.live.set_tap(
+                    id,
+                    0,
+                    kabl_ui::displays::LiveTap {
+                        last: 0.2,
+                        min: -0.2,
+                        max: 0.2,
+                        view: kabl_modules::ModuleView {
+                            valid: false,
+                            position: 0.0,
+                            cycle: [0.0; kabl_modules::VIEW_CYCLE],
+                        },
+                        at: t,
+                    },
+                );
+            }
+        }
+        if self.jobs[self.i].scene.starts_with("first-run") {
+            // The engine's face tap for the envelope that opens the filter: mid-note.
+            let env = self
+                .editor
+                .state()
+                .modules
+                .iter()
+                .find(|(_, m)| m.kind == "env.adsr")
+                .map(|(&id, _)| id);
+            if let Some(id) = env {
+                let t = ctx.input(|i| i.time);
+                self.ui.live.set_tap(
+                    id,
+                    0,
+                    kabl_ui::displays::LiveTap {
+                        last: 0.7,
+                        min: 0.0,
+                        max: 1.0,
+                        view: kabl_modules::ModuleView {
+                            valid: false,
+                            position: 0.0,
+                            cycle: [0.0; kabl_modules::VIEW_CYCLE],
+                        },
+                        at: t,
+                    },
+                );
+            }
+        }
+        let shot = if self.jobs[self.i].scene == "sounds-preview" {
+            240
+        } else if self.jobs[self.i].scene.starts_with("cable-routes")
             || self.jobs[self.i].scene.starts_with("menu-")
             || self.jobs[self.i].scene.starts_with("more-controls")
             || self.jobs[self.i].scene == "dev-tools"
