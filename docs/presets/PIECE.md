@@ -106,7 +106,7 @@ Build, Drop (sub and reese in), Rolldown (ghost snares, busy hats).
 | Macro | Stored | 0 to 1 | Moves |
 |---|---|---|---|
 | Weight | 0.30 | no sub to a deep floor-shaking sub; level-type | sub gain -36 to -4 dB |
-| Reese | 0.30 | slow, subtle beating to a moderate one | reese detune 3 to 14 cents (beat on the F2 fundamental 0.15 Hz at 0, 0.32 Hz stored, 0.71 Hz at 1; was 4 to 40 cents, 0.20, 0.75, 2.0 Hz), its filter 500 Hz to 1.8 kHz, bus drive 4 to 12 dB with trim -3 to -7 dB |
+| Reese | 0.30 | slow, subtle beating to a moderate one | reese detune 2 to 18 cents (beat on the F2 fundamental 0.10 Hz at 0, 0.34 Hz stored, 0.91 Hz at 1; the first take was 4 to 40 cents, 0.20, 0.75, 2.0 Hz; the top was 14 cents, 0.71 Hz, before the owner asked for a little more at 1), its filter 500 Hz to 1.8 kHz, bus drive 4 to 14 dB with trim -3 to -8 dB |
 | Break | 0.15 | plain two-step to ghost snares and busy hats | the ghost-snare and hat mixer levels (top kit mixer) |
 | Haze | 0.50 | dry to echo and room | echo and room mix |
 
@@ -173,7 +173,7 @@ Loudness and peak per piece (`presets_piece levels`; peak dBFS / loudness dB, at
 | Dead Calm | -8.1 / -19.5 | -2.7 / -17.7 | -8.5 / -20.2 | -6.4 / -19.6 | -4.1 / -19.2 | -4.1 / -17.2 |
 | Pawn Shop | -1.8 / -18.8 | -1.8 / -19.1 | -1.8 / -18.7 | -1.8 / -18.6 | -1.8 / -19.1 | -1.8 / -19.3 |
 | Laundromat | -3.0 / -17.4 | -6.8 / -18.7 | -3.8 / -18.4 | -3.5 / -17.0 | -3.2 / -17.2 | -6.8 / -19.1 |
-| Spillway | -5.5 / -20.8 | -1.9 / -18.1 | -4.6 / -19.6 | -4.1 / -19.7 | -4.7 / -20.4 | -4.6 / -20.6 |
+| Spillway | -4.4 / -20.6 | -1.9 / -17.8 | -4.3 / -19.5 | -4.9 / -19.4 | -4.1 / -20.3 | -3.9 / -20.4 |
 | Balcony | -3.2 / -18.2 | -4.1 / -19.2 | -4.1 / -19.4 | -3.1 / -18.0 | -3.6 / -18.1 | -3.6 / -18.2 |
 | Estuary | -7.7 / -20.4 | -3.4 / -18.4 | -8.2 / -22.0 | -5.1 / -18.9 | -7.8 / -18.9 | -4.1 / -18.0 |
 | Lichen | -4.0 / -19.4 | -3.9 / -18.8 | -4.2 / -19.4 | -3.8 / -19.3 | -4.2 / -18.6 | -4.1 / -19.5 |

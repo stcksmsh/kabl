@@ -198,7 +198,7 @@
       },
       "params": {
         "base_hz": 130.815,
-        "detune": 3.0,
+        "detune": 2.0,
         "pw": 50.0,
         "unison": 2.0,
         "waveform": 2.0
@@ -2272,7 +2272,7 @@
         }
       },
       "params": {
-        "amount": 0.11
+        "amount": 0.16000001
       },
       "steps": []
     },
@@ -2308,7 +2308,7 @@
         }
       },
       "params": {
-        "amount": 0.22222224
+        "amount": 0.2777778
       },
       "steps": []
     },
@@ -2326,7 +2326,7 @@
         }
       },
       "params": {
-        "amount": -0.111111104
+        "amount": -0.13888887
       },
       "steps": []
     },
