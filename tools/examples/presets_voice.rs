@@ -293,6 +293,16 @@ fn write_wav(path: &Path, left: &[f32], right: &[f32]) {
 
 /// Plays `hits` through the engine for `secs` seconds. A clocked patch is run at 0.5 s.
 fn render(state: &kabl_core::PatchState, hits: &[Hit], secs: f32) -> (Vec<f32>, Vec<f32>) {
+    render_with_input(state, hits, secs, &[])
+}
+
+/// `render`, with `input` (mono, at the render rate) fed to every `audio.in`; silence past its end.
+fn render_with_input(
+    state: &kabl_core::PatchState,
+    hits: &[Hit],
+    secs: f32,
+    input: &[f32],
+) -> (Vec<f32>, Vec<f32>) {
     let collector = Collector::new();
     // `PP_SET="kind.param=value,..."` overrides a param on every module of that kind (A/B).
     let mut state = state.clone();
@@ -354,6 +364,13 @@ fn render(state: &kabl_core::PatchState, hits: &[Hit], secs: f32) -> (Vec<f32>, 
                     None => KeyEvent::Off { note: h.1 },
                 });
             }
+        }
+        if !input.is_empty() {
+            let mut a = [0.0; BLOCK];
+            for (j, v) in a.iter_mut().enumerate() {
+                *v = input.get(b * BLOCK + j).copied().unwrap_or(0.0);
+            }
+            engine.set_audio_in(&a, &a);
         }
         engine.process_block(&mut l, &mut r);
         left.extend_from_slice(&l);
@@ -2159,6 +2176,80 @@ fn main() {
             for p in presets().into_iter().filter(|p| only(p)) {
                 println!("    (\n        \"presets/{}\",\n        {:?},\n        {:?},\n        &{:?},\n        {:?},\n    ),", p.slug, p.name, p.category, p.tags, p.description);
             }
+        }
+        Some("voice") => {
+            // voice <mono wav> <out dir>: a recorded voice as the vocoder's modulator. Float WAVs
+            // a-saw (plain saw chord carrier), b-sock-puppet, c-automaton (each preset's mouth
+            // replaced by the voice), d-dry. A listening test, not a factory clip.
+            let mut rd = hound::WavReader::open(&args[2]).expect("wav");
+            assert_eq!(rd.spec().sample_rate, sr() as u32, "voice at the render rate");
+            let voice: Vec<f32> = rd.samples::<f32>().map(|s| s.expect("sample")).collect();
+            let secs = voice.len() as f32 / sr();
+            let out = Path::new(&args[3]);
+            std::fs::create_dir_all(out).unwrap();
+            // Replaces whatever drives the vocoder's mod with the voice through audio.in.
+            let with_voice = |mut r: Rack| {
+                let voc = r
+                    .e
+                    .state()
+                    .modules
+                    .iter()
+                    .find(|(_, m)| m.kind == "vocoder")
+                    .map(|(&id, _)| id)
+                    .expect("a vocoder");
+                let input = r.add("audio.in", &[]);
+                let s = r.split(input);
+                r.wire(s, "left", voc, "mod");
+                r
+            };
+            let saw = {
+                let mut r = Rack::new();
+                let mix = r.add("mixer", &[]);
+                for (k, hz) in [220.0f32, 261.63, 329.63].into_iter().enumerate() {
+                    let o = r.add("osc.va", &[("base_hz", hz), ("waveform", 2.0)]);
+                    r.wire(o, "out", mix, &format!("in{}", k + 1));
+                }
+                let voc = r.add("vocoder", &[]);
+                r.wire_both(mix, "out", voc);
+                r.out_stereo(voc);
+                with_voice(r)
+            };
+            let line: Vec<(u32, u8, f32)> = vec![
+                (0, 57, 2.0),
+                (2, 60, 2.0),
+                (4, 64, 3.0),
+                (8, 62, 2.0),
+                (10, 60, 2.0),
+                (12, 57, 4.0),
+                (16, 55, 2.0),
+                (18, 59, 2.0),
+                (20, 62, 3.0),
+                (24, 64, 2.0),
+                (26, 62, 2.0),
+                (28, 60, 4.0),
+            ];
+            let bars = (secs / (32.0 * S16)).ceil() as u32;
+            let mut choir = Vec::new();
+            let mut t = 0.0;
+            while t < secs {
+                for notes in [[57u8, 64, 69], [53, 60, 65], [48, 55, 64], [55, 62, 67]] {
+                    if t < secs {
+                        choir.extend(chord(t, &notes, 3.9));
+                    }
+                    t += 4.0;
+                }
+            }
+            let runs: [(&str, Rack, Vec<Hit>); 3] = [
+                ("a-saw", saw, Vec::new()),
+                ("b-sock-puppet", with_voice(sock_puppet()), riff(&line, 32, bars, 0.0)),
+                ("c-automaton", with_voice(automaton()), choir),
+            ];
+            for (name, rack, hits) in runs {
+                let (l, r) = render_with_input(rack.e.state(), &hits, secs, &voice);
+                write_wav(&out.join(format!("{name}.wav")), &l, &r);
+                println!("wrote {name}");
+            }
+            write_wav(&out.join("d-dry.wav"), &voice, &voice);
         }
         _ => eprintln!(
             "usage: presets_voice write|clips|levels|macros|library <patches dir> [out dir] [group]"
