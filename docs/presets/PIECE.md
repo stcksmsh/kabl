@@ -19,7 +19,7 @@ position and in the all-at-1 check. No piece is in `LOUD_EXCEPTIONS`.
 | Spillway | drum and bass | 174 | Intro 0, Build 4 (16), Drop 8 (0), Rolldown 12 (8) | yes | no |
 | Balcony | pop loop with sections | 104 | Verse 0, Pre 4 (8), Chorus 8 (0), Bridge 12 (4), Last Chorus 16 (0) | yes | no |
 | Estuary | ambient, polymeter and probability | 60 | Low Tide 0, Rising 4 (16), High Tide 10 (16), Ebb 16 (16) | none | no |
-| Lichen | experimental, random loops in polymeter | 112 | Spore 0, Colony 4 (16), Bloom 10 (8), Die-back 16 (16) | yes | no |
+| Lichen | experimental, random loops in polymeter | 112 | Spore 0, Colony 4 (16), Bloom 12 (8), Die-back 20 (16) | yes | no |
 | Roller Rink | synthwave | 100 | Intro 0, Verse 4 (0), Chorus 8 (0), Break 14 (4) | yes | no |
 
 Genre spread follows the BRIEF table (techno, cinematic, hip-hop, disco, drum and bass, pop, ambient,
@@ -158,14 +158,36 @@ Flags: the output trim is +2 dB. At +4 the cue run peaked at -0.9 dBFS; at 0 the
 
 Idea: two random melodies quantized to D dorian, looping in 7 and 5 values, each through a cable with its
 own step pattern, over a bass in 7, a stab in 5 and hats, open hats and toms in 5, 7 and 9 against 16.
-Sections: Spore (loops repeat), Colony (they mutate), Bloom (full), Die-back (settles into a wet echo).
+Sections: Spore (loops repeat), Colony (they mutate), Bloom (full), Die-back (the melodies sink into echo).
+
+Each line has its own register and timbre, so the polymeter can be followed: bass a low saw (D1 to D2,
+low-pass 600 Hz), pad a dark bed under it (low-pass 700 Hz, -18 dB), the 7-loop a saw from C4 (ladder
+1.5 kHz plus its envelope), the stab a bright pulse an octave higher (D5 to A5, low-pass 2.8 kHz), the
+5-loop a triangle bell two octaves above the 7-loop; toms at 180 Hz above the bass, hats 7 dB up. The
+master filter sits at 8 kHz (it was 3 kHz and took the stab's and the 5-loop's top off). The bus is
+mono up to the room, so the separation is by register, timbre and filter band, not by panning.
+Measured on solo and muted renders of the cue run (band-weighted SNR of each voice against the rest of
+the mix, in the frames where it plays; worst cue, before -> after): 5-loop -7.5 -> +3.1 dB, 7-loop -4.5
+-> -0.2 dB, toms -4.3 -> +1.6 dB, stab +3.3 -> +3.1 dB, bass +4.7 -> +7.4 dB. The hats are 11 dB louder
+in the mix (-37 -> -26 dB) but share their band with the now open top (closed +2.4 -> 0.0 dB, open +1.6
+-> +0.6 dB); the pad is a bed (-3.9 -> -7.0 dB).
+
+Die-back: the two melodies go through a keys stage of their own (level, dotted-eighth echo with 55 %
+feedback and a 1.8 kHz tone, 4.5 s room damped at 2 kHz). A route from Echo whose depth is Echo minus
+Mutate moves it by Echo x (Echo - Mutate) of its travel: none at Bloom, 16 % at Spore, 3 % at Colony, all
+of it at Die-back (Echo 0.8, Mutate 0). There the keys drop 9 dB, their filters fall to a sixth (7-loop
+1.5 kHz to 250 Hz, 5-loop 7 kHz to 1.2 kHz) and their echo and room mixes rise to 64 % and 60 % (on top
+of the shared 32 % echo and room); the dry keys are about 19 dB down. Before, Die-back only moved the
+shared echo and room from 14 % to 32 % and the keys kept their level and tone (their share of the mix
+-10.6 dB at Die-back, as at Spore). Now the 7-loop's share is -10.8 dB at Spore and -17.7 dB at Die-back,
+the 5-loop's -14.4 and -21.7 dB, most of it echo.
 
 | Macro | Stored | 0 to 1 | Moves |
 |---|---|---|---|
-| Mutate | 0.05 | the random loops repeat exactly to changing as they come round | both random modules' change 0 to 70 % |
+| Mutate | 0.05 | the random loops repeat exactly to changing as they come round | both random modules' change 0 to 70 % (and holds back Echo's sink of the keys) |
 | Reach | 0.30 | a third to two octaves of range | both random modules' range 4 to 30 semitones |
 | Gate | 0.40 | ticks to held notes on bass and stab | gate length 12 to 95 % |
-| Echo | 0.35 | dry to echo and room | echo and room mix |
+| Echo | 0.35 | dry to echo and room; high with Mutate low, the melodies sink into their own echo and room | echo and room mix; keys level, filters, echo and room by Echo x (Echo - Mutate) |
 
 ### 9. Roller Rink (100 BPM, synthwave)
 
@@ -194,7 +216,7 @@ Loudness and peak per piece (`presets_piece levels`; peak dBFS / loudness dB, at
 | Spillway | -4.4 / -20.6 | -1.9 / -17.8 | -4.3 / -19.5 | -4.9 / -19.4 | -4.1 / -20.3 | -3.9 / -20.4 |
 | Balcony | -3.2 / -18.2 | -4.1 / -19.2 | -4.1 / -19.4 | -3.1 / -18.0 | -3.6 / -18.1 | -3.6 / -18.2 |
 | Estuary | -7.7 / -20.4 | -3.4 / -18.4 | -8.2 / -22.0 | -5.1 / -18.9 | -7.8 / -18.9 | -4.1 / -18.0 |
-| Lichen | -4.0 / -19.4 | -3.9 / -18.8 | -4.2 / -19.4 | -3.8 / -19.3 | -4.2 / -18.6 | -4.1 / -19.5 |
+| Lichen | -2.0 / -20.0 | -1.9 / -19.6 | -2.0 / -19.8 | -2.2 / -20.0 | -2.3 / -19.3 | -3.2 / -20.5 |
 | Roller Rink | -4.5 / -18.5 | -2.1 / -18.1 | -4.2 / -19.8 | -4.3 / -18.0 | -4.5 / -18.4 | -3.9 / -18.5 |
 
 Combination: all macros at 1 stays within about 2.5 dB of the stored loudness for every piece (Dead Calm

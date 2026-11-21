@@ -2226,30 +2226,43 @@ fn estuary_phrase() -> Vec<Hit> {
 // ---- 8. Lichen: a random melody that mutates, in polymeter -----------------------------------
 
 /// The generative part: two random loops (7 and 5 values) quantized to D dorian, each through a
-/// cable with its own step pattern, so the lines drift against the 8-step bar.
+/// cable with its own step pattern, so the lines drift against the 8-step bar. Each loop has its
+/// own register and timbre: the 7-loop a saw in the middle (from C4), the 5-loop a bell-like
+/// triangle two octaves up. Both go through a keys stage of their own (level, dotted-eighth echo,
+/// long room) that sinks them at Die-back.
 fn lichen_voices(r: &mut Rack, clock: ModuleId) -> Vec<(ModuleId, &'static str)> {
+    let knob =
+        *r.e.state()
+            .modules
+            .iter()
+            .find(|(_, m)| m.kind == "macro")
+            .expect("the macros come first")
+            .0;
     let div = r.add("clock.div", &[("div", 2.0)]);
     r.wire(clock, "gate", div, "clock");
     r.wire(clock, "reset", div, "reset");
-    let mixer = r.add("mixer", &[("level1", 1.0), ("level2", 0.6)]);
-    for (len, wave, uni, db, tr, cutoff, pat, pos) in [
+    let mixer = r.add("mixer", &[("level1", 1.0), ("level2", 1.0)]);
+    let mut ladders = Vec::new();
+    for (len, wave, uni, db, tr, cutoff, decay, pat, pos) in [
         (
             7.0,
-            1.0,
             2.0,
-            -6.0,
-            -12.0,
-            1800.0,
+            2.0,
+            -5.0,
+            0.0,
+            1500.0,
+            320.0,
             [("length", 5.0), ("s2", 0.0), ("s4", 0.5)],
             1,
         ),
         (
             5.0,
-            0.0,
             1.0,
-            -12.0,
-            12.0,
-            6000.0,
+            1.0,
+            -8.0,
+            24.0,
+            7000.0,
+            700.0,
             [("length", 3.0), ("s2", 0.0), ("s3", 0.4)],
             2,
         ),
@@ -2266,7 +2279,7 @@ fn lichen_voices(r: &mut Rack, clock: ModuleId) -> Vec<(ModuleId, &'static str)>
             "osc.va",
             &[("waveform", wave), ("unison", uni), ("detune", 8.0)],
         );
-        let env = r.add("env.adsr", &adsr(2.0, 320.0, 0.0, 380.0));
+        let env = r.add("env.adsr", &adsr(2.0, decay, 0.0, decay + 60.0));
         let lad = r.add(
             "filter.ladder",
             &[
@@ -2287,8 +2300,61 @@ fn lichen_voices(r: &mut Rack, clock: ModuleId) -> Vec<(ModuleId, &'static str)>
         r.wire(vca, "out", gain, "in");
         r.route(env, "out", lad, "cutoff_hz", 0.3);
         r.pattern(gain, "out", mixer, &format!("in{pos}"), &pat);
+        ladders.push((lad, cutoff));
     }
-    vec![(mixer, "out")]
+    // The keys stage: level, then their own dotted-eighth echo and long room, summed to mono.
+    let keys = r.add("gain", &[("gain_db", 0.0)]);
+    r.wire(mixer, "out", keys, "in");
+    let echo = r.add(
+        "delay",
+        &[
+            ("sync", 3.0),
+            ("feedback", 55.0),
+            ("mix", 0.0),
+            ("tone_hz", 1800.0),
+        ],
+    );
+    r.wire(keys, "out", echo, "in");
+    r.wire(clock, "gate", echo, "clock");
+    let room = r.add(
+        "reverb",
+        &[
+            ("decay_s", 4.5),
+            ("damp_hz", 2000.0),
+            ("mix", 0.0),
+            ("predelay_ms", 20.0),
+            ("width", 60.0),
+        ],
+    );
+    r.wire(echo, "out", room, "in");
+    let split = r.split(room);
+    let mono = r.add("mixer", &[("level1", 0.5), ("level2", 0.5)]);
+    r.wire(split, "left", mono, "in1");
+    r.wire(split, "right", mono, "in2");
+    // Die-back: a route from Echo whose amount is Echo minus Mutate, so the param moves by
+    // Echo x (Echo - Mutate) of its Die-back travel: 0.16 of it at Spore, 0.03 at Colony, none
+    // at Bloom (it clamps or opens a little), all of it at Die-back (0.8 x 0.8), where the keys
+    // drop back, darken and go wet.
+    let mut sink = |id: ModuleId, kind: &str, param: &str, at_die_back: f32| {
+        let i = param_of(kind, param);
+        let base = r.e.state().modules[&id].params[param];
+        let k = (i.to_norm(at_die_back) - i.to_norm(base)) / 0.64;
+        let cable = r.e.connect_route(jack(knob, "m4"), id, param);
+        r.e.set_route_amount(cable, 0.0, true);
+        for (m, d) in [("m4", k), ("m1", -k)] {
+            let c =
+                r.e.connect_cable_route(jack(knob, m), cable, "amount")
+                    .expect("a route has a depth");
+            r.e.set_route_amount(c, d, true);
+        }
+    };
+    for (lad, cutoff) in ladders {
+        sink(lad, "filter.ladder", "cutoff_hz", cutoff / 6.0);
+    }
+    sink(keys, "gain", "gain_db", -9.0);
+    sink(echo, "delay", "mix", 64.0);
+    sink(room, "reverb", "mix", 60.0);
+    vec![(mono, "out")]
 }
 
 fn lichen() -> (Rack, Vec<CueDef>) {
@@ -2308,15 +2374,15 @@ fn lichen() -> (Rack, Vec<CueDef>) {
                 db: 0.0,
                 ..Line::new("2 - 9 - 5 - 0")
             },
-            // A 5-step stab.
+            // A 5-step stab: a bright pulse an octave above the 7-loop, the presence band.
             Line {
                 wave: 3.0,
                 pw: 30.0,
-                oct: 0.0,
+                oct: 1.0,
                 gate: 40.0,
-                env: [1.0, 200.0, 0.5, 60.0],
-                lp: 2500.0,
-                db: -10.0,
+                env: [1.0, 160.0, 0.4, 60.0],
+                lp: 2800.0,
+                db: -13.0,
                 ..Line::new("2 - 9 5 -")
             },
             Line {
@@ -2326,8 +2392,9 @@ fn lichen() -> (Rack, Vec<CueDef>) {
                 oct: -1.0,
                 gate: 100.0,
                 env: [800.0, 600.0, 0.9, 1500.0],
-                lp: 1200.0,
-                db: -14.0,
+                // Dark, under the 7-loop.
+                lp: 700.0,
+                db: -18.0,
                 div: 16.0,
                 ..Line::new("2 2 0 0")
             },
@@ -2342,19 +2409,21 @@ fn lichen() -> (Rack, Vec<CueDef>) {
                 "x..x..o.x.......",
             ],
             kick: [-10.0, 260.0, 8.0, 55.0],
-            levels: [-10.0, -16.0, -16.0, -10.0],
-            mix: [0.7, 0.5, 0.0, 0.3],
+            levels: [-10.0, -16.0, -9.0, -10.0],
+            mix: [0.7, 0.5, 0.0, 0.45],
             snare_decay: 180.0,
-            tom: [140.0, 260.0],
-            tom_mix: 0.5,
+            // Above the bass, with a short tail.
+            tom: [180.0, 170.0],
+            tom_mix: 0.8,
             div: 1.0,
             // The hat loops in 5, the open hat in 7 and the toms in 9 against a bar of 16.
             lens: [16.0, 16.0, 16.0, 5.0, 7.0, 9.0],
         }),
         play: [1.0, 2.0, 8.0, 0.0, 2500.0, -12.0],
         drive: [3.0, -2.0],
-        lad: [3000.0, 0.2, 0.0],
-        trim_db: 0.0,
+        // Open enough to pass the stab and the 5-loop's bell.
+        lad: [8000.0, 0.2, 0.0],
+        trim_db: -2.5,
         comp: [-18.0, 3.0, 120.0, 0.0],
         duck: None,
         riser: false,
@@ -2710,7 +2779,7 @@ fn presets() -> Vec<Preset> {
         slug: "lichen",
         name: "Lichen",
         tags: &["sequenced", "cues", "drums", "polymeter", "random", "experimental", "112bpm"],
-        description: "A self-playing experimental piece at 112 BPM: two random melodies held to D dorian that loop in 7 and 5 steps, each through a cable with its own step pattern, over a bass in 7, a stab in 5 and hats, open hats and toms looping in 5, 7 and 9 against a bar of 16. Press Run, then launch the four cues with the pads or CC 40-43: Spore, Colony, Bloom, Die-back. Mutate lets the random loops change as they come round, Reach widens their range from a third to two octaves, Gate turns the bass and stab from ticks into held notes, Echo sets the echo and the room.",
+        description: "A self-playing experimental piece at 112 BPM: two random melodies held to D dorian that loop in 7 and 5 steps, each through a cable with its own step pattern, over a bass in 7, a stab in 5 and hats, open hats and toms looping in 5, 7 and 9 against a bar of 16. Press Run, then launch the four cues with the pads or CC 40-43: Spore, Colony, Bloom, Die-back. Mutate lets the random loops change as they come round, Reach widens their range from a third to two octaves, Gate turns the bass and stab from ticks into held notes, Echo sets the echo and the room and, with Mutate down, sinks the melodies into their own echo and room.",
         listen: "The loops that repeat at Spore, then mutate and spread through Colony and Bloom; the Die-back settling into a wet echo.",
         build: lichen,
         phrase: lichen_phrase,
