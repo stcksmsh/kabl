@@ -176,9 +176,13 @@ impl Health {
         (self.fuel_budget() / u64::from(self.voices().max(1))).max(1)
     }
 
-    /// The wall-clock cap for one voice's call: the module's cap split the same way.
+    /// The wall-clock backstop for one voice's call: the module's whole share, not a slice of
+    /// it. The measured rate already keeps the voices together within the share; the backstop
+    /// only catches a call that alone takes all of it. A per-voice slice (10 µs for 32 voices)
+    /// is within normal jitter of a 5 µs call, and eight jittery calls in a row crashed modules
+    /// that fit easily (REAPER, 4 filters at 8 voices, while the host started up).
     pub fn voice_wall_cap(&self) -> Duration {
-        self.wall_cap() / self.voices().max(1)
+        self.wall_cap()
     }
 
     /// A fixed budget (floor = ceiling).
