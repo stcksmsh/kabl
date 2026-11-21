@@ -34,3 +34,4 @@ docs/**/*.flac
 /docs/presets/clips/macros-bass-lead-2/
 /docs/presets/clips/macros-keys-pluck/
 /docs/presets/clips/macros-keys-pluck-2/
+.claude/tmp/
