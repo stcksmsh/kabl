@@ -274,7 +274,7 @@ fn a_trap_is_a_crash_that_fades_and_silences_every_voice() {
 }
 
 #[test]
-fn an_infinite_loop_runs_out_of_fuel_and_eight_in_a_row_crash() {
+fn an_infinite_loop_runs_out_of_fuel_and_eight_in_a_row_suspend_it() {
     let spin = format!("{WHEN_LOUD} (loop $l (br $l))");
     let g = group(&wasm(1, "", &spin), 1, 200_000, Duration::from_secs(5));
     let mut m = voice(&g);
@@ -291,7 +291,10 @@ fn an_infinite_loop_runs_out_of_fuel_and_eight_in_a_row_crash() {
     }
     block(&mut m, &inp, coef);
     news.extend(g.health().take_overrun_news());
-    assert_eq!(g.health().fault(), Some(Fault::Overrun));
+    assert_eq!(g.health().fault(), None, "an overrun is never a crash");
+    assert_eq!(g.health().overrun_count(), OVERRUN_LIMIT);
+    // Suspended: the loop is not even called, so nothing more is counted.
+    block(&mut m, &inp, coef);
     assert_eq!(g.health().overrun_count(), OVERRUN_LIMIT);
     assert_eq!(
         news,
@@ -407,7 +410,14 @@ fn overruns_and_crashes_reach_the_user_as_notes() {
     assert!(
         notes
             .iter()
-            .any(|n| n.contains("test.biquad stopped: kept overrunning")),
+            .any(|n| n.contains("test.biquad") && n.contains("CPU time budget in 8 block")),
+        "told again once the count doubled: {notes:?}"
+    );
+    g.health().crash(Fault::Trap);
+    scope.collect();
+    let notes = scope.take_notes();
+    assert!(
+        notes.iter().any(|n| n.contains("test.biquad stopped:")),
         "{notes:?}"
     );
     scope.collect();
@@ -684,7 +694,11 @@ fn reset_runs_under_the_block_budget_without_allocating() {
     }
     assert_eq!(g.health().overrun_count(), OVERRUN_LIMIT - 1);
     m.reset();
-    assert_eq!(g.health().fault(), Some(Fault::Overrun));
+    assert_eq!(
+        g.health().fault(),
+        None,
+        "reset overruns suspend, never crash"
+    );
 
     // A trapping reset disables the module.
     let g = group(

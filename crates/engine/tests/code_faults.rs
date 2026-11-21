@@ -164,7 +164,6 @@ fn tail_peak(x: &[f32]) -> f32 {
 fn every_runtime_fault_keeps_the_synth_playing_and_flags_the_module() {
     let cases = [
         ("test.f.trap", "unreachable", Fault::Trap),
-        ("test.f.spin", "(loop $s (br $s))", Fault::Overrun),
         (
             "test.f.grow",
             "(drop (memory.grow (i32.const 1)))",
@@ -191,6 +190,14 @@ fn every_runtime_fault_keeps_the_synth_playing_and_flags_the_module() {
         assert!(!g.health().is_crashed());
         code::unregister(kind);
     }
+    // An endless loop only ever overruns: muted and suspended, counted, never a crash.
+    let kind = "test.f.spin";
+    let g = register(&wasm(kind, "", "", "(loop $s (br $s))"), 4).unwrap();
+    let (out, _) = render(patch(&[kind], 3.0).state(), 4, 120, &[57]);
+    assert_eq!(g.health().fault(), None);
+    assert!(g.health().overrun_count() > 0);
+    assert!(tail_peak(&out) > 0.01, "the other oscillator plays");
+    code::unregister(kind);
 }
 
 #[test]

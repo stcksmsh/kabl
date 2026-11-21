@@ -28,7 +28,7 @@ pub use abi::{Layout, LayoutError, ABI_VERSION, DEFAULT_MEMORY_CAP, MAX_BLOB_BYT
 pub use budget::{scaled_shares, Budget, Calibration, PER_MODULE_SHARE, TOTAL_SHARE};
 pub use engine::{CompiledModule, Fault, InstanceConfig, LoadError, WasmEngine, WasmInstance};
 pub use meta::{CodeMeta, CodeParam, CodePort};
-pub use module::{in_code_call, CodeModule, Health, FADE_MS, OVERRUN_LIMIT};
+pub use module::{in_code_call, CodeModule, Health, FADE_MS, OVERRUN_LIMIT, SUSPEND_BLOCKS};
 pub use scope::{hash_of, standin_key, CodeHash, CodeScope};
 pub use wasmi_engine::{WasmiEngine, ALLOWED_IMPORTS, META_SECTION};
 

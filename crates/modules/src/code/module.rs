@@ -6,8 +6,10 @@
 //!   module share a [`Health`]), until the user resets or reloads it ([`Health::clear`]). No
 //!   automatic retry. `Module::reset` (voice steal, note off) never revives a crashed module.
 //! - running out of fuel, or a block taking longer than the wall-clock cap (the backstop), is an
-//!   **overrun**: that block is silent (same short fade), and eight in a row make a crash. A
-//!   one-off overrun is only counted.
+//!   **overrun**: that block is silent (same short fade). Eight in a row make the voice sit out
+//!   [`SUSPEND_BLOCKS`] blocks (silent, not called), then it tries again. An overrun is never a
+//!   crash: a module that does not fit right now (a busy machine, a host starting up) comes back
+//!   by itself, and a runaway one costs its share only one block in fifty.
 //! - a normal block and an out-of-fuel block allocate nothing (the wasmi backend reads running
 //!   out of fuel from a resumable call instead of building an error). A real trap makes wasmi
 //!   build its error value: **one allocation, once**, because the module is disabled right
@@ -25,6 +27,9 @@ use std::time::{Duration, Instant};
 
 pub const FADE_MS: f32 = 5.0;
 pub const OVERRUN_LIMIT: u32 = 8;
+/// Blocks a voice sits out after `OVERRUN_LIMIT` overruns in a row (0.68 s of 64-frame blocks at
+/// 48 kHz).
+pub const SUSPEND_BLOCKS: u32 = 512;
 
 /// State shared by every voice of one code module, and read by the UI (badge, toast).
 pub struct Health {
@@ -233,6 +238,8 @@ pub struct CodeModule {
     fade_total: usize,
     fade_left: usize,
     consecutive_overruns: u32,
+    /// Blocks left to sit out after too many overruns in a row (see `overrun`).
+    suspended: u32,
     fading_dead: bool,
     /// This instance stands for one place of the module in a patch (see `count_as_placement`).
     placed: bool,
@@ -264,6 +271,7 @@ impl CodeModule {
             fade_total: fade_len(cfg.sample_rate),
             fade_left: 0,
             consecutive_overruns: 0,
+            suspended: 0,
             fading_dead: false,
             placed: false,
             cell: None,
@@ -328,10 +336,14 @@ impl CodeModule {
         self.emit_fade(io, n);
     }
 
-    fn overrun(&mut self) -> bool {
+    /// Counts an overrun; the eighth in a row suspends the voice for `SUSPEND_BLOCKS`.
+    fn overrun(&mut self) {
         self.health.overruns.fetch_add(1, Relaxed);
         self.consecutive_overruns += 1;
-        self.consecutive_overruns >= OVERRUN_LIMIT
+        if self.consecutive_overruns >= OVERRUN_LIMIT {
+            self.consecutive_overruns = 0;
+            self.suspended = SUSPEND_BLOCKS;
+        }
     }
 }
 
@@ -417,6 +429,11 @@ impl Module for CodeModule {
             self.emit_fade(io, n);
             return;
         }
+        if self.suspended > 0 {
+            // Sitting out after too many overruns: silent (the fade already ran), not called.
+            self.suspended -= 1;
+            return self.emit_fade(io, n);
+        }
         if n > self.layout.max_block as usize {
             return self.die(Fault::BadLayout, io, n);
         }
@@ -462,9 +479,7 @@ impl Module for CodeModule {
 
         match result {
             Err(Fault::OutOfFuel) => {
-                if self.overrun() {
-                    return self.die(Fault::Overrun, io, n);
-                }
+                self.overrun();
                 self.begin_fade();
                 return self.emit_fade(io, n);
             }
@@ -473,9 +488,7 @@ impl Module for CodeModule {
         }
         if took > cap {
             // The wall-clock backstop: the output is valid, but the module is too slow.
-            if self.overrun() {
-                return self.die(Fault::Overrun, io, n);
-            }
+            self.overrun();
         } else {
             self.consecutive_overruns = 0;
         }
@@ -505,7 +518,7 @@ impl Module for CodeModule {
     /// Resets the module's DSP state (voice reuse). Does not revive a crashed module. The module's
     /// `reset()` runs under the same rules as a block: the voice's share of the fuel budget, the
     /// wall-clock backstop, no allocation, and the same overrun/crash outcome (an overrun is
-    /// counted, eight in a row or a trap disables the module).
+    /// counted, eight in a row suspend the voice, a trap disables the module).
     fn reset(&mut self) {
         if self.health.is_crashed() {
             return;
@@ -517,17 +530,9 @@ impl Module for CodeModule {
         let result = no_alloc(|| inst.reset());
         let took = started.elapsed();
         match result {
-            Err(Fault::OutOfFuel) => {
-                if self.overrun() {
-                    self.health.crash(Fault::Overrun);
-                }
-            }
+            Err(Fault::OutOfFuel) => self.overrun(),
             Err(fault) => self.health.crash(fault),
-            Ok(()) if took > cap => {
-                if self.overrun() {
-                    self.health.crash(Fault::Overrun);
-                }
-            }
+            Ok(()) if took > cap => self.overrun(),
             Ok(()) => {}
         }
     }
