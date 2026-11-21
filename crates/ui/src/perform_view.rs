@@ -954,8 +954,15 @@ fn transport_card(
             for i in 0..4u64 {
                 let (r, _) = ui.allocate_exact_size(vec2(12.0, 12.0), Sense::hover());
                 let on = pos.is_some() && beat == i + 1;
-                ui.painter()
-                    .rect_filled(r, 3.0, if on { st.roles.accent } else { st.roles.inset });
+                ui.painter().rect_filled(
+                    r,
+                    3.0,
+                    if on {
+                        kit::perform_ink(st)
+                    } else {
+                        st.roles.inset
+                    },
+                );
             }
         });
         if run {
@@ -1799,7 +1806,8 @@ fn sequences_card(
 ) {
     let n = banks.len().max(1) as f32;
     let row_h = ((size.y - 64.0) / n).clamp(44.0, 110.0);
-    let hues = [st.roles.gate, st.roles.audio, st.roles.pitch];
+    // Lane colours are per track; none is amber (the accent) or teal (Perform's accent).
+    let hues = [st.roles.gate, st.roles.good, st.roles.pitch];
     let rect = shell(
         ui,
         ui_state,
@@ -1965,14 +1973,15 @@ fn sequences_card(
 
 /// A bank chip, 28 x 24: the playing bank is filled with the accent, the queued one outlined.
 fn bank_chip(ui: &mut egui::Ui, st: &Style, text: &str, state: PadState) -> egui::Response {
+    let hot = kit::perform_ink(st);
     let (rect, resp) = ui.allocate_exact_size(vec2(28.0, 24.0), Sense::click());
     let r = &st.roles;
     let hover = ui
         .ctx()
         .animate_bool_with_time(resp.id.with("hover"), resp.hovered(), 0.1);
     let (fill, line, ink) = match state {
-        PadState::Playing => (r.accent, r.accent, r.on_accent),
-        PadState::Queued => (r.raised, r.accent, r.text),
+        PadState::Playing => (hot, hot, r.bg),
+        PadState::Queued => (r.raised, hot, r.text),
         PadState::Idle => (
             crate::style::mix(r.raised, r.text, 0.05 * hover),
             r.line,
