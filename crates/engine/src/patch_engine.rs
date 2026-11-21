@@ -664,8 +664,7 @@ impl PatchEngine {
     /// Run or Stop from the clock's state in the graph playing. No allocation.
     pub fn transport(&mut self, id: kabl_core::ModuleId, t: kabl_modules::builtins::Transport) {
         use kabl_modules::builtins::Transport;
-        if self.pending.as_ref().is_some_and(|g| g.fresh) {
-            let g = self.pending.as_mut().unwrap();
+        if let Some(g) = self.pending.as_mut().filter(|g| g.fresh) {
             let t = match (t, g.clock(id)) {
                 (Transport::Toggle, Some(c)) if c.running() => Transport::Stop,
                 (Transport::Toggle, Some(_)) => Transport::Run,
@@ -753,19 +752,16 @@ impl PatchEngine {
         for &(seq, bank) in &l.targets[..l.count.min(MAX_TARGETS)] {
             self.cancel(Some(seq));
             match at {
-                None if self.pending.as_ref().is_some_and(|g| g.fresh) => {
-                    self.pending
-                        .as_mut()
-                        .unwrap()
-                        .arm_bank(seq, bank as usize, 0);
-                }
-                None => arm_scoped(
-                    &mut self.active,
-                    &mut self.incoming,
-                    &mut self.pending,
-                    seq,
-                    bank as usize,
-                ),
+                None => match self.pending.as_mut().filter(|g| g.fresh) {
+                    Some(g) => g.arm_bank(seq, bank as usize, 0),
+                    None => arm_scoped(
+                        &mut self.active,
+                        &mut self.incoming,
+                        &mut self.pending,
+                        seq,
+                        bank as usize,
+                    ),
+                },
                 Some(at) => {
                     let slots = if self.pending.as_ref().is_some_and(|g| g.fresh) {
                         &mut self.deferred_launches
@@ -834,12 +830,12 @@ impl PatchEngine {
             Some(id) => g.cancel_bank(id),
             None => g.cancel_banks(),
         };
-        if self.pending.as_ref().is_some_and(|g| g.fresh) {
-            disarm(self.pending.as_mut().unwrap());
+        if let Some(g) = self.pending.as_mut().filter(|g| g.fresh) {
+            disarm(g);
             return;
         }
-        if self.incoming.as_ref().is_some_and(|(g, _)| g.fresh) {
-            disarm(&mut self.incoming.as_mut().unwrap().0);
+        if let Some((g, _)) = self.incoming.as_mut().filter(|(g, _)| g.fresh) {
+            disarm(g);
             if let Some(g) = self.pending.as_mut() {
                 disarm(g);
             }
@@ -1064,7 +1060,11 @@ impl PatchEngine {
         if finished {
             // Move, not clone: drops the old `active` in place. `Owned::drop` only queues the
             // node on the collector (atomic pointer swap) — no deallocation happens here.
-            let (new_patch, _) = self.incoming.take().unwrap();
+            // `finished` is only set while `incoming` is `Some`; the block is the end of the
+            // function, so the `else` is unreachable and returning is harmless.
+            let Some((new_patch, _)) = self.incoming.take() else {
+                return;
+            };
             self.active = new_patch;
             // A swap queued while this fade was in flight (see `receive_swap`) starts now, from
             // the graph that was just promoted — same as any other fresh `receive_swap`, just
@@ -1150,8 +1150,8 @@ fn arm_scoped(
         g.arm_bank(seq, bank, 0);
         return;
     }
-    if incoming.as_ref().is_some_and(|(g, _)| g.fresh) {
-        incoming.as_mut().unwrap().0.arm_bank(seq, bank, 0);
+    if let Some((g, _)) = incoming.as_mut().filter(|(g, _)| g.fresh) {
+        g.arm_bank(seq, bank, 0);
         if let Some(g) = pending.as_mut() {
             g.arm_bank(seq, bank, 0);
         }

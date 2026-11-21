@@ -5,7 +5,8 @@
 //!
 //! For each patch directory: compile at 48 kHz with 8 and with 16 voices, hold the notes, and time
 //! `process_block` (64 samples, a budget of 1333 us) over 20 000 blocks. Prints the median and
-//! the 99.9th percentile in microseconds. A patch with a filter is also timed as a stereo
+//! the 99.9th percentile in microseconds. `--max-median-pct N` (CI gate) exits 1 if any median is
+//! above N % of the budget. A patch with a filter is also timed as a stereo
 //! variant (`+st`): a `pan` before every filter input, and each `in_l`/`in_r` pair fed by one
 //! source becomes one stereo cable, so every module after the first filter runs once per channel.
 
@@ -44,7 +45,25 @@ fn main() {
         "{:<38} {:>6} {:>10} {:>10} {:>9}",
         "patch", "voices", "median us", "p99.9 us", "% budget"
     );
-    for dir in std::env::args().skip(1) {
+    // `--max-median-pct N` is the CI perf gate: exit 1 when any patch's median block time is
+    // above N % of the block budget. The median is the robust statistic on a shared runner;
+    // p99.9 is printed for the record but never gated (one noisy neighbour moves it).
+    let mut args = std::env::args().skip(1).peekable();
+    let mut max_pct: Option<f64> = None;
+    let mut dirs = Vec::new();
+    while let Some(a) = args.next() {
+        if a == "--max-median-pct" {
+            max_pct = args.next().and_then(|v| v.parse().ok());
+            if max_pct.is_none() {
+                eprintln!("--max-median-pct needs a number");
+                std::process::exit(2);
+            }
+        } else {
+            dirs.push(a);
+        }
+    }
+    let mut over = Vec::new();
+    for dir in dirs {
         let Ok(log) = kabl_core::load(std::path::Path::new(&dir)) else {
             continue;
         };
@@ -62,11 +81,23 @@ fn main() {
                 let Some((median, p999)) = time(&patch, voices) else {
                     continue;
                 };
-                println!(
-                    "{label:<38} {voices:>6} {median:>10.1} {p999:>10.1} {:>8.1}%",
-                    median / (64.0 / 48000.0 * 1e6) * 100.0
-                );
+                let pct = median / (64.0 / 48000.0 * 1e6) * 100.0;
+                println!("{label:<38} {voices:>6} {median:>10.1} {p999:>10.1} {pct:>8.1}%");
+                if max_pct.is_some_and(|m| pct > m) {
+                    over.push(format!("{label} ({voices} voices): {pct:.1} %"));
+                }
             }
+        }
+    }
+    if let Some(m) = max_pct {
+        if over.is_empty() {
+            println!("perf gate: every median is within {m} % of the block budget");
+        } else {
+            eprintln!("perf gate FAILED: median above {m} % of the block budget:");
+            for o in &over {
+                eprintln!("  {o}");
+            }
+            std::process::exit(1);
         }
     }
 }

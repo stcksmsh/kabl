@@ -671,7 +671,7 @@ What actually exists vs. what's still spike-scoped or missing:
 | `modules`: 9 v1 built-ins + metadata | **9 of 9 have a `Module` impl.** `Module` trait, `ModuleInfo`, `ProcessIo`/`Signal` all built and tested. `osc.va` now has all 4 waveforms + hard sync (triangle naive, not BLEP/BLAMP-corrected). `lfo` has no sync (needs a clock, v3 scope) — see decisions.md. **Registry now exists** (`registry.rs`: `create(kind)`, `all_infos()`, `info_for(kind)`) — the compiler uses it to turn `ModuleState.kind` strings into instances. |
 | `learn`: unlock flags filter catalog | **not built.** `crates/learn` is an empty stub. |
 | `ui`: egui patchbay | **built, run, and screenshotted.** `crates/ui`, binary `kabl-ui`. Node-graph editor over `PatchEditor` (real op-log-backed undo/redo), live audio via the same `cpal`/`midir`/`PatchEngine` path as `standalone` (shared behind a flagged, non-textbook-RT-safe `Mutex` — see decisions.md). Verified actually rendering + handling a real click in this container via Xvfb; audio playback itself still unverified (no device here). |
-| `standalone`: cpal + midir + JACK | **cpal + midir built** (`crates/standalone`, binary `kabl`). Default patch or `--patch <dir>`, live MIDI-in, RT-safe audio callback. Unverified on real hardware (none in this container) — falls back to a WAV self-test render instead. JACK not attempted (cpal's JACK backend needs a running jackd; deferred, not blocking — ALSA/default host covers the common case). `--save-default <dir>` bootstraps a save file. |
+| `standalone`: cpal + midir + JACK | **library + CLI** (`crates/standalone`, binary `kabl`). Since E3b the binary is a command-line tool with no player: `cat`/`pack`/`unpack`, `--save-default <file>`, and a WAV self-test render of the default patch or `--patch <file>`. Live play (audio out, MIDI in) is `kabl-ui` only, which uses this crate as a library. JACK not attempted (cpal's JACK backend needs a running jackd; deferred, not blocking — ALSA/default host covers the common case). `--save-default <dir>` bootstraps a save file. |
 | **v1 accept test** (play a 4-voice MIDI chord, repatch live no click, undo, save, reload, replay construction log; potato gate passes) | **infrastructure complete, unverified end-to-end.** `kabl-ui` provides live repatch, undo/redo, and real save/reload now. Nothing here has been exercised on real audio/MIDI hardware or a real display by a person. |
 
 Bottom line: the *risky architectural bets* (event-sourced patch, cable-as-node swap mechanism,
@@ -770,15 +770,10 @@ crates/
                                 -> VoiceEvent, control thread, uses VoiceAllocator), apply_
                                 voice_event (audio thread, no allocation). 13 tests in
                                 tests/lib_logic.rs, all hardware-independent.
-                 main.rs   - the actual cpal+midir wiring: opens default output device + first
-                                MIDI port, runs PatchEngine live. `--patch <dir>` loads a saved
-                                patch (kabl_core::load) instead of default_patch(); `--save-
-                                default <dir>` writes default_patch() out and exits, a starting
-                                point for kabl-ui. Falls back to rendering target/spike-renders/
-                                standalone_selftest.wav if no usable audio device is found (this
-                                container's case) instead of doing nothing observable. NOT
-                                verified against real audio/MIDI hardware -- none exists in this
-                                container. 4 tests in tests/persistence.rs (round-trip exactness,
+                 main.rs   - the `kabl` CLI (no player since E3b; live play is kabl-ui):
+                                cat/pack/unpack, `--save-default <file>` writes default_patch()
+                                out, and otherwise renders target/spike-renders/
+                                standalone_selftest.wav from default_patch() or `--patch <file>`. 4 tests in tests/persistence.rs (round-trip exactness,
                                 bit-identical replay, real undo history preserved). See
                                 decisions.md "Standalone binary" and "Persistence".
   ui/          REAL, first version. Binary `kabl-ui` (cargo run -p kabl-ui). Depends on
@@ -848,8 +843,7 @@ cargo fmt --all -- --check
 taskset -c 0 cargo bench -p kabl-engine --bench s2_potato
 taskset -c 0 cargo bench -p kabl-engine --bench s3_simd_voices
 
-# Play it live, no UI (needs real audio output + optionally a MIDI controller; on Linux, cpal
-# needs libasound2-dev installed to build at all -- see decisions.md "Standalone binary"):
+# CLI, no player (since E3b): .kabl file tools, --save-default, and a self-test WAV render:
 cargo run -p kabl-standalone
 
 # Play it live WITH the patchbay UI (same hardware needs as above, plus a display; on Linux also

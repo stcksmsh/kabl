@@ -420,6 +420,9 @@ struct Shared {
     cc_epochs: [AtomicU64; automation::SLOTS],
     cc_values: [AtomicU32; automation::SLOTS],
     start_reset: AtomicBool,
+    /// The host's transport is playing (published by `process`, read by the editor): a Sounds
+    /// preview is silent then.
+    host_playing: AtomicBool,
 }
 
 impl Shared {
@@ -818,6 +821,9 @@ pub struct Instrument {
     worker: Option<JoinHandle<()>>,
     editor_state: Arc<EguiState>,
     repaint: RepaintNotifier,
+    /// The Sounds preview's audio half, mixed on top of the rack (`mix_preview`). Made on
+    /// `activate` with its UI half, which goes to the editor's browser.
+    preview: Option<kabl_ui::sound_preview::Voice>,
 }
 impl Default for Instrument {
     fn default() -> Self {
@@ -907,6 +913,7 @@ impl Default for Instrument {
             cc_epochs: std::array::from_fn(|_| AtomicU64::new(0)),
             cc_values: std::array::from_fn(|i| AtomicU32::new(initial_values[i].to_bits())),
             start_reset: AtomicBool::new(false),
+            host_playing: AtomicBool::new(false),
             tail_samples: AtomicU64::new(tail::samples(&kabl_standalone::default_patch(), 48000.0)),
         });
         let (event_tx, events) = rtrb::RingBuffer::new(4096);
@@ -939,6 +946,7 @@ impl Default for Instrument {
                                 .map(|t| automation::normalized(c.editor.state(), t))
                         });
                         c.view.host_clock = worker_shared.native_value(17, false) >= 0.5;
+                        c.view.host_playing = worker_shared.host_playing.load(Ordering::Relaxed);
                         let Control { editor, view, .. } = &mut *c;
                         kabl_ui::perform::apply_cc(
                             editor,
@@ -996,6 +1004,7 @@ impl Default for Instrument {
             worker: Some(worker),
             editor_state: EguiState::from_size(LogicalSize::new(1180.0, 680.0), 1.0),
             repaint: RepaintNotifier::new(),
+            preview: None,
         }
     }
 }
@@ -1021,7 +1030,9 @@ impl Instrument {
             self.session = self.pending.take();
             self.timeline.reset();
             self.raw_position = None;
-            self.schedule = schedule::Schedule::new(self.session.as_ref().unwrap().slot_values);
+            if let Some(session) = &self.session {
+                self.schedule = schedule::Schedule::new(session.slot_values);
+            }
         }
     }
     fn live_params(&mut self) -> (u32, [f32; automation::SLOTS]) {
@@ -1069,6 +1080,30 @@ impl Instrument {
         notify.fetch_or(mask, Ordering::Release);
         (0, [0.0; automation::SLOTS])
     }
+    /// The Sounds preview, on top of the rendered rack (no allocation). While the host's
+    /// transport plays it is silent and a clip still sounding ends: the host's music is the
+    /// only thing on the track. A host that gives no transport counts as stopped.
+    fn mix_preview(&mut self, left: &mut [f32], right: &mut [f32]) {
+        let playing = self
+            .raw_position
+            .is_some_and(|(position, _)| position.playing);
+        self.shared.host_playing.store(playing, Ordering::Relaxed);
+        let Some(voice) = self.preview.as_mut() else {
+            return;
+        };
+        voice.poll();
+        if playing {
+            voice.silence();
+        } else {
+            for (l, r) in left.iter_mut().zip(right.iter_mut()) {
+                let (a, b) = voice.frame();
+                *l += a;
+                *r += b;
+            }
+        }
+        voice.report();
+    }
+
     fn render(&mut self, left: &mut [f32], right: &mut [f32]) {
         let Some(s) = &mut self.session else {
             left.fill(0.0);
@@ -1212,6 +1247,10 @@ impl Plugin for Instrument {
             .store(tail::samples(&c.patch, c.rate), Ordering::Relaxed);
         self.rate = config.sample_rate;
         c.view.sample_rate = c.rate;
+        // The Sounds preview plays through this instance's own output.
+        let (player, voice) = kabl_ui::sound_preview::channel(c.handle.clone());
+        c.view.browser.clips.attach(Some(player));
+        self.preview = Some(voice);
         c.delivery = delivery;
         c.cc = cc;
         c.reports = reports;
@@ -1385,6 +1424,7 @@ impl Plugin for Instrument {
         if channels.len() >= 2 {
             let (left, right) = channels.split_at_mut(1);
             self.render(left[0], right[0]);
+            self.mix_preview(left[0], right[0]);
         }
         // Before the input port existed, anything a host mixed onto the track (audio items,
         // sends) passed through an instrument that had no inputs. Keep that for every patch that
@@ -1422,6 +1462,15 @@ impl Plugin for Instrument {
     }
     fn deactivate(&mut self) {
         self.session = None;
+        self.preview = None;
+        self.shared
+            .control
+            .lock()
+            .unwrap()
+            .view
+            .browser
+            .clips
+            .attach(None);
         self.pending = None;
         while let Ok(s) = self.loads.pop() {
             drop(s);
@@ -1809,6 +1858,86 @@ mod tests {
         }
         assert_no_alloc(|| p.render(&mut left, &mut right));
         left
+    }
+    /// A stereo clip of `frames` frames at a constant 0.25, and the preview channel's UI half
+    /// (the voice is installed in `p`).
+    fn preview_for(
+        p: &mut Instrument,
+        frames: usize,
+    ) -> (kabl_ui::sound_preview::Player, kabl_ui::sound_preview::Clip) {
+        let handle = p.shared.control.lock().unwrap().handle.clone();
+        let (player, voice) = kabl_ui::sound_preview::channel(handle);
+        p.preview = Some(voice);
+        let clip = kabl_ui::sound_preview::Clip {
+            rate: 48000,
+            samples: vec![0.25; frames * 2],
+            wave: vec![1.0],
+            gain_db: 0.0,
+            bpm: None,
+        };
+        (player, clip)
+    }
+    #[test]
+    fn the_sounds_preview_mixes_on_top_of_the_rack_without_allocating() {
+        let mut p = instrument();
+        let (mut player, clip) = preview_for(&mut p, 300);
+        player.play(&clip).unwrap();
+        // The rack is silent (no note): what comes out is the clip, then silence.
+        let mut l = vec![0.0; 256];
+        let mut r = vec![0.0; 256];
+        p.render(&mut l, &mut r);
+        assert_no_alloc(|| p.mix_preview(&mut l, &mut r));
+        assert!(
+            l.iter().chain(&r).all(|&s| s == 0.25),
+            "the clip, first block"
+        );
+        let mut l = vec![0.0; 256];
+        let mut r = vec![0.0; 256];
+        p.render(&mut l, &mut r);
+        assert_no_alloc(|| p.mix_preview(&mut l, &mut r));
+        assert!(l[..44].iter().all(|&s| s == 0.25), "the rest of the clip");
+        assert!(l[44..].iter().all(|&s| s == 0.0), "then silence");
+        assert!(!p.shared.host_playing.load(Ordering::Relaxed));
+    }
+    #[test]
+    fn the_sounds_preview_is_silent_and_ends_while_the_host_transport_plays() {
+        let mut p = instrument();
+        let (mut player, clip) = preview_for(&mut p, 4800);
+        player.play(&clip).unwrap();
+        p.raw_position = Some((
+            schedule::Position {
+                playing: true,
+                ..Default::default()
+            },
+            256,
+        ));
+        let mut l = vec![0.0; 256];
+        let mut r = vec![0.0; 256];
+        p.render(&mut l, &mut r);
+        assert_no_alloc(|| p.mix_preview(&mut l, &mut r));
+        assert!(
+            l.iter().chain(&r).all(|&s| s == 0.0),
+            "the host's music only"
+        );
+        assert!(
+            p.shared.host_playing.load(Ordering::Relaxed),
+            "the editor is told"
+        );
+        // The transport stops: the clip that was cut does not come back.
+        p.raw_position = Some((schedule::Position::default(), 256));
+        let mut l = vec![0.0; 256];
+        let mut r = vec![0.0; 256];
+        p.render(&mut l, &mut r);
+        assert_no_alloc(|| p.mix_preview(&mut l, &mut r));
+        assert!(l.iter().all(|&s| s == 0.0), "ended, not paused");
+        assert!(!p.shared.host_playing.load(Ordering::Relaxed));
+        // A new request after the stop plays again.
+        player.play(&clip).unwrap();
+        let mut l = vec![0.0; 256];
+        let mut r = vec![0.0; 256];
+        p.render(&mut l, &mut r);
+        assert_no_alloc(|| p.mix_preview(&mut l, &mut r));
+        assert!(l.iter().all(|&s| s == 0.25));
     }
     #[test]
     fn reset_repeats_sound_clears_sustain_and_is_allocation_free() {

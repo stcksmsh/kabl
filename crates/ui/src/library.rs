@@ -149,6 +149,10 @@ pub struct Prefs {
     /// Remembered answer of the custom-code notice per content hash (lower-case hex SHA-256):
     /// true = Open, false = Cancel.
     pub code_trust: std::collections::BTreeMap<String, bool>,
+    /// "Preview when selected" in the Sounds scene. Off until the user turns it on.
+    pub preview_on_select: bool,
+    /// The first-run tour was finished or skipped: it is not shown again.
+    pub first_run_done: bool,
 }
 
 #[derive(Debug)]

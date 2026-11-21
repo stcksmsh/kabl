@@ -5,9 +5,9 @@
 //! an envelope follower per band tracks how loud each slice is. The same number of band-pass
 //! filters split each carrier channel, and each carrier slice is multiplied by its modulator
 //! envelope and summed. Every filter is two cascaded TPT state-variable band-passes
-//! (Zavalishin, ch. 4), each normalised to unity at its centre and widened (`WIDEN`) so the
-//! cascade's −3 dB width equals the band's slot: neighbours cross at about −3 dB. Bandwidth
-//! follows the local band spacing. The carrier is filtered per channel, so a stereo carrier
+//! (Zavalishin, ch. 4), each normalised to unity at its centre. A band is narrower than its
+//! slot (`WIDEN`), so neighbours overlap little and each band carries its own part of the
+//! voice. Bandwidth follows the local band spacing. The carrier is filtered per channel, so a stereo carrier
 //! keeps its width; the envelopes are shared.
 //!
 //! **Bands.** Centres run from `low_hz` to `high_hz`. `spacing` 0 is logarithmic (equal
@@ -26,15 +26,22 @@
 //! voice is within about 5 dB at 8 bands and at 32 (each band hears less of it, and there are more). Each envelope is capped at 16.
 //!
 //! **Unvoiced.** A vocoder loses consonants: `s`, `t`, `f` are noise, and a saw has no noise.
-//! `hf` mixes in white noise band-passed around 5.5 kHz (about 2.5 kHz wide, 4 to 7.5 kHz; the sibilant range), shaped by the
+//! Two paths bring them back, both following the carrier's level (a follower of it, 5 ms
+//! attack, 80 ms release), so a voice with no synth under it is silent, not whispering, and a
+//! quiet synth has quiet consonants.
+//!
+//! `thru` passes the voice's own highs (above 5 kHz, 4th-order high-pass) to the output: the
+//! consonants as they were spoken. They pass at a fifth of full level while the voice is voiced
+//! and in full while it is unvoiced (see below), so vowels keep the carrier's colour.
+//!
+//! `hf` adds white noise band-limited to 3 … 10 kHz (4th-order each side) (the sibilant range), shaped by the
 //! follower of the modulator above 5 kHz (fixed 3 ms attack, 35 ms release), but only while the
-//! voice is mostly above 5 kHz: the noise is closed while the high follower is under 15 % of
+//! voice is mostly above 5 kHz: the noise is closed while the high follower is under 10 % of
 //! high plus low and fully open from 40 %. Vowels, which have a little energy up there, and a
-//! microphone's floor stay clean; `s`, `t`, `f` open it. `hf` 0 skips the path (nothing added,
-//! exactly the clean vocoder); `hf` glides like the other controls. Left and right get separate
-//! noise. The noise sounds only while the carrier does
-//! (a follower of the carrier's level, full from −34 dBFS): a voice with no synth under it is
-//! silent, not whispering.
+//! microphone's floor stay clean; `s`, `t`, `f` open it. Left and right get separate noise.
+//!
+//! `hf` and `thru` at 0 skip the path (nothing added, exactly the clean vocoder); both glide
+//! like the other controls.
 //!
 //! **Mix.** 0 is the carrier only, 1 the vocoded sound only. An unpatched `mod` is silence:
 //! the vocoded part is silent too.
@@ -61,7 +68,7 @@ pub const MAX_BANDS: usize = 32;
 const PORTS: &[PortInfo] = &[STEREO_IN, port("mod", PortType::Audio, true), STEREO_OUT];
 
 const PARAMS: &[ParamInfo] = &[
-    param("bands", 8.0, MAX_BANDS as f32, 16.0, "bands", Taper::Linear),
+    param("bands", 8.0, MAX_BANDS as f32, 24.0, "bands", Taper::Linear),
     param("spacing", 0.0, 1.0, 0.0, "", Taper::Linear),
     param("low_hz", 60.0, 400.0, 120.0, "Hz", Taper::Exponential),
     param("high_hz", 3000.0, 16000.0, 9000.0, "Hz", Taper::Exponential),
@@ -71,6 +78,7 @@ const PARAMS: &[ParamInfo] = &[
     param("hf", 0.0, 1.0, 0.35, "", Taper::Linear),
     param("drive_db", 0.0, 36.0, 18.0, "dB", Taper::Linear),
     param("mix", 0.0, 1.0, 1.0, "", Taper::Linear),
+    param("thru", 0.0, 1.0, 0.5, "", Taper::Linear),
 ];
 
 pub static VOCODER_INFO: ModuleInfo = ModuleInfo {
@@ -78,7 +86,7 @@ pub static VOCODER_INFO: ModuleInfo = ModuleInfo {
     name: "Vocoder",
     category: Category::Effect,
     rate: Rate::Global,
-    explain: "Makes a synth speak. The shape of the sound on mod (a voice) is stamped on the synth: a robot voice. Bands is the detail, shift moves the voice up or down, hf keeps the s and t sounds.",
+    explain: "Makes a synth speak. The shape of the sound on mod (a voice) is stamped on the synth: a robot voice. Bands is the detail, shift moves the voice up or down, hf and thru keep the s and t sounds.",
     lesson: None,
     requires: &[],
     ports: PORTS,
@@ -96,31 +104,37 @@ pub static VOCODER_INFO: ModuleInfo = ModuleInfo {
 const GLIDE_TAU_S: f32 = 0.02;
 /// Samples per parameter read and filter redesign.
 const SUB: usize = 16;
-/// Each stage's width against the slot, so two cascaded stages measure the slot at −3 dB
-/// (two identical band-passes are 0.644 as wide as one).
-const WIDEN: f32 = 1.55;
+/// Each stage's width against the slot. Two cascaded stages are 0.644 as wide as one, so at
+/// 0.9 a band's −3 dB width is about 0.6 of its slot and neighbours cross well below −3 dB:
+/// less overlap keeps the bands apart, which a voice needs to be understood (1.55, where they
+/// crossed at −3 dB, measured worse against a recorded voice).
+const WIDEN: f32 = 0.9;
 /// Peak to mean-absolute: a rectified band-limited signal averages about 0.8 of its RMS.
 const DETECT: f32 = 1.25;
+/// Level the narrower bands lose against the -3 dB crossover they replaced (2.7 dB on a noise
+/// voice), given back so the vocoder is as loud as before.
+const MAKEUP: f32 = 1.36;
 const ENV_MAX: f32 = 16.0;
 const INPUT_MAX: f32 = 16.0;
-/// The unvoiced path: the voice is followed above `HF_HZ`; the noise it shapes is a band
-/// around `HF_NOISE_HZ` (two cascaded band-passes of `k` = `HF_NOISE_K`, about 2.5 kHz wide), not
-/// everything up to Nyquist, and sits at `NOISE_REF` RMS at full envelope, about the level of a
-/// saw's upper harmonics, which are quiet.
+/// The unvoiced path: the voice is followed above `HF_HZ`; the noise it shapes is a band from
+/// `NOISE_LO_HZ` to `NOISE_HI_HZ` (4th-order high-pass, then 4th-order low-pass), not
+/// everything up to Nyquist, and sits at `NOISE_REF` RMS at full envelope and a full-scale
+/// carrier. The voice's own highs (above `HF_HZ`) pass at `THRU_REF` times `thru`, at
+/// `THRU_VOICED` of that on voiced frames and in full on unvoiced ones.
 const HF_HZ: f32 = 5000.0;
-const HF_NOISE_HZ: f32 = 5500.0;
-const HF_NOISE_K: f32 = 0.55;
-const HF_NOISE_BW: f32 = 2500.0;
-const NOISE_REF: f32 = 0.12;
+const NOISE_LO_HZ: f32 = 3000.0;
+const NOISE_HI_HZ: f32 = 10000.0;
+const NOISE_REF: f32 = 0.25;
+const THRU_REF: f32 = 1.0;
+const THRU_VOICED: f32 = 0.2;
 const HF_ATTACK_MS: f32 = 3.0;
 const HF_RELEASE_MS: f32 = 35.0;
-/// The noise is closed while the voice's share above `HF_HZ` is under `UNVOICED_FROM` and fully
+/// The noise (and most of the passthrough) is closed while the voice's share above `HF_HZ` is under `UNVOICED_FROM` and fully
 /// open from `UNVOICED_FULL`.
-const UNVOICED_FROM: f32 = 0.15;
+const UNVOICED_FROM: f32 = 0.1;
 const UNVOICED_FULL: f32 = 0.4;
 const CAR_ATTACK_MS: f32 = 5.0;
 const CAR_RELEASE_MS: f32 = 80.0;
-const CAR_GATE: f32 = 50.0;
 
 #[derive(Debug, Clone, Copy)]
 struct Band {
@@ -152,14 +166,15 @@ struct Core {
     drive: Glide,
     mix: Glide,
     hf: Glide,
+    thru: Glide,
     attack: TimeCoef,
     release: TimeCoef,
     /// The settings the filters were last designed for.
     key: [f32; 5],
-    /// Unvoiced path: high-pass state (two stages) for the modulator and each noise, the
-    /// follower, and the two noise generators.
+    /// Unvoiced path: high-pass state (two stages) for the modulator, high- then low-pass state
+    /// (two stages each) for each noise, the follower, and the two noise generators.
     hf_mod: [[f32; 2]; 2],
-    hf_noise: [[[f32; 2]; 2]; 2],
+    hf_noise: [[[[f32; 2]; 2]; 2]; 2],
     hf_env: f32,
     /// Follower of the voice below `HF_HZ`: the noise needs the voice to be mostly above it.
     lf_env: f32,
@@ -187,11 +202,12 @@ impl Vocoder {
                 drive: Glide::default(),
                 mix: Glide::default(),
                 hf: Glide::default(),
+                thru: Glide::default(),
                 attack: TimeCoef::new(),
                 release: TimeCoef::new(),
                 key: [f32::NAN; 5],
                 hf_mod: [[0.0; 2]; 2],
-                hf_noise: [[[0.0; 2]; 2]; 2],
+                hf_noise: [[[[0.0; 2]; 2]; 2]; 2],
                 hf_env: 0.0,
                 lf_env: 0.0,
                 car_env: 0.0,
@@ -297,6 +313,17 @@ fn hp_stage(ic: &mut [f32; 2], co: &[f32; 4], x: f32) -> f32 {
     x - co[3] * v1 - v2
 }
 
+/// A 2nd-order low-pass stage (TPT state-variable, `v2`).
+#[inline(always)]
+fn lp_stage(ic: &mut [f32; 2], co: &[f32; 4], x: f32) -> f32 {
+    let v3 = x - ic[1];
+    let v1 = co[0] * ic[0] + co[1] * v3;
+    let v2 = ic[1] + co[1] * ic[0] + co[2] * v3;
+    ic[0] = 2.0 * v1 - ic[0];
+    ic[1] = 2.0 * v2 - ic[1];
+    v2
+}
+
 #[inline(always)]
 fn white(rng: &mut u32) -> f32 {
     *rng ^= *rng << 13;
@@ -352,12 +379,15 @@ impl Module for Vocoder {
             io.param(7),
             io.param(8),
             io.param(9),
+            io.param(10),
         ];
         let kg = coef(GLIDE_TAU_S, sr / SUB as f32);
         let hp = tpt(HF_HZ.min(0.4 * sr), std::f32::consts::SQRT_2, sr);
-        let nbp = tpt(HF_NOISE_HZ.min(0.4 * sr), HF_NOISE_K, sr);
-        // Unit RMS after the band-pass: white noise is 0.577 RMS and the band takes its share.
-        let noise_gain = NOISE_REF * (0.5 * sr / HF_NOISE_BW).sqrt() / 0.577;
+        let nhp = tpt(NOISE_LO_HZ, std::f32::consts::SQRT_2, sr);
+        let nlp = tpt(NOISE_HI_HZ.min(0.4 * sr), std::f32::consts::SQRT_2, sr);
+        // Unit RMS after the band: white noise is 0.577 RMS and the band takes its share.
+        let noise_bw = NOISE_HI_HZ.min(0.4 * sr) - NOISE_LO_HZ;
+        let noise_gain = NOISE_REF * (0.5 * sr / noise_bw).sqrt() / 0.577;
         let c = &mut self.c;
         let mut i0 = 0;
         while i0 < n {
@@ -378,8 +408,9 @@ impl Module for Vocoder {
             let rel = c.release.get(p[6].at(i0).clamp(5.0, 500.0), sr);
             let hf = c.hf.next(p[7], i0, kg).clamp(0.0, 1.0);
             let drive = c.drive.next(p[8], i0, kg).clamp(0.0, 36.0);
-            let det = DETECT * (drive * NEPER_PER_DB).exp() * (nb as f32 / 16.0).sqrt();
+            let det = DETECT * MAKEUP * (drive * NEPER_PER_DB).exp() * (nb as f32 / 16.0).sqrt();
             let mix = c.mix.next(p[9], i0, kg).clamp(0.0, 1.0);
+            let thru = c.thru.next(p[10], i0, kg).clamp(0.0, 1.0);
 
             let mut x = [[0.0f32; SUB]; 3];
             #[allow(clippy::needless_range_loop)]
@@ -400,7 +431,7 @@ impl Module for Vocoder {
                     }
                 }
             }
-            if hf > 0.0 {
+            if hf > 0.0 || thru > 0.0 {
                 let (ka, kr) = (retention(HF_ATTACK_MS, sr), retention(HF_RELEASE_MS, sr));
                 let (ca, cr) = (retention(CAR_ATTACK_MS, sr), retention(CAR_RELEASE_MS, sr));
                 for j in 0..len {
@@ -419,11 +450,20 @@ impl Module for Vocoder {
                     let level = x[0][j].abs().max(x[1][j].abs());
                     let k = if level > c.car_env { ca } else { cr };
                     c.car_env = level + (c.car_env - level) * k;
-                    // Full from -34 dBFS up: the noise follows the synth, not the voice alone.
-                    let gate = (c.car_env * CAR_GATE).min(1.0);
+                    // Both follow the synth's level, not the voice alone: no synth, no consonants.
+                    let car = c.car_env.min(1.0);
+                    let air = h
+                        * det
+                        * thru
+                        * THRU_REF
+                        * car
+                        * (THRU_VOICED + (1.0 - THRU_VOICED) * unvoiced);
+                    let hiss = c.hf_env * unvoiced * hf * car * noise_gain;
                     for (ch, w) in wet.iter_mut().enumerate() {
-                        let nz = cascade(&mut c.hf_noise[ch], &nbp, white(&mut c.rng[ch]), stage);
-                        w[j] += nz * c.hf_env * unvoiced * hf * gate * noise_gain;
+                        let [hs, ls] = &mut c.hf_noise[ch];
+                        let nz = cascade(hs, &nhp, white(&mut c.rng[ch]), hp_stage);
+                        let nz = cascade(ls, &nlp, nz, lp_stage);
+                        w[j] += air + nz * hiss;
                     }
                 }
             }
