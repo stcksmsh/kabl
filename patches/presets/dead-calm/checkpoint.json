@@ -804,7 +804,7 @@
       },
       "params": {
         "attack_ms": 5.0,
-        "makeup_db": 10.6,
+        "makeup_db": 10.22,
         "ratio": 3.0,
         "release_ms": 300.0,
         "threshold_db": -34.0
@@ -911,7 +911,7 @@
       },
       "params": {
         "decay_ms": 600.0,
-        "level_db": -7.0,
+        "level_db": -10.0,
         "tune_hz": 90.0
       }
     },
@@ -3065,7 +3065,7 @@
         }
       },
       "params": {
-        "amount": -0.25
+        "amount": -0.09
       },
       "steps": []
     },
@@ -3083,7 +3083,7 @@
         }
       },
       "params": {
-        "amount": -0.12500018
+        "amount": -0.04583344
       },
       "steps": []
     }

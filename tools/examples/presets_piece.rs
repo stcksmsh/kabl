@@ -1321,7 +1321,7 @@ fn dead_calm() -> (Rack, Vec<CueDef>) {
                 "x.o.....x.o.....",
             ],
             kick: [-12.0, 1800.0, 6.0, 40.0],
-            levels: [-6.0, -9.0, -12.0, -7.0],
+            levels: [-6.0, -9.0, -12.0, -10.0],
             mix: [0.8, 0.0, 0.0, 0.0],
             snare_decay: 200.0,
             tom: [90.0, 600.0],
@@ -1404,7 +1404,7 @@ fn dead_calm() -> (Rack, Vec<CueDef>) {
     let beat = r.add("lfo", &[("waveform", 2.0), ("sync", 3.0), ("rate_hz", 1.1)]);
     r.wire(h.clock, "gate", beat, "clock");
     r.wire(h.clock, "reset", beat, "reset");
-    depth_route(&mut r, beat, "out", h.comp, "makeup_db", k, "m3", -0.25);
+    depth_route(&mut r, beat, "out", h.comp, "makeup_db", k, "m3", -0.09);
     let stored = r.e.state().modules[&k].params["m3"];
     span(
         &mut r,
@@ -1414,7 +1414,7 @@ fn dead_calm() -> (Rack, Vec<CueDef>) {
         h.comp,
         "compressor",
         "makeup_db",
-        10.0 + 3.0 * stored,
+        10.0 + 1.1 * stored,
         10.0,
     );
     let cues = vec![
