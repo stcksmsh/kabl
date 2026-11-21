@@ -1293,8 +1293,13 @@ fn dead_calm() -> (Rack, Vec<CueDef>) {
             slow("0 0 -4 -4 -7 -7 -2 -2", 6.0, 22.0, -2.0, 900.0, 0.0),
             slow("7 7 3 3 0 0 5 5", 4.0, 16.0, -1.0, 1800.0, -4.0),
             slow("3 3 0 0 8 8 14 14", 4.0, 14.0, -1.0, 2200.0, -8.0),
-            // The dread: a tritone and a semitone above, a slow cluster.
-            slow("6 6 1 1 6 6 1 1", 3.0, 45.0, 0.0, 1500.0, -40.0),
+            // The dread: a tritone and a semitone above, a slow, dark triangle cluster. After the
+            // master filter, so Swell neither hides it nor shares its brightness.
+            Line {
+                wave: 1.0,
+                after: true,
+                ..slow("6 6 1 1 6 6 1 1", 3.0, 45.0, -1.0, 1500.0, -40.0)
+            },
             // A sparse high bell, half the steps play half the time.
             Line {
                 wave: 0.0,
@@ -1316,10 +1321,10 @@ fn dead_calm() -> (Rack, Vec<CueDef>) {
                 "x.o.....x.o.....",
             ],
             kick: [-12.0, 1800.0, 6.0, 40.0],
-            levels: [-6.0, -9.0, -12.0, -10.0],
+            levels: [-6.0, -9.0, -12.0, -7.0],
             mix: [0.8, 0.0, 0.0, 0.0],
             snare_decay: 200.0,
-            tom: [70.0, 600.0],
+            tom: [90.0, 600.0],
             tom_mix: 0.8,
             div: 2.0,
             lens: [16.0; 6],
@@ -1327,12 +1332,12 @@ fn dead_calm() -> (Rack, Vec<CueDef>) {
         play: [2.0, 3.0, 12.0, 0.0, 1800.0, -12.0],
         drive: [3.0, -2.0],
         lad: [180.0, 0.3, 0.0],
-        trim_db: 9.0,
-        comp: [-26.0, 3.0, 300.0, 2.0],
+        trim_db: 1.0,
+        comp: [-34.0, 3.0, 300.0, 10.0],
         duck: None,
         riser: true,
         space: Some(SpaceSpec {
-            echo: [45.0, 2500.0, 2500.0],
+            echo: [45.0, 2500.0, 6000.0],
             sync: 4.0,
             echo_max: 0.4,
             room_decay: 9.0,
@@ -1367,8 +1372,8 @@ fn dead_calm() -> (Rack, Vec<CueDef>) {
         h.lines[3].gain,
         "gain",
         "gain_db",
-        -30.0,
-        -4.0,
+        -40.0,
+        -2.0,
     );
     rise(
         &mut r,
@@ -1377,15 +1382,41 @@ fn dead_calm() -> (Rack, Vec<CueDef>) {
         h.lines[3].tone.unwrap(),
         "filter.svf",
         "cutoff_hz",
-        400.0,
-        4000.0,
+        300.0,
+        1200.0,
     );
-    // Pulse: the heartbeat toms and the low impact come up.
-    // Hall: the echo and room add level; take the stage down by what they add.
-    level_comp(&mut r, &h, 4, h.trim, 4.6);
+    // Hall: the echo and room add level; take the stage down by what they add. The room also
+    // widens as it opens.
+    level_comp(&mut r, &h, 4, h.trim, 6.0);
+    let verb =
+        r.e.state()
+            .modules
+            .iter()
+            .find(|(_, m)| m.kind == "reverb")
+            .map(|(&id, _)| id);
+    rise(&mut r, k, 4, verb.unwrap(), "reverb", "width", 0.0, 100.0);
+    // Pulse: the heartbeat toms and the low impact come up, and the whole stage throbs once a
+    // beat: a clock-locked falling saw on the compressor makeup (after the compression, so it is
+    // not squashed), with the makeup taken down by what the throb adds.
     let kit = h.kit.as_ref().unwrap();
     rise(&mut r, k, 3, kit.out, "mixer", "level1", 0.0, 1.0);
     rise(&mut r, k, 3, kit.out, "mixer", "level2", 0.0, 0.8);
+    let beat = r.add("lfo", &[("waveform", 2.0), ("sync", 3.0), ("rate_hz", 1.1)]);
+    r.wire(h.clock, "gate", beat, "clock");
+    r.wire(h.clock, "reset", beat, "reset");
+    depth_route(&mut r, beat, "out", h.comp, "makeup_db", k, "m3", -0.25);
+    let stored = r.e.state().modules[&k].params["m3"];
+    span(
+        &mut r,
+        k,
+        3,
+        stored,
+        h.comp,
+        "compressor",
+        "makeup_db",
+        10.0 + 3.0 * stored,
+        10.0,
+    );
     let cues = vec![
         CueDef {
             name: "Hush",
