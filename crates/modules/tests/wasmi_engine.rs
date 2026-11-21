@@ -302,10 +302,11 @@ fn an_infinite_loop_runs_out_of_fuel_and_eight_in_a_row_crash() {
 
 #[test]
 fn a_modules_measured_rate_moves_its_fuel_between_floor_and_ceiling() {
-    let us = Duration::from_micros;
+    // Each observation here is one whole 100 us rate window.
+    let win = Duration::from_micros(100);
     let h = Health::new(1, Duration::ZERO);
     // A 100 us share: floor at 1000 fuel/us, ceiling at 4000 fuel/us.
-    h.set_budget_range(100_000, 400_000, us(100));
+    h.set_budget_range(100_000, 400_000, win);
     assert_eq!(h.fuel_range(), (100_000, 400_000));
     assert_eq!(
         h.fuel_budget(),
@@ -313,40 +314,40 @@ fn a_modules_measured_rate_moves_its_fuel_between_floor_and_ceiling() {
         "a new module starts at the ceiling"
     );
 
-    // One late call (10x slower, e.g. preempted) costs a quarter at most.
-    h.observe(4_000, us(10));
-    assert!(h.fuel_budget() >= 300_000, "{}", h.fuel_budget());
-    for _ in 0..64 {
-        h.observe(40_000, us(10));
+    // One slow window (10x slower, e.g. preempted) costs half at most, and is made up.
+    h.observe(40_000, win);
+    assert!(h.fuel_budget() >= 200_000, "{}", h.fuel_budget());
+    for _ in 0..32 {
+        h.observe(400_000, win);
     }
     assert!(h.fuel_budget() >= 390_000, "recovers: {}", h.fuel_budget());
 
-    // Code that burns fuel at the floor rate is reined in within a few calls.
+    // Code that burns fuel at the floor rate is reined in within a few windows.
     for _ in 0..6 {
-        h.observe(10_000, us(10));
+        h.observe(100_000, win);
     }
-    assert!(h.fuel_budget() < 160_000, "{}", h.fuel_budget());
+    assert!(h.fuel_budget() < 110_000, "{}", h.fuel_budget());
     // Slower than the floor: never below the floor (the old, worst-case budget).
-    for _ in 0..64 {
-        h.observe(1_000, us(10));
+    for _ in 0..8 {
+        h.observe(10_000, win);
     }
     assert_eq!(h.fuel_budget(), 100_000);
 
-    // Faster than the ceiling: never above it (the hard cap). Calls too short to time count
-    // for nothing.
-    for _ in 0..256 {
-        h.observe(1_000_000, us(10));
+    // Faster than the ceiling: never above it (the hard cap).
+    for _ in 0..64 {
+        h.observe(100_000_000, win);
     }
     assert_eq!(h.fuel_budget(), 400_000);
-    h.observe(1, Duration::from_nanos(500));
+    // Short calls only add up; alone they move nothing.
+    h.observe(1, Duration::from_micros(1));
     assert_eq!(h.fuel_budget(), 400_000);
 
     // A new share (device change) keeps the measured rate: the fuel scales with the share.
     for _ in 0..64 {
-        h.observe(20_000, us(10));
+        h.observe(200_000, win);
     }
     let before = h.fuel_budget();
-    h.set_budget_range(200_000, 800_000, us(200));
+    h.set_budget_range(200_000, 800_000, Duration::from_micros(200));
     assert!(h.fuel_budget().abs_diff(before * 2) <= 2, "{before}");
 }
 

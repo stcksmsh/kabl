@@ -41,6 +41,9 @@ pub struct Health {
     ceil_fuel: AtomicU64,
     /// Where in that range the module's measured rate puts it, in 1/65536 of the ceiling.
     trust: AtomicU32,
+    /// Fuel and run time of the calls since the trust last moved (see `observe`).
+    acc_fuel: AtomicU64,
+    acc_ns: AtomicU64,
     voices: AtomicU32,
     /// Places this module has in running patches (its lane-0 instances); each asks for a share.
     placements: AtomicU32,
@@ -49,8 +52,8 @@ pub struct Health {
 
 /// `Health::trust` at the ceiling.
 const FULL_TRUST: u32 = 1 << 16;
-/// Calls shorter than this are not timed reliably enough to move the budget.
-const MIN_TIMED: Duration = Duration::from_micros(1);
+/// Run time summed before the measured rate moves the budget: a few dozen typical voice calls.
+const RATE_WINDOW: Duration = Duration::from_micros(100);
 
 impl Health {
     pub fn new(fuel_budget: u64, wall_cap: Duration) -> Arc<Health> {
@@ -65,6 +68,8 @@ impl Health {
             floor_fuel: AtomicU64::new(fuel_budget),
             ceil_fuel: AtomicU64::new(fuel_budget),
             trust: AtomicU32::new(FULL_TRUST),
+            acc_fuel: AtomicU64::new(0),
+            acc_ns: AtomicU64::new(0),
             voices: AtomicU32::new(0),
             placements: AtomicU32::new(0),
             wall_cap_ns: AtomicU64::new(wall_cap.as_nanos() as u64),
@@ -141,22 +146,29 @@ impl Health {
         (self.floor_fuel.load(Relaxed), self.ceil_fuel.load(Relaxed))
     }
 
-    /// Feeds one call's cost back into the budget (audio thread; atomics only). `fuel` burned
-    /// in `took`: the rate it ran at, against the ceiling's rate, moves the trust down quickly
-    /// (a quarter of the way) and up slowly (a sixteenth), so a slow module is reined in within
-    /// a few calls and one late call (preemption) costs little.
+    /// Feeds one call's cost back into the budget (audio thread; atomics only). Calls are
+    /// summed until they add up to `RATE_WINDOW` of run time; the rate of the sum (total fuel
+    /// over total time, so one jittery 5 µs call barely moves it), against the ceiling's rate,
+    /// then moves the trust half the way down or a quarter of the way up.
     pub fn observe(&self, fuel: u64, took: Duration) {
-        let ceil = self.ceil_fuel.load(Relaxed);
-        let cap = self.wall_cap_ns.load(Relaxed);
-        if took < MIN_TIMED || ceil == 0 || cap == 0 {
+        let ns = self.acc_ns.fetch_add(took.as_nanos() as u64, Relaxed) + took.as_nanos() as u64;
+        let fuel = self.acc_fuel.fetch_add(fuel, Relaxed) + fuel;
+        if ns < RATE_WINDOW.as_nanos() as u64 {
             return;
         }
-        // The rate this call ran at, relative to the ceiling's rate (ceil fuel per cap).
+        self.acc_ns.store(0, Relaxed);
+        self.acc_fuel.store(0, Relaxed);
+        let ceil = self.ceil_fuel.load(Relaxed);
+        let cap = self.wall_cap_ns.load(Relaxed);
+        if ceil == 0 || cap == 0 {
+            return;
+        }
+        // The rate the window ran at, relative to the ceiling's rate (ceil fuel per cap).
         let sample = (u128::from(fuel) * u128::from(cap) * u128::from(FULL_TRUST)
-            / (took.as_nanos() * u128::from(ceil)))
+            / (u128::from(ns) * u128::from(ceil)))
         .min(u128::from(FULL_TRUST)) as i64;
         let old = i64::from(self.trust.load(Relaxed));
-        let step = if sample < old { 4 } else { 16 };
+        let step = if sample < old { 2 } else { 4 };
         let delta = match (sample - old) / step {
             0 => sample - old, // close enough: settle on it
             d => d,
