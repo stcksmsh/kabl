@@ -1096,15 +1096,14 @@ fn gantry() -> (Rack, Vec<CueDef>) {
                 post: true,
                 ..Line::new("- -3 - -3 - -3 - -3")
             },
-            // The acid stab: A minor, off the beat, an octave above the pad so the two do not
-            // share notes, and dry beside the rumble: neither the kick duck nor Climb's level
-            // compensation pulls it under the rest.
+            // The acid stab: A minor, off the beat. It joins dry beside the rumble, out of Climb's
+            // level compensation, and the kick ducks it only gently (see Acid below).
             Line {
                 wave: 3.0,
                 pw: 30.0,
                 uni: 2.0,
                 det: 12.0,
-                oct: 0.0,
+                oct: -1.0,
                 gate: 40.0,
                 env: [1.0, 110.0, 0.0, 60.0],
                 db: -6.0,
@@ -1112,15 +1111,16 @@ fn gantry() -> (Rack, Vec<CueDef>) {
                 post: true,
                 ..Line::new("9! - - 9 - 12 - - 9! - 16 - 12 - 7 -")
             },
-            // The pad: a bar per step, A, A, F, G.
+            // The pad: a bar per step, A, A, F, G, an octave under the stab (A2 and E3) so the two
+            // do not share notes.
             Line {
                 wave: 2.0,
                 uni: 5.0,
                 det: 18.0,
-                oct: -1.0,
+                oct: -2.0,
                 gate: 100.0,
                 env: [400.0, 300.0, 0.9, 700.0],
-                db: -14.0,
+                db: -17.0,
                 div: 16.0,
                 ..Line::new("9 9 5 7")
             },
@@ -1128,10 +1128,10 @@ fn gantry() -> (Rack, Vec<CueDef>) {
                 wave: 2.0,
                 uni: 5.0,
                 det: 18.0,
-                oct: -1.0,
+                oct: -2.0,
                 gate: 100.0,
                 env: [400.0, 300.0, 0.9, 700.0],
-                db: -14.0,
+                db: -17.0,
                 div: 16.0,
                 ..Line::new("16 16 12 14")
             },
@@ -1195,7 +1195,7 @@ fn gantry() -> (Rack, Vec<CueDef>) {
     level_comp(&mut r, &h, 1, h.trim, 8.0);
     // Rumble: the bass part from out to full, and its notes lengthen.
     let rum = &h.lines[0];
-    rise(&mut r, k, 2, rum.gain, "gain", "gain_db", -34.0, -9.0);
+    rise(&mut r, k, 2, rum.gain, "gain", "gain_db", -34.0, -10.0);
     rise(&mut r, k, 2, rum.seq, "seq", "gate_len", 25.0, 90.0);
     rise(
         &mut r,
@@ -1219,9 +1219,14 @@ fn gantry() -> (Rack, Vec<CueDef>) {
         "filter.svf",
         "resonance",
         0.15,
-        0.7,
+        0.78,
     );
-    rise(&mut r, k, 3, acid.gain, "gain", "gain_db", -21.5, -20.5);
+    // The gain falls as the stab rings longer and squeals, so it sits at about the same level
+    // over the mix at every setting.
+    rise(&mut r, k, 3, acid.gain, "gain", "gain_db", -18.0, -21.0);
+    // The kick duck's gain reduction takes the stab down by 15 % of what the music loses, so
+    // the stab still pumps with the kick without sinking under it.
+    r.route(h.duck.unwrap(), "gr", acid.gain, "gain_db", -0.15 / 84.0);
     // Pump: the kick ducks the music harder.
     let duck = h.duck.unwrap();
     rise(&mut r, k, 4, duck, "compressor", "threshold_db", 0.0, -45.0);
