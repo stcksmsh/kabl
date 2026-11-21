@@ -66,10 +66,19 @@ into the build), Impact (no morph), Aftermath (16-beat morph back and a long roo
 
 | Macro | Stored | 0 to 1 | Moves |
 |---|---|---|---|
-| Swell | 0.15 | closed and quiet to open with a riser fading in | master ladder 180 Hz to 9 kHz, riser, drone gain; level-type |
-| Dread | 0.10 | nothing to a dissonant cluster that opens | cluster gain and its filter |
-| Pulse | 0.20 | nothing to a heartbeat of toms and the impact | tom and impact mixer levels; level-type |
-| Hall | 0.60 | dry to a long echo and a 9 s room | echo and room mix, **level-compensated by 4.6 dB** over its travel |
+| Swell | 0.15 | brightness: closed and quiet to open with a riser fading in | master ladder 180 Hz to 9 kHz, riser, drone gain; level-type |
+| Dread | 0.10 | harmony: nothing to a dark, beating tritone and semitone cluster | cluster gain -40 to -2 dB and its filter 300 Hz to 1.2 kHz (a triangle cluster an octave down, after the master filter so Swell does not hide it) |
+| Pulse | 0.20 | rhythm: still to a heartbeat; toms and the impact come in and the stage throbs once a beat | tom and impact mixer levels, depth of a beat-locked falling saw on the compressor makeup (0 to 6 dB), makeup -3 dB over the travel |
+| Hall | 0.60 | space: dry and narrow to a long echo and a wide 9 s room | echo and room mix, room width 0 to 100 %, **level-compensated by 6 dB** over its travel |
+
+Distinctness (owner: "the macros seem similar"). Measured on the macro-alone renders at 0 and 1 (`macro_audit`
+steps): change vectors over level, centroid, band balance, onsets, beat-rate level swing, stereo width,
+flatness and pitch-class content. Before: Dread and Pulse barely moved the sound at the stored Swell (the
+cluster sat under the closed master filter, the toms under the drone; change 3.5 and 3.0 against Swell's
+14.7) and Swell and Dread pointed the same way (cosine 0.74). Now every macro moves 7.8 to 15 and the
+largest cosine between two macros is 0.27 (mean 0.15): Swell brightness, Dread pitch content, Pulse a
+beat-rate level swing of 8.5 dB, Hall stereo width. The cue run keeps its stored values; per cue the
+loudness moves 0.1 to 0.9 dB (Impact the most, with its throb) and the stereo width a little.
 
 Flags: Swell and Pulse are level-type (they add parts). The piece's own first bar is nearly silent (every
 line steps once per bar), so the tours were rendered after a 2-bar pre-roll (see Tools).
@@ -106,7 +115,7 @@ Build, Drop (sub and reese in), Rolldown (ghost snares, busy hats).
 | Macro | Stored | 0 to 1 | Moves |
 |---|---|---|---|
 | Weight | 0.30 | no sub to a deep floor-shaking sub; level-type | sub gain -36 to -4 dB |
-| Reese | 0.30 | slow beating to fast, biting beating | reese detune 4 to 40, its filter 500 Hz to 2.5 kHz, bus drive 4 to 20 dB with trim compensating |
+| Reese | 0.30 | slow, subtle beating to a moderate one | reese detune 2 to 18 cents (beat on the F2 fundamental 0.10 Hz at 0, 0.34 Hz stored, 0.91 Hz at 1; the first take was 4 to 40 cents, 0.20, 0.75, 2.0 Hz; the top was 14 cents, 0.71 Hz, before the owner asked for a little more at 1), its filter 500 Hz to 1.8 kHz, bus drive 4 to 14 dB with trim -3 to -8 dB |
 | Break | 0.15 | plain two-step to ghost snares and busy hats | the ghost-snare and hat mixer levels (top kit mixer) |
 | Haze | 0.50 | dry to echo and room | echo and room mix |
 
@@ -192,17 +201,17 @@ Loudness and peak per piece (`presets_piece levels`; peak dBFS / loudness dB, at
 | Piece | normal | all at 1 | m1 | m2 | m3 | m4 |
 |---|---|---|---|---|---|---|
 | Gantry | -4.3 / -19.2 | -5.2 / -18.2 | -5.6 / -21.1 | -2.7 / -17.1 | -2.7 / -19.1 | -5.8 / -19.2 |
-| Dead Calm | -8.1 / -19.5 | -2.7 / -17.7 | -8.5 / -20.2 | -6.4 / -19.6 | -4.1 / -19.2 | -4.1 / -17.2 |
+| Dead Calm | -7.9 / -19.3 | -2.0 / -17.5 | -8.9 / -20.0 | -6.2 / -18.0 | -3.6 / -20.1 | -2.4 / -15.3 |
 | Pawn Shop | -1.8 / -18.8 | -1.8 / -19.1 | -1.8 / -18.7 | -1.8 / -18.6 | -1.8 / -19.1 | -1.8 / -19.3 |
 | Laundromat | -3.0 / -17.4 | -6.8 / -18.7 | -3.8 / -18.4 | -3.5 / -17.0 | -3.2 / -17.2 | -6.8 / -19.1 |
-| Spillway | -4.5 / -20.4 | -2.4 / -17.9 | -3.8 / -19.3 | -4.9 / -19.0 | -4.3 / -20.1 | -4.3 / -20.2 |
+| Spillway | -4.4 / -20.6 | -1.9 / -17.8 | -4.3 / -19.5 | -4.9 / -19.4 | -4.1 / -20.3 | -3.9 / -20.4 |
 | Balcony | -3.2 / -18.2 | -4.1 / -19.2 | -4.1 / -19.4 | -3.1 / -18.0 | -3.6 / -18.1 | -3.6 / -18.2 |
 | Estuary | -7.7 / -20.4 | -3.4 / -18.4 | -8.2 / -22.0 | -5.1 / -18.9 | -7.8 / -18.9 | -4.1 / -18.0 |
 | Lichen | -2.0 / -20.0 | -1.9 / -19.6 | -2.0 / -19.8 | -2.2 / -20.0 | -2.3 / -19.3 | -3.2 / -20.5 |
 | Roller Rink | -4.5 / -18.5 | -2.1 / -18.1 | -4.2 / -19.8 | -4.3 / -18.0 | -4.5 / -18.4 | -3.9 / -18.5 |
 
 Combination: all macros at 1 stays within about 2.5 dB of the stored loudness for every piece (Dead Calm
-+1.8, where the swell and the impact are meant to build; Estuary +2.0; Spillway +2.5, the sub and the reese
++1.8, where the swell and the impact are meant to build; Estuary +2.0; Spillway +2.7, the sub and the reese
 at full); no combination clips. The factory level test (`factory_levels_hold_the_target`) passes.
 
 Clips (checked on the mp3s): cue runs 62-92 s at -14.1 to -17.2 LUFS, peaks -2.0 to -3.9 dBFS; tours 84 s
@@ -210,9 +219,11 @@ Clips (checked on the mp3s): cue runs 62-92 s at -14.1 to -17.2 LUFS, peaks -2.0
 levels (6 s at macro 0 against 6 s at macro 1) are within 3 dB for every macro of every piece except the
 level-type ones (Dead Calm Swell about -3 dB).
 
-Level compensation of the two space macros that added level: Dead Calm Hall (4.6 dB) and Estuary Wash
-(2.5 dB). Measured on the tour windows (6 s at 0, 6 s at 1): Hall +0.6 dB, Wash +1.6 dB; on steady renders
-Hall -1.1 dB, and Wash +2.3 dB before its compensation.
+Level compensation of the two space macros that added level: Dead Calm Hall (6 dB) and Estuary Wash
+(2.5 dB). Measured on the tour windows (6 s at 0, 6 s at 1): Hall +0.1 dB, Wash +1.6 dB; on steady renders
+Hall -1.5 dB, and Wash +2.3 dB before its compensation. Dead Calm after its macro redesign: cue run -15.3
+LUFS, peak -2.1 dBFS; tour -15.4 LUFS, peak -1.1 dBFS (Hall at 1, the widest room); tour holds Swell -2.2,
+Dread +0.3, Pulse -2.1, Hall +0.1 dB.
 
 ## Tools
 
