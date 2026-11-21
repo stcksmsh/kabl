@@ -812,3 +812,45 @@ fn an_sdk_module_survives_running_out_of_fuel_mid_block() {
         assert!(inst.reset().is_ok(), "{}", ex.kind);
     }
 }
+
+/// The same code placed several times in a patch gets a share per place, within the 50 % total
+/// (all copies of one blob share one `Health`, so one share split eight ways starved them).
+#[test]
+fn each_place_of_a_module_gets_its_own_share_within_the_total() {
+    let budget = Budget::new(Calibration::fixed(1000.0), SR, N as u32);
+    let g = group(&wasm(1, "", BIQUAD), 8, 1, Duration::from_secs(1));
+    budget.register(g.health());
+    let mut voices: Vec<CodeModule> = (0..8).map(|_| voice(&g)).collect();
+    budget.rebalance();
+    assert_eq!(
+        g.health().fuel_budget(),
+        333_333,
+        "no places yet: one share"
+    );
+    voices[0].count_as_placement();
+    voices[0].count_as_placement();
+    budget.rebalance();
+    assert_eq!(g.health().placements(), 1, "counted once per instance");
+    assert_eq!(g.health().fuel_budget(), 333_333);
+    voices[4].count_as_placement();
+    budget.rebalance();
+    assert_eq!(g.health().fuel_budget(), 666_666, "two places: two shares");
+    for v in &mut voices[1..4] {
+        v.count_as_placement();
+    }
+    budget.rebalance();
+    assert_eq!(g.health().placements(), 5);
+    assert_eq!(
+        g.health().fuel_budget(),
+        666_666,
+        "capped at the 50 % total"
+    );
+    drop(voices.split_off(1));
+    budget.rebalance();
+    assert_eq!(
+        g.health().placements(),
+        1,
+        "dropping a place frees its share"
+    );
+    assert_eq!(g.health().fuel_budget(), 333_333);
+}

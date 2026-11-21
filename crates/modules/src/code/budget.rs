@@ -231,7 +231,11 @@ fn apply(s: &mut State) {
     let requests: Vec<f64> = s
         .entries
         .iter()
-        .map(|e| if counts(e) { e.request } else { 0.0 })
+        .map(|e| match e.health.upgrade() {
+            // One share per place in a patch; the 50 % total still caps them together.
+            Some(h) if counts(e) => e.request * f64::from(h.placements().max(1)),
+            _ => 0.0,
+        })
         .collect();
     let shares = scaled_shares(&requests);
     for (e, share) in s.entries.iter().zip(shares) {

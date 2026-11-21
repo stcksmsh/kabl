@@ -42,6 +42,8 @@ pub struct Health {
     /// Where in that range the module's measured rate puts it, in 1/65536 of the ceiling.
     trust: AtomicU32,
     voices: AtomicU32,
+    /// Places this module has in running patches (its lane-0 instances); each asks for a share.
+    placements: AtomicU32,
     wall_cap_ns: AtomicU64,
 }
 
@@ -64,6 +66,7 @@ impl Health {
             ceil_fuel: AtomicU64::new(fuel_budget),
             trust: AtomicU32::new(FULL_TRUST),
             voices: AtomicU32::new(0),
+            placements: AtomicU32::new(0),
             wall_cap_ns: AtomicU64::new(wall_cap.as_nanos() as u64),
         })
     }
@@ -170,6 +173,12 @@ impl Health {
         self.voices.load(Relaxed)
     }
 
+    /// Places this module has in running patches: the same code placed six times asks for six
+    /// shares (within the 50 % total), not one share split six ways.
+    pub fn placements(&self) -> u32 {
+        self.placements.load(Relaxed)
+    }
+
     /// What one voice's call may spend: the module's budget split across its voices, so that all
     /// voices together stay within the module's 25 % (and, via `Budget`, the global 50 %).
     pub fn voice_fuel(&self) -> u64 {
@@ -213,6 +222,8 @@ pub struct CodeModule {
     fade_left: usize,
     consecutive_overruns: u32,
     fading_dead: bool,
+    /// This instance stands for one place of the module in a patch (see `count_as_placement`).
+    placed: bool,
     /// Where the song's settings for this instance are handed over (see `state::StateCell`).
     cell: Option<Arc<super::state::StateCell>>,
 }
@@ -242,7 +253,19 @@ impl CodeModule {
             fade_left: 0,
             consecutive_overruns: 0,
             fading_dead: false,
+            placed: false,
             cell: None,
+        }
+    }
+
+    /// Marks this instance as the one that stands for a place of the module in a patch (the
+    /// compiler calls it on lane 0, channel 0), so the budget gives the module a share per
+    /// place. Control thread.
+    pub fn count_as_placement(&mut self) {
+        if !self.placed {
+            self.placed = true;
+            self.health.placements.fetch_add(1, Relaxed);
+            super::host::budget().rebalance();
         }
     }
 
@@ -350,7 +373,11 @@ fn put_f32s(mem: &mut [u8], at: usize, vals: impl Iterator<Item = f32>) {
 
 impl Drop for CodeModule {
     fn drop(&mut self) {
-        if self.health.voices.fetch_sub(1, Relaxed) == 1 {
+        let last = self.health.voices.fetch_sub(1, Relaxed) == 1;
+        if self.placed {
+            self.health.placements.fetch_sub(1, Relaxed);
+        }
+        if last || self.placed {
             super::host::budget().rebalance();
         }
     }
