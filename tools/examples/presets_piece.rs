@@ -1816,8 +1816,8 @@ fn spillway() -> (Rack, Vec<CueDef>) {
         -36.0,
         -4.0,
     );
-    // Reese: the saws beat faster, the filter opens, the bus bites.
-    rise(&mut r, k, 2, h.lines[1].osc, "osc.va", "detune", 4.0, 40.0);
+    // Reese: the saws beat a little faster (a few cents), the filter opens, the bus bites gently.
+    rise(&mut r, k, 2, h.lines[1].osc, "osc.va", "detune", 3.0, 14.0);
     rise(
         &mut r,
         k,
@@ -1826,10 +1826,10 @@ fn spillway() -> (Rack, Vec<CueDef>) {
         "filter.svf",
         "cutoff_hz",
         500.0,
-        2500.0,
+        1800.0,
     );
-    rise(&mut r, k, 2, h.drive, "drive", "drive_db", 4.0, 20.0);
-    rise(&mut r, k, 2, h.drive, "drive", "trim_db", -3.0, -12.0);
+    rise(&mut r, k, 2, h.drive, "drive", "drive_db", 4.0, 12.0);
+    rise(&mut r, k, 2, h.drive, "drive", "trim_db", -3.0, -7.0);
     // Break: ghost snares and busy hats come in around the two-step.
     let kit = h.kit.as_ref().unwrap();
     rise(&mut r, k, 3, kit.top, "mixer", "level1", 0.0, 1.0);
