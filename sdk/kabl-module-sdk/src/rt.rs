@@ -85,7 +85,14 @@ impl<T> Store<T> {
             .1
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
             .is_ok();
-        assert!(free, "kabl module called concurrently or re-entrantly");
+        // On wasm the host runs one call at a time, so a taken flag means the host stopped the
+        // previous call part-way (it ran out of its time budget) and the guard never dropped.
+        // Carry on: that block's output was already muted, and trapping here would kill the
+        // module for good over one late block.
+        assert!(
+            free || cfg!(target_arch = "wasm32"),
+            "kabl module called concurrently or re-entrantly"
+        );
         Guard(self)
     }
 }

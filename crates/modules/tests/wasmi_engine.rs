@@ -779,3 +779,36 @@ fn calibration_module_matches_its_wat_source() {
         "run with KABL_REGEN_CALIB=1"
     );
 }
+
+/// An SDK module stopped part-way by running out of fuel keeps working on the next block. Its
+/// busy flag stays taken when the host abandons the call; the SDK used to trap on it from then
+/// on, so one late block killed the module for good (the REAPER benchmark's "only two fit").
+#[test]
+fn an_sdk_module_survives_running_out_of_fuel_mid_block() {
+    for ex in &kabl_modules::code::host::EXAMPLES {
+        let compiled = engine().compile(ex.wasm).unwrap();
+        let mut inst = compiled.instantiate(&cfg()).unwrap();
+        inst.set_fuel(1_000_000);
+        inst.reset().unwrap();
+        inst.set_fuel(1_000_000);
+        let full = inst.call_block(N as u32).unwrap();
+        // Stop it at every tenth of the way through a block, then run a whole block.
+        for k in 1..10 {
+            inst.set_fuel(full * k / 10);
+            assert_eq!(
+                inst.call_block(N as u32),
+                Err(Fault::OutOfFuel),
+                "{}",
+                ex.kind
+            );
+            inst.set_fuel(1_000_000);
+            assert!(
+                inst.call_block(N as u32).is_ok(),
+                "{} after {k}/10",
+                ex.kind
+            );
+        }
+        inst.set_fuel(1_000_000);
+        assert!(inst.reset().is_ok(), "{}", ex.kind);
+    }
+}
