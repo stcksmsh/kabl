@@ -47,26 +47,19 @@ patches and the tours.
 
 Idea: a four-on-the-floor build and drop with the music ducking to the kick. Sections: Intro (filter closed,
 bass out), Build (filter and riser open over 16 beats), Drop (rumble and acid in at once, no morph), Break
-(everything pulled back in 4 beats), Peak. The acid stab plays in its original register (A3 to E4); the pad
-moved an octave down (A2 and E3) and 3 dB quieter so the two no longer share notes. The stab joins dry
-beside the rumble, out of Climb's level compensation, and the kick duck's gain reduction takes it down by 15 %
-of what the music loses, so it still pumps with the kick. Its gain falls from -18 to -21 dB as Acid makes it
-ring longer and squeal (resonance back to 0.78), so it sits at about the same level at every setting.
-Measured on the cue run (stab solo against the mix without it, 400 Hz to 3 kHz, stab hits, median per bar):
-Intro +0.7, Build -0.2, Drop +0.9, Break -1.5, Peak +2.0 dB (bars within -2 to +3.1 dB, except the bar on
-each side of the Break-to-Peak morph, -3.0 and -2.5 dB, under the riser). The previous version, an octave up
-and with no duck, sat at +8 dB in the Peak; the first version 7 to 10 dB under. The rumble tops out at -10 dB.
+(everything pulled back in 4 beats), Peak. The Peak cue sets Rumble to 0.85 and Acid to 1 (was 1 and 0.95)
+so the stabs stay legible: stab against the rest of the mix (400 Hz to 3 kHz, on stab hits, median per bar
+once the Peak is in) -3.6 dB, was -5.5 dB.
 
 | Macro | Stored | 0 to 1 | Moves |
 |---|---|---|---|
 | Climb | 0.20 | muffled and dark, to open with a rising noise riser | master ladder cutoff 140 Hz to 12 kHz and its resonance, riser gain, hat/clap filter; level-compensated by 8 dB |
-| Rumble | 0.35 | the off-beat bass from out to full, and its notes lengthen | bass gain -34 to -10 dB, gate length, its filter |
-| Acid | 0.15 | clipped stabs to squealing, ringing stabs | stab decay 40 to 320 ms, resonance 0.15 to 0.78, gain -18 to -21 dB |
+| Rumble | 0.35 | the off-beat bass from out to full, and its notes lengthen | bass gain, gate length, its filter |
+| Acid | 0.15 | clipped stabs to squealing, ringing stabs | stab decay, resonance, gain |
 | Pump | 0.55 | music barely ducks to the kick hard pumping | ducker threshold and makeup |
 
-Flags: Pump and Rumble are level-type (pump, bass in). Louder drop: the Drop cue is about 1.5 dB louder than
-the Intro (Rumble at 1). Factory macro sweeps peak at -2.0 dBFS (-1.5 before this change). Clips: cue run
--16.9 LUFS, peak -4.2 dBFS; tour -17.4 LUFS, peak -3.7 dBFS.
+Flags: Pump and Rumble are level-type (pump, bass in). Louder drop: the Drop cue is about 2 dB louder than
+the Intro (Rumble at 1).
 
 ### 2. Dead Calm (66 BPM, cinematic)
 
@@ -246,7 +239,7 @@ Loudness and peak per piece (`presets_piece levels`; peak dBFS / loudness dB, at
 
 | Piece | normal | all at 1 | m1 | m2 | m3 | m4 |
 |---|---|---|---|---|---|---|
-| Gantry | -2.4 / -19.6 | -3.4 / -19.1 | -3.4 / -21.2 | -1.1 / -18.1 | -2.0 / -19.5 | -5.6 / -19.8 |
+| Gantry | -4.3 / -19.2 | -5.2 / -18.2 | -5.6 / -21.1 | -2.7 / -17.1 | -2.7 / -19.1 | -5.8 / -19.2 |
 | Dead Calm | -8.3 / -19.4 | -2.9 / -17.2 | -9.4 / -20.1 | -6.6 / -18.1 | -4.5 / -19.7 | -2.4 / -15.4 |
 | Pawn Shop | -1.8 / -18.8 | -1.8 / -19.1 | -1.8 / -18.7 | -1.8 / -18.6 | -1.8 / -19.1 | -1.8 / -19.3 |
 | Laundromat | -3.0 / -17.4 | -6.8 / -18.7 | -3.8 / -18.4 | -3.5 / -17.0 | -3.2 / -17.2 | -6.8 / -19.1 |
