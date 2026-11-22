@@ -277,7 +277,7 @@ author, is refused).
 | Memory | 4 MiB per instance, fixed after `init`; `memory.grow` while running is a fault |
 | Time | each place of a module in the patch may use 25 % of the block period, all modules together 50 %, measured at the rate your code actually runs; a block that runs out is muted, and eight in a row make that voice sit out about 0.7 s before it tries again (never a crash) |
 | Block | `io.n` is at most 2048; do not assume a size, do not assume it is constant |
-| Ports / params | at most 16 ports of each direction, 32 params, port width 1 or 2 |
+| Ports / params | at most 4 input slots and 8 output slots (a width-2 port is 2 slots; the same limits as the kabl engine, so a bigger module would not load), 32 params, port width 1 or 2 |
 | Metadata text | 2048 bytes (long `explain` text counts) |
 | Saved settings | `STATE_CAP` at most 64 KiB, written whole (never chunked) |
 | Imports | none at all; WASI included |
@@ -300,7 +300,7 @@ Each row: what you see, why, what to do. Texts are the real ones; parts in `<ang
 | `no method named `sqrt` found for type `f32`` (also `sin`, `exp`, `ln`, `powf`) | those need `std` | write your own, or use `exp2` and `sin_cos` from the SDK |
 | `<path>: No such file or directory` on build | wrong `--manifest-path` | point at your `Cargo.toml` |
 | compile error `evaluation panicked: input port is at a different slot` (also `output port ...`, `param is at a different index`, `no such input port`, `no such param`) | an index constant disagrees with the order in `META` | fix the constant or the order |
-| compile error `too many params`, `too many input ports`, `meta text too long`, `port width is 1 or 2`, `empty name`, `no line breaks in text` | a `META` limit from section 7 | shrink `META` |
+| compile error `too many params`, `too many input ports` / `too many output ports` (over 4 input or 8 output slots), `meta text too long`, `port width is 1 or 2`, `empty name`, `no line breaks in text` | a `META` limit from section 7 | shrink `META` |
 | compile error `STATE_CAP is over the 64 KiB host limit` / `ARENA_BYTES needs kabl-module-sdk's arena feature` | state or arena setting | lower it / enable the feature |
 | `cargo kabl: cargo built no cdylib .wasm: is `crate-type = ["cdylib"]` set?` | `[lib] crate-type` removed | restore it from the template |
 | `cannot tell which package is the module; pick one with `--package`` | a workspace with several crates | `-p yourcrate` |
