@@ -29,9 +29,12 @@ TIMELINE=docs/promo-demo/timeline.json
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
-cargo build --release -p kabl-ui --bin kabl-ui --example promo_demo
-DEMO=target/release/examples/promo_demo
+TARGET=${CARGO_TARGET_DIR:-target}
+cargo build --release -p kabl-ui --bin kabl-ui
+export KABL_BIN=${KABL_BIN:-$TARGET/release/kabl-ui}
 if [ -z "${TAKES:-}" ]; then
+  cargo build --release -p kabl-ui --example promo_demo
+  DEMO=$TARGET/release/examples/promo_demo
   $DEMO write "$PATCH" $TIMELINE
   $DEMO render "$OUT/render.wav" > "$OUT/render-levels.txt"
   head -1 "$OUT/render-levels.txt"
@@ -40,7 +43,8 @@ if [ -z "${TAKES:-}" ]; then
   TAKES="$PATCH:$OUT/drive.txt:$TIMELINE:$OUT/render.wav"
 fi
 
-pactl list short sinks | grep -q "$SINK" || pactl load-module module-null-sink sink_name="$SINK"
+pactl list short sinks | grep -q "$SINK" || pactl load-module module-null-sink sink_name="$SINK" \
+  sink_properties=device.description=kabl-agents-silent
 Xvfb "$XDISP" -screen 0 ${SIZE}x24 >/dev/null 2>&1 &
 XVFB=$!
 trap 'kill $XVFB 2>/dev/null || true' EXIT

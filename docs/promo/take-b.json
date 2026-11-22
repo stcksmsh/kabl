@@ -1,0 +1,26 @@
+{
+  "_comment": "Take B of STORYBOARD-V1.md (shots 3-9, bars 8-40) on docs/promo/lichen-plus.kabl. The clock runs on load, so setup stops it and arms a restart (sequencers on step 1 when it runs); bar 0 is a click on view:All and the clock starts on bar 8. Ids: 1 macro (m5 Focus, m6 Chords), 2 cues (1 Spore, 2 Colony, 3 Bloom, 4 Bloom+, 5 Die-back), 3 clock, cable 46 the 7-loop's pattern. Cues are clicked half a bar early; they launch on the next bar.",
+  "bpm": 112,
+  "anchor": "view:All",
+  "setup": ["click run:3", "sleep 0.3", "click restart:3", "sleep 0.3", "click zoom:fit"],
+  "shots": [
+    {"bar": 7.5, "do": ["aim run:3"]},
+    {"bar": 7.98, "do": ["click run:3"]},
+    {"bar": 12, "do": ["rclick cable:46", "sleep 0.3", "click menu:cable-pattern"]},
+    {"bar": 15.3, "do": ["key Escape"]},
+    {"bar": 15.5, "do": ["click perform", "sleep 0.2", "click pcue:2.2"]},
+    {"bar": 21.5, "do": ["aim pslider:1.m5", "slidey -90 3.2"]},
+    {"bar": 23.5, "do": ["click pcue:2.3"]},
+    {"bar": 25.5, "do": ["click pcue:2.4"]},
+    {"bar": 28, "do": ["click rack"]},
+    {"bar": 29, "do": ["click perform"]},
+    {"bar": 30, "do": ["aim pslider:1.m6", "slidey 50 1.6"]},
+    {"bar": 31, "do": ["aim pslider:1.m6", "slidey -60 1.6"]},
+    {"bar": 32, "do": ["click browser", "sleep 0.3", "click category:Piece"]},
+    {"bar": 33, "do": ["click sound:factory:presets/balcony"]},
+    {"bar": 34, "do": ["click sound:factory:presets/laundromat"]},
+    {"bar": 35, "do": ["click sound:factory:presets/gantry"]},
+    {"bar": 35.5, "do": ["click perform", "sleep 0.2", "click pcue:2.5"]},
+    {"bar": 41, "do": []}
+  ]
+}
