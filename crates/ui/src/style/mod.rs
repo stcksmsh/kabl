@@ -6,9 +6,11 @@
 //! sizes live in [`Metrics`] and are not themable.
 
 mod builtin;
+mod cables;
 mod load;
 
 pub use builtin::{builtin_a, builtin_b, BUILTIN_A_ID, BUILTIN_B_ID, REDUCED_MS, SETTLE};
+pub use cables::CablePalette;
 pub use load::{config_dir, themes_dir, Prefs, Theme, Themes};
 pub use solid::{
     compose, line_solid_default, look_b_default, outline_default, with_accent, Accent, FACE_STYLES,
@@ -465,6 +467,10 @@ pub struct Style {
     /// colour across its lead, lane, ring and drawer row. Not part of a theme file.
     #[serde(skip, default = "route_colors")]
     pub route_colors: [Color32; 8],
+    /// The skin's cable palette (signal and route colours); the "Cable colours" setting can
+    /// override it. Applied by [`Style::with_cables`].
+    #[serde(default)]
+    pub cable_palette: CablePalette,
     /// The custom font families are live in egui (set by `show`, not themable).
     #[serde(skip)]
     pub fonts_ready: bool,

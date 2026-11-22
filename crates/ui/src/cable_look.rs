@@ -432,16 +432,21 @@ mod tests {
             ("look B", false),
             ("look B", true),
         ];
-        for (name, dark) in looks {
+        let palettes = crate::style::CablePalette::ALL;
+        for ((name, dark), p) in looks
+            .into_iter()
+            .flat_map(|l| palettes.into_iter().map(move |p| (l, p)))
+        {
             let st = match name {
                 "A" => builtin_a(dark),
                 "B" => crate::style::builtin_b(dark),
                 "look A" => crate::style::line_solid_default(dark),
                 _ => crate::style::look_b_default(dark),
-            };
+            }
+            .with_cables(p);
             let th = crate::theme::theme(&st);
             let surf = surfaces(&st);
-            let mut colours = vec![th.audio, th.cv, th.gate];
+            let mut colours = vec![th.audio, th.cv, th.gate, th.pitch];
             colours.extend(st.route_colors.iter().copied());
             let rest = st.slots.cable.rest_alpha;
             let ctx = egui::Context::default();
@@ -461,9 +466,9 @@ mod tests {
                     worst_contrast(Color32::BLACK, casing, &surf)
                 };
                 worst = worst.min(w);
-                assert!(w >= MIN_CONTRAST, "{name} dark={dark} {c:?}: {w:.2}");
+                assert!(w >= MIN_CONTRAST, "{name} {p:?} dark={dark} {c:?}: {w:.2}");
             }
-            println!("theme {name} dark={dark}: worst resting cable contrast {worst:.2}:1");
+            println!("theme {name} {p:?} dark={dark}: worst resting cable contrast {worst:.2}:1");
         }
     }
 }
