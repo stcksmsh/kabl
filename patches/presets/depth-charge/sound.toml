@@ -1,0 +1,12 @@
+name = "Depth Charge"
+category = "FX"
+tags = [
+    "poly",
+    "impact",
+    "sub",
+    "cinematic",
+    "hip-hop",
+]
+description = "An impact: a sine that falls in pitch under a noise crack, with a long hall. Every key is a one-shot, so play low single notes and let the tail run. Boom sets how long the thud rings, Crack adds the noise crack on the front, Drop sets how far the pitch falls, Space adds the echo and the hall."
+keys = true
+sequence = false

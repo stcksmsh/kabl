@@ -105,7 +105,7 @@ fn phrase(shelf: Option<&str>) -> &'static [Note] {
             (2.0, 1.0, 67),
             (2.0, 1.0, 72),
         ],
-        Some("Pad") | Some("Voice") => &[
+        Some("Pad") | Some("Voice") | Some("FX") => &[
             (0.0, 3.0, 57),
             (0.0, 3.0, 60),
             (0.0, 3.0, 64),

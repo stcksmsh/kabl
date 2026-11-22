@@ -1,0 +1,12 @@
+name = "Vox Chop"
+category = "Voice"
+tags = [
+    "poly",
+    "formant",
+    "chopped",
+    "124bpm",
+    "house",
+]
+description = "House chord stabs that talk: saws through a formant filter whose vowel hops on every sixteenth of the host clock, with a breathing chop on the level. Press Run to start the clock, then play short chords. Chop goes from a steady level to a deep, breathing pulse, Vowels from one vowel to a mouth that jumps all over, Shift from a small bright mouth to a large dark one, Space adds the echo and the room."
+keys = true
+sequence = true

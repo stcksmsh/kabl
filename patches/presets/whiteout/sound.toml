@@ -1,0 +1,13 @@
+name = "Whiteout"
+category = "FX"
+tags = [
+    "poly",
+    "noise",
+    "wind",
+    "comb",
+    "experimental",
+    "ambient",
+]
+description = "Wind you can play: noise through a comb filter that follows the keys, a filter that gusts and a long room. Play slow notes and fifths. Pitch goes from plain wind to a ringing note, Gust makes the filter open and close, deeper and faster, Grain brings in a bitcrusher, Space adds the echo and the room."
+keys = true
+sequence = false

@@ -116,6 +116,6 @@ fn a_long_lane_dims_the_pages_the_playhead_is_not_on() {
 #[test]
 fn what_you_play_has_one_ink_token() {
     let ui = UiState::default();
-    // Amber (the accent) in the mockup; switching it is one line in `kit::perform_ink`.
-    assert_eq!(kabl_ui::kit::perform_ink(&ui.style), ui.style.roles.accent);
+    // Teal (the cv role), by the owner's choice; one line in `kit::perform_ink`.
+    assert_eq!(kabl_ui::kit::perform_ink(&ui.style), ui.style.roles.cv);
 }

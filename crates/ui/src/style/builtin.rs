@@ -187,6 +187,7 @@ pub fn builtin_a(dark: bool) -> Style {
         },
         metrics: Metrics::default(),
         route_colors: super::route_colors(),
+        cable_palette: Default::default(),
     }
 }
 
@@ -440,6 +441,7 @@ pub fn builtin_b(dark: bool) -> Style {
         },
         metrics: Metrics::default(),
         route_colors: super::route_colors(),
+        cable_palette: Default::default(),
     }
 }
 

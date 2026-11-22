@@ -3,7 +3,7 @@
 use kabl_modules::code::fake::{fake_meta, Behavior, FakeEngine};
 use kabl_modules::code::{
     CodeGroup, CodeModule, Fault, InstanceConfig, Layout, LayoutError, LoadError, WasmEngine,
-    MAX_BLOB_BYTES, OVERRUN_LIMIT,
+    MAX_BLOB_BYTES, OVERRUN_LIMIT, SUSPEND_BLOCKS,
 };
 use kabl_modules::{registry, Module, ProcessIo, QualityConfig, QualityTier, Signal};
 use std::alloc::{GlobalAlloc, Layout as Layout2, System};
@@ -221,26 +221,32 @@ fn memory_over_cap_is_a_crash_at_run_time_and_a_load_error_at_build_time() {
 }
 
 #[test]
-fn eight_consecutive_overruns_are_a_crash() {
+fn eight_consecutive_overruns_suspend_the_voice_and_it_comes_back() {
+    // Out of fuel for exactly eight calls, then fine (a host that was busy starting up).
     let g = group(
         "t.eight",
-        vec![Behavior::OutOfFuel {
-            from: 0,
-            count: 1000,
-        }],
+        vec![Behavior::OutOfFuel { from: 0, count: 8 }],
         1,
         Duration::from_secs(1),
     );
     let mut m = voice(&g);
-    for k in 1..OVERRUN_LIMIT {
+    for k in 1..=OVERRUN_LIMIT {
         assert!(
             run(&mut m).iter().all(|&v| v == 0.0),
             "overrun block is silent"
         );
         assert!(!g.health().is_crashed(), "{k} overruns are not a crash");
     }
-    run(&mut m);
-    assert_eq!(g.health().fault(), Some(Fault::Overrun));
+    // Suspended: silent, and not called (the fake would answer 0.5 on its ninth call).
+    for _ in 0..SUSPEND_BLOCKS {
+        assert!(run(&mut m).iter().all(|&v| v == 0.0));
+    }
+    assert_eq!(g.health().overrun_count(), OVERRUN_LIMIT);
+    assert!(
+        run(&mut m).iter().all(|&v| v == 0.5),
+        "back after sitting out"
+    );
+    assert_eq!(g.health().fault(), None);
 }
 
 #[test]
@@ -286,7 +292,8 @@ fn overrun_blocks_fade_instead_of_cutting() {
 
 #[test]
 fn wall_clock_backstop_counts_overruns_even_with_fuel_left() {
-    // Each call sleeps 3 ms against a 1 ms cap; the output is valid, but eight in a row crash.
+    // Each call sleeps 3 ms against a 1 ms cap; the output is valid, but eight in a row suspend
+    // the voice.
     let g = group(
         "t.slow",
         vec![Behavior::Sleep(Duration::from_millis(3))],
@@ -300,9 +307,10 @@ fn wall_clock_backstop_counts_overruns_even_with_fuel_left() {
             "valid output is kept while counting"
         );
     }
-    assert!(!g.health().is_crashed());
     run(&mut m);
-    assert_eq!(g.health().fault(), Some(Fault::Overrun));
+    assert!(run(&mut m).iter().all(|&v| v == 0.0), "suspended");
+    assert!(!g.health().is_crashed());
+    assert_eq!(g.health().overrun_count(), OVERRUN_LIMIT);
 }
 
 #[test]

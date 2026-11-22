@@ -1,0 +1,13 @@
+name = "Oracle"
+category = "Voice"
+tags = [
+    "poly",
+    "formant",
+    "choir",
+    "slow",
+    "ambient",
+    "cinematic",
+]
+description = "A choir of saws and a triangle through a formant filter that holds every vowel clear, with a slow bloom and a long room. Play slow chords and move the mod wheel. Vowel steps through a, e, i, o and u, Breath brings in a whispered layer through the same vowels, Choir spreads one voice into a crowd, Space adds the echo and the room."
+keys = true
+sequence = false

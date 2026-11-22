@@ -173,7 +173,11 @@ fn cc_to_callback_during_delayed_save_and_open() {
     let dir = tempfile::tempdir().unwrap();
     let factory = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches");
     let log = kabl_core::load(&factory.join("composition")).unwrap();
-    let mut lib = Library::open(Some(factory), dir.path().to_path_buf());
+    // The library reads packed `.kabl` factory files, not the raw `patches/` folders.
+    let mut lib = Library::open(
+        Some(kabl_ui::library::built_factory_dir()),
+        dir.path().to_path_buf(),
+    );
     let meta = Meta {
         name: "CC latency piece".into(),
         ..Meta::default()
