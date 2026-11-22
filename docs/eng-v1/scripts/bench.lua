@@ -10,7 +10,7 @@ local started=reaper.time_precise()
 local function exists(p) local f=io.open(p,'r') if f then f:close() return true end return false end
 local function step()
  local waited=reaper.time_precise()-started
- if waited<3 or (not exists(report) and waited<30) then reaper.defer(step) return end
+ if waited<tonumber(os.getenv('KB_WAIT') or '3') or (not exists(report) and waited<30) then reaper.defer(step) return end
  reaper.OnStopButton()
  for i=0,reaper.CountTracks(0)-1 do
   local tr=reaper.GetTrack(0,i)

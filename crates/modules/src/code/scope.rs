@@ -192,6 +192,24 @@ impl CodeScope {
                 ));
             }
         }
+        // Running modules in trouble, said once (overruns again each time the count doubles).
+        // Groups are process-wide, so in a host with several songs the first to look tells it.
+        for g in super::groups() {
+            let (kind, h) = (g.info().kind, g.health());
+            if h.take_notice() {
+                if let Some(f) = h.fault() {
+                    self.session
+                        .note(format!("custom module {kind} stopped: {}", f.label()));
+                }
+            } else if h.is_crashed() {
+                // Already said why it stopped.
+            } else if let Some(n) = h.take_overrun_news() {
+                self.session.note(format!(
+                    "custom module {kind} went over its CPU time budget in {n} block(s); \
+                     a block that runs out of budget is muted"
+                ));
+            }
+        }
         n
     }
 

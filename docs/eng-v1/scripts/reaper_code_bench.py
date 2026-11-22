@@ -36,6 +36,7 @@ LUA = repo / 'docs/eng-v1/scripts/bench.lua'
 SECS = int(os.environ.get('KB_SECS', '30'))
 REPEATS = int(os.environ.get('KB_REPEATS', '3'))
 COUNTS = [int(n) for n in os.environ.get('KB_COUNTS', '1,2,3').split(',')]
+KINDS = os.environ.get('KB_KINDS', 'filter.svf,demo.bitfilter').split(',')
 CHORD = [48, 52, 55, 59, 60, 64, 67, 71]
 BLOCK = 256
 
@@ -146,7 +147,7 @@ def main():
     time.sleep(.8)
     wm = sp.Popen(['metacity', '--sm-disable'], env=env0, stdout=log, stderr=log)
     time.sleep(.8)
-    variants = [('none', 0)] + [(k, n) for n in COUNTS for k in ('filter.svf', 'demo.bitfilter')]
+    variants = [('none', 0)] + [(k, n) for n in COUNTS for k in KINDS]
     runs = {}
     try:
         for rep in range(REPEATS):
