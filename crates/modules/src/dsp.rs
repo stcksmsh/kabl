@@ -18,6 +18,38 @@ fn poly_blep(t: f32, dt: f32) -> f32 {
     }
 }
 
+/// PolyBLAMP correction: `poly_blep` integrated once, for a corner (a jump in slope) rather
+/// than a jump in value. Same convention: `t` = phase since the corner (or before the next).
+/// Add `slope_change * poly_blamp(t, dt)`, where `slope_change` is the jump in slope per
+/// sample (`slope_after - slope_before`, in units per phase, times `dt`). The residual is
+/// `(1 - |x|)³ / 6` at `x` samples from the corner: symmetric, so it moves no zero crossing.
+#[inline]
+pub fn poly_blamp(t: f32, dt: f32) -> f32 {
+    let x = if t < dt {
+        1.0 - t / dt
+    } else if t > 1.0 - dt {
+        (t - 1.0) / dt + 1.0
+    } else {
+        return 0.0;
+    };
+    x * x * x * (1.0 / 6.0)
+}
+
+/// The triangle (0 at phase 0, +1 at 0.25, -1 at 0.75) with PolyBLAMP at both corners: the
+/// slope steps by -8 at 0.25 and +8 at 0.75 (per unit phase). Peaks and zero crossings are the
+/// naive triangle's; only the corners are rounded, by at most `8 * dt / 6`.
+#[inline]
+pub fn triangle_blamp(p: f32, dt: f32) -> f32 {
+    let v = if p < 0.25 {
+        4.0 * p
+    } else if p < 0.75 {
+        2.0 - 4.0 * p
+    } else {
+        4.0 * p - 4.0
+    };
+    v + 8.0 * dt * (poly_blamp((p + 0.25).fract(), dt) - poly_blamp((p + 0.75).fract(), dt))
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Saw {
     pub phase: f32,
@@ -477,12 +509,9 @@ pub enum OscWaveform {
 ///
 /// **Saw and square are PolyBLEP-corrected** (`poly_blep`, same function `Saw` uses — square
 /// applies it at both of its discontinuities: phase 0's rising edge and phase 0.5's falling
-/// edge, the standard two-correction extension of the same technique). **Triangle is naive, not
-/// band-limited** — a real PolyBLEP triangle needs "polyBLAMP" (an integrated correction at the
-/// two corners, not the single discontinuity BLEP handles), which is a distinct algorithm this
-/// pass didn't implement. Triangle's corners alias at high fundamental frequencies the way an
-/// uncorrected square would; documented here rather than silently claiming full anti-aliasing
-/// for all four waveforms. Sine needs no correction (it has no discontinuity to alias).
+/// edge, the standard two-correction extension of the same technique). **Triangle is
+/// PolyBLAMP-corrected** at its two corners (`triangle_blamp`). Sine needs no correction (it
+/// has no discontinuity to alias).
 #[derive(Debug, Clone, Copy)]
 pub struct FullOsc {
     pub phase: f32,
@@ -522,18 +551,7 @@ impl FullOsc {
                 v -= poly_blep((self.phase + 0.5).fract(), dt);
                 v
             }
-            OscWaveform::Triangle => {
-                // Naive -- see the struct doc for why this one isn't PolyBLEP/BLAMP-corrected.
-                // Standard piecewise-linear triangle: 0 at phase 0, +1 at phase 0.25, -1 at
-                // phase 0.75, back to 0 at phase 1.
-                if self.phase < 0.25 {
-                    4.0 * self.phase
-                } else if self.phase < 0.75 {
-                    2.0 - 4.0 * self.phase
-                } else {
-                    4.0 * self.phase - 4.0
-                }
-            }
+            OscWaveform::Triangle => triangle_blamp(self.phase, dt),
             OscWaveform::Sine => (2.0 * PI * self.phase).sin(),
         };
         self.phase += dt;
