@@ -35,9 +35,10 @@ pub const EXAMPLES: [Example; 2] = [
 /// (`budget().update(..)`).
 const DEFAULT_SAMPLE_RATE: f32 = 48_000.0;
 const DEFAULT_BLOCK: u32 = 512;
-/// Fuel per microsecond used until calibration runs: below the slowest probe measured in the
-/// D11 report (1,327), so budgets stay inside the time cap.
-const DEFAULT_FUEL_PER_US: f64 = 1_000.0;
+/// Fuel per microsecond used until calibration runs: the floor is below the slowest probe measured
+/// in the D11 report (1,327), so budgets stay inside the time cap; the ceiling is below the
+/// fastest probes seen (about 4,300), and each module's measured rate picks within the range.
+const DEFAULT_FUEL_PER_US: (f64, f64) = (1_000.0, super::budget::MIN_CEILING_FUEL_PER_US);
 /// Memory cap and block the instances are built for.
 const MAX_BLOCK: u32 = 2048;
 
@@ -65,7 +66,7 @@ pub fn budget() -> &'static Budget {
     static B: OnceLock<Budget> = OnceLock::new();
     B.get_or_init(|| {
         Budget::new(
-            Calibration::fixed(DEFAULT_FUEL_PER_US),
+            Calibration::range(DEFAULT_FUEL_PER_US.0, DEFAULT_FUEL_PER_US.1),
             DEFAULT_SAMPLE_RATE,
             DEFAULT_BLOCK,
         )
@@ -308,7 +309,10 @@ pub fn device_changed(sample_rate: f32, block_frames: u32) {
                 let (sr, blk) = *latest().lock().unwrap_or_else(|e| e.into_inner());
                 // For benchmark runs inside a host (REAPER): set the variable to a file path.
                 if let Some(path) = std::env::var_os("KABL_CODE_CALIBRATION_REPORT") {
-                    let mut text = format!("worst_fuel_per_us {:.1}\n", cal.fuel_per_us);
+                    let mut text = format!(
+                        "worst_fuel_per_us {:.1}\nbest_fuel_per_us {:.1}\n",
+                        cal.fuel_per_us, cal.max_fuel_per_us
+                    );
                     for (name, rate) in &cal.probes {
                         text.push_str(&format!("{name} {rate:.1}\n"));
                     }

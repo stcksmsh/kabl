@@ -25,8 +25,14 @@ fn startup_calibration_replaces_the_fallback_budget() {
     let cal = host::budget().calibration();
     assert!(!cal.probes.is_empty(), "measured, not the fixed fallback");
     // Two examples at 25 % each fit the 50 % total: 25 % of a 64-frame period at 48 kHz.
-    let want = cal.fuel_for_us(64.0 / 48_000.0 * 1e6 * 0.25);
-    assert_eq!(h.fuel_budget(), want);
+    // The range runs from the slowest to the fastest probe; a module that has not run yet is
+    // at the ceiling.
+    let us = 64.0 / 48_000.0 * 1e6 * 0.25;
+    assert_eq!(
+        h.fuel_range(),
+        (cal.fuel_for_us(us), cal.max_fuel_for_us(us))
+    );
+    assert_eq!(h.fuel_budget(), cal.max_fuel_for_us(us));
     assert_ne!(h.fuel_budget(), fallback);
     println!(
         "calibrated {:.0} fuel/us; per-module budget {} fuel ({:?})",

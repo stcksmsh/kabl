@@ -275,7 +275,7 @@ author, is refused).
 |---|---|
 | Blob | 2 MiB; a package 4 MiB. A template module is about 6 KiB |
 | Memory | 4 MiB per instance, fixed after `init`; `memory.grow` while running is a fault |
-| Time | one module may use 25 % of the block period, all modules together 50 %; eight overruns in a row disable it |
+| Time | each place of a module in the patch may use 25 % of the block period, all modules together 50 %, measured at the rate your code actually runs; a block that runs out is muted, and eight in a row make that voice sit out about 0.7 s before it tries again (never a crash) |
 | Block | `io.n` is at most 2048; do not assume a size, do not assume it is constant |
 | Ports / params | at most 16 ports of each direction, 32 params, port width 1 or 2 |
 | Metadata text | 2048 bytes (long `explain` text counts) |
@@ -342,7 +342,7 @@ Each row: what you see, why, what to do. Texts are the real ones; parts in `<ang
 | `code module layout: <what>` (`layout input slot count differs from metadata`, `layout regions input and output overlap`, `module supports blocks of <n> frames, host needs 2048` ...) | hand-written layout (C, other languages) disagrees with the metadata or the block size | section 10; SDK users never see this |
 | `invalid code module: meta line <n>: <what>` (`bad version`, `unknown category`, `rate must be voice or global`, `port needs: in|out type name width`, `param needs: name min max default taper smoothing_ms [unit]`, `unknown taper`, `bad number `x` for min`) | a metadata line is malformed | the builder prevents these; if you wrote the section by hand, fix the line |
 | `invalid code module: meta: `version` is required and starts at 1` / `empty kind` / `duplicate port `p`` / `duplicate param `p`` / `param `p` has an invalid range` / `port `p` width 2 (must be 1 or 2)` | metadata sanity | fix `META` (min must be below max) |
-| the module's face shows a badge `trapped`, `ran out of time budget`, `used too much memory`, `produced NaN or infinity`, `kept overrunning its time budget` or `has an unusable buffer layout`; it fades out in 5 ms and the rest of the synth keeps playing | a runtime fault (`memory.grow`, out-of-bounds access, `panic!`, divide by zero, a loop that is too long, eight slow blocks in a row, non-finite output) | reproduce with `cargo kabl test`; use `cargo kabl test` cost figure; bound loops by `io.n` |
+| the module's face shows a badge `trapped`, `ran out of time budget`, `used too much memory`, `produced NaN or infinity` or `has an unusable buffer layout`; it fades out in 5 ms and the rest of the synth keeps playing | a runtime fault (`memory.grow`, out-of-bounds access, `panic!`, divide by zero, non-finite output) | reproduce with `cargo kabl test`; use `cargo kabl test` cost figure; bound loops by `io.n` |
 | opening a patch: the module is a pass-through stand-in | you chose Cancel, or the embedded code cannot load (rows above) | reopen and choose Open; rebuild the module |
 | a settings warning when saving, or a module at defaults after opening | `save` wrote more than `STATE_CAP` or returned -1; `load` returned `false`; the patch holds settings of a newer `STATE_VERSION` | raise `STATE_CAP`; write a `migrate`; the old bytes stay in the patch |
 

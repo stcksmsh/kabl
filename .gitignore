@@ -35,3 +35,4 @@ docs/**/*.flac
 /docs/presets/clips/macros-keys-pluck/
 /docs/presets/clips/macros-keys-pluck-2/
 /docs/presets/clips/voice/*-tour.mp3
+.claude/tmp/

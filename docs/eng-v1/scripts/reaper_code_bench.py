@@ -36,6 +36,7 @@ LUA = repo / 'docs/eng-v1/scripts/bench.lua'
 SECS = int(os.environ.get('KB_SECS', '30'))
 REPEATS = int(os.environ.get('KB_REPEATS', '3'))
 COUNTS = [int(n) for n in os.environ.get('KB_COUNTS', '1,2,3').split(',')]
+KINDS = os.environ.get('KB_KINDS', 'filter.svf,demo.bitfilter').split(',')
 CHORD = [48, 52, 55, 59, 60, 64, 67, 71]
 BLOCK = 256
 
@@ -135,8 +136,12 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     shutil.copy2(PLUGIN, S / 'plugin/kabl.clap')
     ini = S / 'reaper.ini'
+    # automute=0: REAPER's default circuit breaker mutes a track whose level passes its threshold
+    # and then stops calling that track's plug-ins, so the render is silent and quicker than the
+    # baseline. Eight or more resonant bitfilters in series pass it (each adds gain near its
+    # cutoff); the bench measures CPU, not level, so the breaker is off in this scratch profile.
     ini.write_text(f'[reaper]\nvstpath={S}/empty-vst\nvstpath64={S}/empty-vst\nlinux_audio_bsize={BLOCK}\n'
-                   'linux_audio_mode=0\nlinux_audio_srate=48000\nwnd_w=1280\nwnd_h=800\nwnd_x=0\nwnd_y=0\n')
+                   'automute=0\nautomuteflags=0\nlinux_audio_mode=0\nlinux_audio_srate=48000\nwnd_w=1280\nwnd_h=800\nwnd_x=0\nwnd_y=0\n')
     disp = ':151'
     env0 = dict(os.environ, PIPEWIRE_NODE='kabl_agents', PULSE_SINK='kabl_agents', DISPLAY=disp,
                 XDG_RUNTIME_DIR='/run/user/1000', CLAP_PATH=str(S / 'plugin'), KB_DIR=str(S), KB_SECS=str(SECS),
@@ -146,7 +151,7 @@ def main():
     time.sleep(.8)
     wm = sp.Popen(['metacity', '--sm-disable'], env=env0, stdout=log, stderr=log)
     time.sleep(.8)
-    variants = [('none', 0)] + [(k, n) for n in COUNTS for k in ('filter.svf', 'demo.bitfilter')]
+    variants = [('none', 0)] + [(k, n) for n in COUNTS for k in KINDS]
     runs = {}
     try:
         for rep in range(REPEATS):
@@ -167,6 +172,9 @@ def main():
                 info = dict(l.split('=', 1) for l in done.read_text().split('\n') if '=' in l)
                 r = dict(render_s=float(info['render_s']), calibrated=info['calibrated'] == 'true',
                          bsize=info['bsize'], reaper=info['reaper'], **audio(S / f'render-{tag}.wav'))
+                # No sound at all: REAPER did not run the plug-in (see automute above) or a module
+                # crashed. Either way the time measures nothing, so stop instead of reporting it.
+                assert r['rms'] > 0, f'{tag}: the whole render is silent; see {S}/run.txt'
                 if report.exists():
                     r['calibration'] = report.read_text()
                 runs.setdefault(f'{kind}-{n}', []).append(r)

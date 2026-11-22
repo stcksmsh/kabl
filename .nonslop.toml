@@ -1,0 +1,53 @@
+# nonslop per-project wiring. Copied to <project>/.nonslop.toml by `nonslop init`.
+# A project without this file gets no nonslop behaviour at all.
+# Agents are blocked from editing this file; only the owner changes it.
+
+[commands]
+# The exact commands agents must use. Add or rename keys freely; every non-empty one is shown to agents.
+# No shell syntax (pipes, &&, VAR=x): commands are run without a shell. Wrap anything complex in a script.
+# CI pins Rust 1.100.0, which is not installed here; 1.99.0 is the newest local toolchain (stable is 1.93).
+fmt = "cargo +1.99.0 fmt --all"
+lint = "cargo +1.99.0 clippy --workspace --all-targets -- -D warnings"
+test = "cargo +1.99.0 test --workspace"
+clean = "cargo clean"
+
+[slop]
+# From the slopstop evaluation on kabl (nonslop eval/slopstop/REPORT-IMPROVED.md): 11 findings over nine PRs.
+allow_suppress = ["clippy::too_many_arguments"]   # house pattern in preset builders and egui helpers
+exclude = ["docs/**"]                             # probe scripts and design mockups, not product code
+warn = ["file-too-large", "single-impl-trait"]
+
+[done]
+# Checked when an agent on a matching branch tries to finish.
+branch_prefix = "claude/"
+require = ["clean_tree", "pushed", "pr"]
+# CI runs fmt, clippy and the tests on every pull request, so they are not repeated here.
+run = []
+gate_timeout_s = 1800
+# CLAUDE.md: run `cargo clean` before stopping; /secondary fills with target/ directories.
+auto_clean = true
+# CLAUDE.md: under 30 GB free on /secondary, tell "Kabl overseer" before building.
+min_free_gb = 30
+stop_retries = 2
+
+[state]
+# The single handover file the coordinator keeps. Printed at every session start.
+file = "docs/STATE.md"
+
+[env]
+# Project-relative scratch root. Hook logs go to <scratch>/nonslop/. Must be git-ignored.
+scratch = ".claude/tmp"
+# Null sink for agents (CLAUDE.md "Audio").
+audio_sink = "kabl_agents"
+
+[rules]
+# Extra one-line rules for this project, shown to every agent.
+notes = [
+  "Caveman and Ponytail run at ultra in this project, from the first message and after every context clear.",
+  "Stay under 50% context; at 50% follow the checkpoint protocol in CLAUDE.md and report to the session named \"Kabl overseer\".",
+  "Confirm with `pactl list sink-inputs` that your streams are on `kabl_agents`; move any that are not. If the sink is missing, recreate it with `pactl load-module module-null-sink sink_name=kabl_agents sink_properties=device.description=kabl-agents-silent`. Never change the default sink.",
+  "Never write to /home. All scratch, including CARGO_TARGET_DIR, goes under the scratch directory above.",
+  "The root checkout's master is stale: use origin/master and the worktrees. Never work in a worktree another session is using.",
+  "Every commit is signed off (`git commit -s`), per CONTRIBUTING.md.",
+  "Set pull request bodies with `gh api -X PATCH repos/stcksmsh/kabl/pulls/<n> -F body=@<file>`; `gh pr edit` fails on this machine.",
+]
