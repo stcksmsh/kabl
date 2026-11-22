@@ -6,6 +6,7 @@
 //!
 //! Files: `OUT/<scene>__<dark|light>__<W>x<H>.png`. `theme` is a theme id (default
 //! `kabl.line_solid`; `kabl.satin` for a before/after). Silent: no audio device is opened.
+//! `KABL_CAPTURE_CABLES=signal|neutral|contrast|modulation` sets the "Cable colours" setting.
 use eframe::egui;
 use egui::{Pos2, Rect};
 use image::RgbaImage;
@@ -14,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 38] = [
+const SCENES: [&str; 39] = [
     "rack",
     "perform",
     "sounds",
@@ -53,6 +54,7 @@ const SCENES: [&str; 38] = [
     "dlg-restore",
     "about",
     "dev-tools",
+    "settings",
 ];
 
 struct Job {
@@ -259,6 +261,11 @@ impl App {
         let mut ui = UiState::default();
         ui.theme = self.theme.clone();
         ui.dark = j.dark;
+        ui.cable_palette = std::env::var("KABL_CAPTURE_CABLES").ok().and_then(|k| {
+            kabl_ui::style::CablePalette::ALL
+                .into_iter()
+                .find(|p| p.key() == k)
+        });
         ui.status_meter = true;
         // The mockup's status bar readouts, as a host would feed them.
         ui.status_cpu = Some(6.0);
@@ -965,7 +972,12 @@ impl eframe::App for App {
         // The menus: a right-click on the sequencer's title bar, or on a cable's middle. The
         // previous job's menu is still open in egui's memory (the press would only close it):
         // Escape it first.
-        if self.f == 6 && matches!(self.jobs[self.i].scene, "menu-module" | "menu-cable") {
+        if self.f == 6
+            && matches!(
+                self.jobs[self.i].scene,
+                "menu-module" | "menu-cable" | "settings"
+            )
+        {
             self.inject.push(egui::Event::Key {
                 key: egui::Key::Escape,
                 physical_key: None,
@@ -1008,6 +1020,17 @@ impl eframe::App for App {
             self.inject.push(egui::Event::PointerButton {
                 pos: at,
                 button: egui::PointerButton::Secondary,
+                pressed: self.f == 8,
+                modifiers: egui::Modifiers::NONE,
+            });
+        }
+        // The settings menu: a click on the rail's gear.
+        if matches!(self.f, 8 | 9) && self.jobs[self.i].scene == "settings" {
+            let at = self.ui.hits["view-menu"].center();
+            self.inject.push(egui::Event::PointerMoved(at));
+            self.inject.push(egui::Event::PointerButton {
+                pos: at,
+                button: egui::PointerButton::Primary,
                 pressed: self.f == 8,
                 modifiers: egui::Modifiers::NONE,
             });
@@ -1094,6 +1117,7 @@ impl eframe::App for App {
             || self.jobs[self.i].scene.starts_with("menu-")
             || self.jobs[self.i].scene.starts_with("more-controls")
             || self.jobs[self.i].scene == "dev-tools"
+            || self.jobs[self.i].scene == "settings"
         {
             30
         } else {

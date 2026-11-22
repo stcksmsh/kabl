@@ -570,6 +570,9 @@ pub struct Prefs {
     /// Setting "Intensity" of the cable glow.
     #[serde(default)]
     pub cable_intensity: crate::cable_life::Intensity,
+    /// Setting "Cable colours"; `None` follows the skin.
+    #[serde(default)]
+    pub cable_palette: Option<super::CablePalette>,
     /// Setting "Theme". Absent in files from before it existed: `dark` stands then.
     #[serde(default)]
     pub theme_mode: Option<crate::desktop::ThemeMode>,
@@ -586,6 +589,7 @@ impl Default for Prefs {
             folders: Default::default(),
             cable_life: Default::default(),
             cable_intensity: Default::default(),
+            cable_palette: None,
             theme_mode: Some(Default::default()),
             reduce_motion: Default::default(),
         }
@@ -811,6 +815,7 @@ mod tests {
             folders: [("patches".to_string(), PathBuf::from("/tmp"))].into(),
             cable_life: crate::cable_life::CableLife::Glow,
             cable_intensity: crate::cable_life::Intensity::High,
+            cable_palette: Some(super::super::CablePalette::Contrast),
             theme_mode: Some(crate::desktop::ThemeMode::Light),
             reduce_motion: crate::desktop::ReduceMotion::On,
         };
