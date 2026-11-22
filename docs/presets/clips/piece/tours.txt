@@ -1,0 +1,63 @@
+gantry-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
+     0.0 s  macro 1: Climb
+    21.0 s  macro 2: Rumble
+    42.0 s  macro 3: Acid
+    63.0 s  macro 4: Pump
+  total 84.0 s
+
+pawn-shop-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
+     0.0 s  macro 1: Swing
+    20.5 s  macro 2: Dust
+    41.0 s  macro 3: Tape
+    61.5 s  macro 4: Room
+  total 82.0 s
+
+dead-calm-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
+     0.0 s  macro 1: Swell
+    21.0 s  macro 2: Dread
+    42.0 s  macro 3: Pulse
+    63.0 s  macro 4: Hall
+  total 84.0 s
+
+laundromat-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
+     0.0 s  macro 1: Sweep
+    21.0 s  macro 2: Crunch
+    42.0 s  macro 3: Stutter
+    63.0 s  macro 4: Pump
+  total 84.0 s
+
+spillway-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
+     0.0 s  macro 1: Weight
+    21.0 s  macro 2: Reese
+    42.0 s  macro 3: Break
+    63.0 s  macro 4: Haze
+  total 84.0 s
+
+balcony-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
+     0.0 s  macro 1: Lift
+    21.0 s  macro 2: Sparkle
+    42.0 s  macro 3: Bounce
+    63.0 s  macro 4: Room
+  total 84.0 s
+
+estuary-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
+     0.0 s  macro 1: Tide
+    21.0 s  macro 2: Glitter
+    42.0 s  macro 3: Depth
+    63.0 s  macro 4: Wash
+  total 84.0 s
+
+lichen-tour.mp3 (new macros 1 to 5; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
+     0.0 s  macro 1: Mutate
+    21.0 s  macro 2: Reach
+    42.0 s  macro 3: Gate
+    63.0 s  macro 4: Echo
+    84.0 s  macro 5: Focus
+  total 105.0 s
+
+roller-rink-tour.mp3 (new macros 1 to 4; each clip 20 s: 0 for 6 s, up 4 s, 1 for 6 s, down 4 s; 1 s silence between)
+     0.0 s  macro 1: Glow
+    21.0 s  macro 2: Arp
+    42.0 s  macro 3: Gated
+    63.0 s  macro 4: Space
+  total 84.0 s

@@ -1,0 +1,14 @@
+name = "Laundromat"
+category = "Piece"
+tags = [
+    "sequenced",
+    "cues",
+    "drums",
+    "disco",
+    "french touch",
+    "122bpm",
+    "signature",
+]
+description = "A self-playing filtered disco loop at 122 BPM with swing: an octave bass, two off-beat stab lines, a kick, clap and hats, all ducking to the kick. It is dry on purpose: no echo, no room. Press Run, then launch the four cues with the pads or CC 40-43: Loop, Cut-up, Break, Full. Sweep is a DJ filter over the loop, Crunch bitcrushes and drives the bus, Stutter turns the stabs from clipped ticks into held chords, Pump sets how hard the kick ducks the loop."
+keys = true
+sequence = true
