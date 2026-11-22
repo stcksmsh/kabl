@@ -4070,10 +4070,7 @@ fn draw_cues(
             .unwrap_or((banks::startup(state, s), None))
     };
     let last = ui_state.last_cue.get(&id).copied();
-    let standing: Vec<(bool, bool)> = all
-        .iter()
-        .map(|c| cues::standing_now(c, &bank_of, last))
-        .collect();
+    let standing = cues::standing_all(&all, &bank_of, last);
     let (gap, h) = (8.0, 50.0);
     let w = (r.width() - 3.0 * gap) / 4.0;
     let mut launch = None;

@@ -417,6 +417,30 @@ pub fn standing_now(
     }
 }
 
+/// `standing_now` for every cue of a module, with at most one cue playing and one queued.
+/// Cues that set the same banks (a piece whose scenes differ only in their macros) all stand
+/// the same against the sequencers, so a tie goes to the last launched cue (`last`), and to
+/// none when that is not one of them.
+pub fn standing_all(
+    all: &[Cue],
+    bank_of: &dyn Fn(ModuleId) -> (usize, Option<usize>),
+    last: Option<usize>,
+) -> Vec<(bool, bool)> {
+    let raw: Vec<(bool, bool)> = all.iter().map(|c| standing_now(c, bank_of, last)).collect();
+    let tie = |f: fn(&(bool, bool)) -> bool| raw.iter().filter(|s| f(s)).count() > 1;
+    let (playing_tie, queued_tie) = (tie(|s| s.0), tie(|s| s.1));
+    all.iter()
+        .zip(raw.iter())
+        .map(|(c, &(p, q))| {
+            let is_last = last == Some(c.n);
+            (
+                p && (!playing_tie || is_last),
+                q && (!queued_tie || is_last),
+            )
+        })
+        .collect()
+}
+
 /// Ops removing every cue and launch-setting reference to module `removed` (a sequencer's cue
 /// entries, a cue's or a sequencer's reference clock), for deleting it in the same undo step.
 pub fn references_to(state: &PatchState, removed: ModuleId) -> Vec<Op> {
