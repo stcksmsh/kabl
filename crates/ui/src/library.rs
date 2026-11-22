@@ -49,6 +49,7 @@ pub const CATEGORIES: &[&str] = &[
     "Percussion",
     "Groove",
     "Voice",
+    "FX",
     "Piece",
     "Study",
 ];
@@ -94,7 +95,7 @@ impl Meta {
             "Pluck" => "Pluck",
             "Groove" | "Percussion" => "Groove",
             "Piece" | "Study" => "Piece",
-            "Voice" => "Voice",
+            "Voice" | "FX" => "Voice",
             _ => return None,
         })
     }

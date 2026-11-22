@@ -1,0 +1,13 @@
+name = "Sock Puppet"
+category = "Voice"
+tags = [
+    "mono",
+    "vocoder",
+    "talkbox",
+    "124bpm",
+    "french touch",
+    "signature",
+]
+description = "A talkbox for French touch: your lead plays through a vocoder whose voice is a formant mouth built into the patch, close and dry. Press Run to start the clock for Chatter, then play a line and move the mod wheel. Mouth sets the vowel from a to u, Chatter makes the mouth hop to a new vowel every eighth note, Weight brings in a saw an octave down, Bite drives and crushes the voice."
+keys = true
+sequence = true

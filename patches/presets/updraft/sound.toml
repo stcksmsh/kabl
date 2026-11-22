@@ -1,0 +1,13 @@
+name = "Updraft"
+category = "FX"
+tags = [
+    "poly",
+    "riser",
+    "noise",
+    "build",
+    "techno",
+    "house",
+]
+description = "A riser: hold a key and the sound builds, a closed filter opening over seconds under a saw stack and noise. Hold a note for the whole build and let go to end it. Build sets how long the rise takes, from one and a half to ten seconds, Lift makes the pitch climb with it, up to an octave, Air turns the saws into a noise wash, Space adds the echo and the room."
+keys = true
+sequence = false
