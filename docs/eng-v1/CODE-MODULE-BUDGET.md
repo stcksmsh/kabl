@@ -68,7 +68,9 @@ probe 1261 fuel/µs (`spin`), fastest 4893 (`mem`).
 | 3 | silent (crash) | 3.36 s | 0 |
 | 4 | – | 4.38 s | 0 |
 | 6 | – | 6.32 s | 0 |
-| 8 | – | 8.59 s (see the open issue below) | 0 |
+| 8 | – | 8.59 s (8.68 s with the bench fix below) | 0 |
+| 10 | – | 10.74 s | 0 to 130 of 5606 (budget, a run under load) |
+| 12 | – | 9.18 s (not a valid timing) | about 2500 of 5606 (budget) |
 
 - One filter at 8 voices costs about 0.91 s per 30 s of audio: about 3 % of one core, or about
   40 µs per 64-frame block (about 5 µs per voice call, 11.8k fuel).
@@ -79,12 +81,17 @@ probe 1261 fuel/µs (`spin`), fastest 4893 (`mem`).
 - In the plug-in, the measured rate settled at about 2000 to 3000 fuel/µs. The budget per voice
   call was 20k to 30k fuel against the 11.8k needed.
 
-**Open issue (not the budget).** At 8 or more filters, most REAPER runs render silence in about
-0.4 s, less than the baseline. One 8-filter run rendered fully (the 8.59 s above). Instrumented
-runs show the modules running with healthy budgets (no overruns that matter) while REAPER plays
-before the render. During the offline render itself, the code modules are not called at all. Some
-plug-in or host path stops processing the voices for large code patches. That is separate from
-this policy and needs its own investigation.
+**Silent renders at 8 or more filters (fixed in the bench, not a plug-in fault).** Most REAPER
+runs at 8 or more filters used to render silence in about 0.4 s, less than the baseline. The
+cause is REAPER's automute, a circuit breaker that is on by default: it mutes a track whose level
+passes its threshold, and REAPER does not run the plug-ins of a muted track. Each resonant
+bitfilter adds gain near its cutoff, so the chain's output grows with N (render RMS 0.52 at 6,
+1.65 at 8, 5.4 at 10, 12 at 12; peaks near 25 at 10). Around 8 filters the level crosses the
+threshold, so some runs got through and most did not. Instrumented runs showed REAPER calling
+`process` for about 120 blocks after the render started and then never again, with no plug-in
+error. The bench now writes `automute=0` into its scratch REAPER profile and stops with an error
+when a whole render is silent. With 10 or 12 filters the budget mutes blocks, as the policy
+intends: 10 filters cost about 65 % of the block and 12 about 78 %, above the 50 % cap.
 
 ## Trade-offs
 
