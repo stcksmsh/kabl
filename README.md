@@ -33,7 +33,9 @@ validator). Linux is the supported platform for 1.0.
 - **Functional cables:** a cable can carry a step pattern, a pass probability, an A/B morph
   and glide, all locked to the patch clock, and macros can drive cable parameters.
 - **Factory bank:** over 100 sounds in `patches/` (installed as `share/kabl/patches`): bass,
-  lead, keys, pad, pluck and groove sounds, each played from a few named macros, and self-playing pieces
+  lead, keys, pad, pluck and groove sounds, vocoder and chopped-voice sounds (Sock Puppet and
+  Automaton have a built-in formant mouth and also take your own voice on `audio.in`), FX
+  sounds (bowls, drones, risers, impacts), each played from a few named macros, and self-playing pieces
   with scenes and cues. The Sounds browser searches them and previews any sound at matched
   loudness before you load it, in the app and in the plugin. Your own sounds are saved to
   `~/.local/share/kabl/sounds` and are never touched by an upgrade or an uninstall.
