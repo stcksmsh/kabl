@@ -512,7 +512,7 @@ fn only_modules_in_use_divide_the_shared_budget() {
     // The block period the host budget was built for.
     let cal = host::budget().calibration();
     let period_us = f64::from(512u32) / 48_000.0 * 1e6;
-    let full = cal.fuel_for_us(period_us * PER_MODULE_SHARE);
+    let full = cal.max_fuel_for_us(period_us * PER_MODULE_SHARE);
     assert_eq!(
         group.health().fuel_budget(),
         full,
@@ -527,7 +527,7 @@ fn only_modules_in_use_divide_the_shared_budget() {
         .map(|&i| kabl_modules::code::group_by_key(&regs[i].key).unwrap())
         .collect();
     let _voices: Vec<_> = others.iter().map(|g| g.voice().unwrap()).collect();
-    let quarter_of_total = cal.fuel_for_us(period_us * TOTAL_SHARE / 4.0);
+    let quarter_of_total = cal.max_fuel_for_us(period_us * TOTAL_SHARE / 4.0);
     assert_eq!(group.health().fuel_budget(), quarter_of_total);
     drop(voice);
 }

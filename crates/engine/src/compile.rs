@@ -1795,6 +1795,7 @@ fn wire_modules(cx: &WireCtx, built: Built) -> Result<Built, CompileError> {
             // The first instance of a code module serves the song's saved settings for it.
             if lane == 0 && ch == 0 {
                 if let Some(code) = instance.as_any_mut().downcast_mut::<CodeModule>() {
+                    code.count_as_placement();
                     scope.attach(id, &meta.kind, code);
                 }
             }

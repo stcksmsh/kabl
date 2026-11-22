@@ -274,7 +274,7 @@ fn a_trap_is_a_crash_that_fades_and_silences_every_voice() {
 }
 
 #[test]
-fn an_infinite_loop_runs_out_of_fuel_and_eight_in_a_row_crash() {
+fn an_infinite_loop_runs_out_of_fuel_and_eight_in_a_row_suspend_it() {
     let spin = format!("{WHEN_LOUD} (loop $l (br $l))");
     let g = group(&wasm(1, "", &spin), 1, 200_000, Duration::from_secs(5));
     let mut m = voice(&g);
@@ -283,13 +283,201 @@ fn an_infinite_loop_runs_out_of_fuel_and_eight_in_a_row_crash() {
     let mut loud = COEF;
     loud[0] = 3.0;
     let coef = loud;
+    let mut news = vec![];
     for k in 1..OVERRUN_LIMIT {
         block(&mut m, &inp, coef);
         assert!(!g.health().is_crashed(), "{k} overruns are not a crash");
+        news.extend(g.health().take_overrun_news());
     }
     block(&mut m, &inp, coef);
-    assert_eq!(g.health().fault(), Some(Fault::Overrun));
+    news.extend(g.health().take_overrun_news());
+    assert_eq!(g.health().fault(), None, "an overrun is never a crash");
     assert_eq!(g.health().overrun_count(), OVERRUN_LIMIT);
+    // Suspended: the loop is not even called, so nothing more is counted.
+    block(&mut m, &inp, coef);
+    assert_eq!(g.health().overrun_count(), OVERRUN_LIMIT);
+    assert_eq!(
+        news,
+        [1, 2, 4, 8],
+        "told at first, then each time it doubles"
+    );
+}
+
+#[test]
+fn a_modules_measured_rate_moves_its_fuel_between_floor_and_ceiling() {
+    // Each observation here is one whole 100 us rate window.
+    let win = Duration::from_micros(100);
+    let h = Health::new(1, Duration::ZERO);
+    // A 100 us share: floor at 1000 fuel/us, ceiling at 4000 fuel/us.
+    h.set_budget_range(100_000, 400_000, win);
+    assert_eq!(h.fuel_range(), (100_000, 400_000));
+    assert_eq!(
+        h.fuel_budget(),
+        400_000,
+        "a new module starts at the ceiling"
+    );
+
+    // One slow window (10x slower, e.g. preempted) costs half at most, and is made up.
+    h.observe(40_000, win);
+    assert!(h.fuel_budget() >= 200_000, "{}", h.fuel_budget());
+    for _ in 0..32 {
+        h.observe(400_000, win);
+    }
+    assert!(h.fuel_budget() >= 390_000, "recovers: {}", h.fuel_budget());
+
+    // Code that burns fuel at the floor rate is reined in within a few windows.
+    for _ in 0..6 {
+        h.observe(100_000, win);
+    }
+    assert!(h.fuel_budget() < 110_000, "{}", h.fuel_budget());
+    // Slower than the floor: never below the floor (the old, worst-case budget).
+    for _ in 0..8 {
+        h.observe(10_000, win);
+    }
+    assert_eq!(h.fuel_budget(), 100_000);
+
+    // Faster than the ceiling: never above it (the hard cap).
+    for _ in 0..64 {
+        h.observe(100_000_000, win);
+    }
+    assert_eq!(h.fuel_budget(), 400_000);
+    // Short calls only add up; alone they move nothing.
+    h.observe(1, Duration::from_micros(1));
+    assert_eq!(h.fuel_budget(), 400_000);
+
+    // A new share (device change) keeps the measured rate: the fuel scales with the share.
+    for _ in 0..64 {
+        h.observe(200_000, win);
+    }
+    let before = h.fuel_budget();
+    h.set_budget_range(200_000, 800_000, Duration::from_micros(200));
+    assert!(h.fuel_budget().abs_diff(before * 2) <= 2, "{before}");
+}
+
+#[test]
+fn slow_per_fuel_code_gets_less_fuel_than_dsp_code() {
+    let cal = Calibration::measure(&engine()).unwrap();
+    let cap = Duration::from_millis(1);
+    let (floor, ceil) = (cal.fuel_for_us(1000.0), cal.max_fuel_for_us(1000.0));
+    // Thousands of calls per block: the `call` probe's mix, the slowest per unit of fuel.
+    let leaf = "(func $leaf (param i32) (result i32) (i32.add (local.get 0) (i32.const 1)))";
+    let calls =
+        "(local $i i32) (block $d (loop $l (br_if $d (i32.ge_u (local.get $i) (i32.const 4000)))
+        (local.set $i (call $leaf (local.get $i))) (br $l)))";
+    let slow = group(&wasm(1, leaf, calls), 1, 1, cap);
+    let dsp = group(&wasm(1, "", BIQUAD), 1, 1, cap);
+    let mut seed = 1;
+    for g in [&slow, &dsp] {
+        g.health().set_budget_range(floor, ceil, cap);
+        let mut m = voice(g);
+        for _ in 0..32 {
+            block(&mut m, &noise(&mut seed), COEF);
+        }
+        assert!(!g.health().is_crashed());
+    }
+    let (s, d) = (slow.health().fuel_budget(), dsp.health().fuel_budget());
+    println!("fuel range {floor}..{ceil}: call-heavy {s}, biquad {d}");
+    // Release builds show the probes' full spread; a debug build's interpreter overhead narrows
+    // it, so only the order is checked.
+    assert!(s < d, "call-heavy {s} vs biquad {d}");
+    assert!(s >= floor && d <= ceil);
+}
+
+#[test]
+fn overruns_and_crashes_reach_the_user_as_notes() {
+    let spin = format!("{WHEN_LOUD} (loop $l (br $l))");
+    let g = group(&wasm(1, "", &spin), 1, 200_000, Duration::from_secs(5));
+    kabl_modules::code::register(Arc::clone(&g)).unwrap();
+    let mut m = voice(&g);
+    let mut loud = COEF;
+    loud[0] = 3.0;
+    let scope = kabl_modules::code::CodeScope::new();
+    let mut seed = 1;
+    block(&mut m, &noise(&mut seed), loud);
+    scope.collect();
+    let notes = scope.take_notes();
+    assert!(
+        notes
+            .iter()
+            .any(|n| n.contains("test.biquad") && n.contains("CPU time budget in 1 block")),
+        "{notes:?}"
+    );
+    for _ in 1..OVERRUN_LIMIT {
+        block(&mut m, &noise(&mut seed), loud);
+    }
+    scope.collect();
+    let notes = scope.take_notes();
+    assert!(
+        notes
+            .iter()
+            .any(|n| n.contains("test.biquad") && n.contains("CPU time budget in 8 block")),
+        "told again once the count doubled: {notes:?}"
+    );
+    g.health().crash(Fault::Trap);
+    scope.collect();
+    let notes = scope.take_notes();
+    assert!(
+        notes.iter().any(|n| n.contains("test.biquad stopped:")),
+        "{notes:?}"
+    );
+    scope.collect();
+    assert!(scope
+        .take_notes()
+        .iter()
+        .all(|n| !n.contains("test.biquad")));
+    kabl_modules::code::unregister("test.biquad");
+}
+
+/// The capacity the budget policy is sized for: `demo.bitfilter` (a stereo resonant filter with
+/// drive) at 8 voices, at 48 kHz with 64-frame blocks, with the rates REAPER's calibration
+/// measured on an i7-13700H (PR #181: worst 927 fuel/us, fastest 4309).
+#[test]
+fn eight_code_filters_at_eight_voices_fit_the_budget() {
+    let ex = &kabl_modules::code::host::EXAMPLES[1];
+    assert_eq!(ex.kind, "demo.bitfilter");
+    let compiled = engine().compile(ex.wasm).unwrap();
+    let params: Vec<f32> = compiled.meta().params.iter().map(|p| p.default).collect();
+    let mut inst = compiled.instantiate(&cfg()).unwrap();
+    let layout = inst.layout();
+    inst.set_fuel(u64::MAX / 2);
+    inst.reset().unwrap();
+    let mut seed = 3;
+    let mut need = 0;
+    for _ in 0..16 {
+        let sig = noise(&mut seed);
+        let mem = inst.memory();
+        for s in 0..layout.in_slots as usize {
+            for (i, v) in sig.iter().enumerate() {
+                let at = layout.input_range(s).start + i * 4;
+                mem[at..at + 4].copy_from_slice(&v.to_le_bytes());
+            }
+        }
+        for (p, v) in params.iter().enumerate() {
+            mem[layout.param_range(p)].copy_from_slice(&v.to_le_bytes());
+        }
+        inst.set_fuel(u64::MAX / 2);
+        need = need.max(inst.call_block(N as u32).unwrap());
+    }
+    // Twice the cost measured here, for other settings and input than these defaults.
+    let voices = 8u64;
+    let need = 2 * need;
+    let cal = Calibration::range(927.2, 4309.0);
+    let period_us = N as f64 / SR as f64 * 1e6;
+    let fits = |modules: usize, fuel_for: &dyn Fn(f64) -> u64| {
+        let share = scaled_shares(&vec![PER_MODULE_SHARE; modules])[0];
+        voices * need <= fuel_for(period_us * share)
+    };
+    let capacity =
+        |fuel_for: &dyn Fn(f64) -> u64| (1..64).take_while(|&n| fits(n, fuel_for)).count();
+    let old = capacity(&|us| cal.fuel_for_us(us));
+    let new = capacity(&|us| cal.max_fuel_for_us(us));
+    println!(
+        "demo.bitfilter: {} fuel per voice-block (x2 margin {need}); at {voices} voices {old} fit \
+         the worst-case budget, {new} the measured-rate ceiling",
+        need / 2
+    );
+    assert!(new >= 8, "{new}");
+    assert!(new >= 4 * old, "old {old}, new {new}");
 }
 
 #[test]
@@ -506,7 +694,11 @@ fn reset_runs_under_the_block_budget_without_allocating() {
     }
     assert_eq!(g.health().overrun_count(), OVERRUN_LIMIT - 1);
     m.reset();
-    assert_eq!(g.health().fault(), Some(Fault::Overrun));
+    assert_eq!(
+        g.health().fault(),
+        None,
+        "reset overruns suspend, never crash"
+    );
 
     // A trapping reset disables the module.
     let g = group(
@@ -544,7 +736,8 @@ fn sixteen_voices_share_their_modules_budget_and_stay_within_both_caps() {
         16 * h.voice_fuel() > module_cap_fuel * 9 / 10,
         "voices do get the budget, not a sliver"
     );
-    assert!(h.voice_wall_cap() * 16 <= Duration::from_secs_f64(period_us * PER_MODULE_SHARE / 1e6));
+    // The wall-clock backstop is the whole share per call: it catches one call taking it all.
+    assert!(h.voice_wall_cap() <= Duration::from_secs_f64(period_us * PER_MODULE_SHARE / 1e6));
 
     // Four such modules (64 voices): each within 12.5 %, all together within 50 %.
     let groups: Vec<_> = (0..3)
@@ -600,4 +793,79 @@ fn calibration_module_matches_its_wat_source() {
         built,
         "run with KABL_REGEN_CALIB=1"
     );
+}
+
+/// An SDK module stopped part-way by running out of fuel keeps working on the next block. Its
+/// busy flag stays taken when the host abandons the call; the SDK used to trap on it from then
+/// on, so one late block killed the module for good (the REAPER benchmark's "only two fit").
+#[test]
+fn an_sdk_module_survives_running_out_of_fuel_mid_block() {
+    for ex in &kabl_modules::code::host::EXAMPLES {
+        let compiled = engine().compile(ex.wasm).unwrap();
+        let mut inst = compiled.instantiate(&cfg()).unwrap();
+        inst.set_fuel(1_000_000);
+        inst.reset().unwrap();
+        inst.set_fuel(1_000_000);
+        let full = inst.call_block(N as u32).unwrap();
+        // Stop it at every tenth of the way through a block, then run a whole block.
+        for k in 1..10 {
+            inst.set_fuel(full * k / 10);
+            assert_eq!(
+                inst.call_block(N as u32),
+                Err(Fault::OutOfFuel),
+                "{}",
+                ex.kind
+            );
+            inst.set_fuel(1_000_000);
+            assert!(
+                inst.call_block(N as u32).is_ok(),
+                "{} after {k}/10",
+                ex.kind
+            );
+        }
+        inst.set_fuel(1_000_000);
+        assert!(inst.reset().is_ok(), "{}", ex.kind);
+    }
+}
+
+/// The same code placed several times in a patch gets a share per place, within the 50 % total
+/// (all copies of one blob share one `Health`, so one share split eight ways starved them).
+#[test]
+fn each_place_of_a_module_gets_its_own_share_within_the_total() {
+    let budget = Budget::new(Calibration::fixed(1000.0), SR, N as u32);
+    let g = group(&wasm(1, "", BIQUAD), 8, 1, Duration::from_secs(1));
+    budget.register(g.health());
+    let mut voices: Vec<CodeModule> = (0..8).map(|_| voice(&g)).collect();
+    budget.rebalance();
+    assert_eq!(
+        g.health().fuel_budget(),
+        333_333,
+        "no places yet: one share"
+    );
+    voices[0].count_as_placement();
+    voices[0].count_as_placement();
+    budget.rebalance();
+    assert_eq!(g.health().placements(), 1, "counted once per instance");
+    assert_eq!(g.health().fuel_budget(), 333_333);
+    voices[4].count_as_placement();
+    budget.rebalance();
+    assert_eq!(g.health().fuel_budget(), 666_666, "two places: two shares");
+    for v in &mut voices[1..4] {
+        v.count_as_placement();
+    }
+    budget.rebalance();
+    assert_eq!(g.health().placements(), 5);
+    assert_eq!(
+        g.health().fuel_budget(),
+        666_666,
+        "capped at the 50 % total"
+    );
+    drop(voices.split_off(1));
+    budget.rebalance();
+    assert_eq!(
+        g.health().placements(),
+        1,
+        "dropping a place frees its share"
+    );
+    assert_eq!(g.health().fuel_budget(), 333_333);
 }

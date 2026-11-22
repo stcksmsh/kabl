@@ -8,7 +8,7 @@ Status: audio and video are engineering evidence, not owner acceptance. The agen
 
 | Path | What |
 |---|---|
-| `morph-suite-promo.mp4` | Final clip: 1920x1080, 30 fps, H.264 + AAC, real app audio, burned-in captions. |
+| `morph-suite-promo.mp4` | Final clip: 1920x1080, 60 fps (30 fps for the 2026-10 recording), H.264 + AAC, real app audio, burned-in captions. |
 | `morph-suite-audio.mp3` | The same piece rendered offline (no UI), 160 kb/s. |
 | `patch/morph-suite/` | The patch, saved by the editor. Open with `kabl-ui --patch docs/promo-demo/patch/morph-suite`. |
 | `timeline.json` | When each cable's morph moves, cable ids, section names. Written by `promo_demo`, read by the scripts. |
@@ -26,7 +26,27 @@ docs/promo-demo/record.sh
 
 It builds, regenerates `patch/morph-suite` and `timeline.json`, renders the audio (`morph-suite-audio.mp3`), generates the drive script, starts its own Xvfb (`XDISP`, default `:98`, 1920x1080), plays the patch in `target/release/kabl-ui`, drives it with xdotool, records the screen and the app's audio, and writes `morph-suite-promo.mp4`. Intermediate files (render, recording, drive script and log, screenshots) are in `target/promo-demo/` (`OUT`). Takes about 5 minutes, 3 of them real time.
 
-Needs: cargo, Xvfb, xdotool, ffmpeg with libass, ImageMagick `import`, PipeWire or PulseAudio (`pactl`; a null sink `kabl_rec` is created if missing), python3 with numpy.
+Needs: cargo, Xvfb, xdotool, ffmpeg with libass, ImageMagick `import`, PipeWire or PulseAudio (`pactl`; a null sink, `kabl_agents` by default (or `SINK`), is created if missing), python3 with numpy.
+
+### Options
+
+`record.sh` reads these environment variables (defaults are the 1.0 storyboard spec, `docs/promo/STORYBOARD-V1.md`):
+
+| Variable | Default | What |
+|---|---|---|
+| `FPS` | 60 | Capture rate. Capture is lossless (`libx264rgb -qp 0`); `post.py` re-encodes. |
+| `SINK` | `kabl_agents` | Audio sink the app plays into and the recording takes (`$SINK.monitor`); created if missing. `SINK=kabl_rec` keeps the old behaviour. |
+| `CRF` | 18 | Final quality, used by `post.py`. |
+| `TAKES` | one take, morph-suite | Space-separated `patch:drive[:timeline:render]`: patch folder, drive script, reference timeline and render. Each take is recorded and finished to `$OUT/take-N/take.mp4`. |
+| `CUTS` | none | With `TAKES`: cut seconds `S1,S2,...`, one fewer than takes; joins them into `$FINAL` (take i up to cut i, then take i+1; 20 ms audio crossfade). Cut second = 0.5 + bar * bar_seconds. Same as `post.py --join OUT.mp4 CUTS TAKE...`. |
+| `KABL_ANCHOR` | targets.json `anchor` | Bar-0 click key, read by `post.py` from the drive log. |
+| `FINAL` | `docs/promo-demo/morph-suite-promo.mp4` | Output file. |
+
+Scripting other commands: `make-drive-script.py TIMELINE|- TARGETS OUT.txt [STORYBOARD.json]`. The storyboard is
+`{"bpm": 112, "anchor": "prun:{clock}", "clock": "7", "shots": [{"bar": 16, "do": ["click pcue:12.2", "slidey -60 2"]}]}`;
+each shot writes `wait t0+bar*bar_seconds` plus its raw drive commands, merged by time with the morph gestures (pass `-`
+as the timeline for a storyboard-only script). The bar-0 click key is the storyboard `anchor`, else `targets.json` `anchor`
+(old files with only `restart` still work). `slidey DY SECONDS` in `drive.py` is a timed vertical drag (down is positive), for macro knobs.
 
 Only the audio, no UI:
 

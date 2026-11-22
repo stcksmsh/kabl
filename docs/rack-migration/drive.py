@@ -17,6 +17,7 @@ Script lines (# comments):
                                                  turning)
     aim KEY                                      move the pointer onto a target's centre (no click)
     slide DX SECONDS                             press here, move DX points right over SECONDS, release
+    slidey DY SECONDS                            the same, moving down (negative = up); for vertical knobs
     wheel KEY N [ctrl]                           N wheel notches (negative = down) over a target
     goto KEY X Y                                 wheel-pan until KEY's centre is near (X, Y)
     key COMBO                                    e.g. ctrl+z, Escape
@@ -199,10 +200,11 @@ try:
         elif cmd == "aim":
             glide(*centre(a[0]))
             continue
-        elif cmd == "slide":
+        elif cmd in ("slide", "slidey"):
             # Press where the pointer is, move DX points right (negative = left) in a straight
             # line over SECONDS of wall-clock time, release. Pair with `aim` and `wait`.
             dx, secs = round(float(a[0]) * scale), float(a[1])
+            vert = cmd == "slidey"
             loc = subprocess.run(["xdotool", "getmouselocation", "--shell"], capture_output=True, text=True,
                                  check=True).stdout
             cur = dict(l.split("=") for l in loc.split())
@@ -210,9 +212,9 @@ try:
             x("mousedown", 1)
             t0 = time.time()
             while (f := (time.time() - t0) / secs) < 1:
-                x("mousemove", ax + round(dx * f), ay)
+                x("mousemove", ax + (0 if vert else round(dx * f)), ay + (round(dx * f) if vert else 0))
                 time.sleep(0.02)
-            x("mousemove", ax + dx, ay)
+            x("mousemove", ax + (0 if vert else dx), ay + (dx if vert else 0))
             x("mouseup", 1)
         elif cmd == "wheel":
             glide(*centre(a[0]))
