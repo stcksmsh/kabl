@@ -4,6 +4,7 @@
 pub mod compile;
 pub mod facetap;
 pub mod ftz;
+pub mod golden;
 pub mod graph;
 pub mod keyboard;
 pub mod morph;

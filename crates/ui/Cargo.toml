@@ -47,5 +47,5 @@ strict = []
 [dev-dependencies]
 tempfile = "3.27.0"
 skrifa = "=0.42.1"
-assert_no_alloc = "1.1.2"
+assert_no_alloc = { version = "1.1.2", default-features = false }
 wat = "1"
