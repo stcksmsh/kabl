@@ -14,31 +14,17 @@
 //! Regenerate deliberately, only when a sound is meant to change:
 //! `KABL_WRITE_GOLDEN=1 cargo test -p kabl-ui --test golden_corpus`.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use kabl_core::PatchState;
 use kabl_engine::compile::compile;
+use kabl_engine::golden::{patch_dirs, SampleHash};
 use kabl_ui::cues;
 
 const COUNT: usize = 129;
 const BLOCKS: usize = 6000;
 /// Patches with at least one cue launch; guards against `cues()` silently returning nothing.
 const CUE_PATCHES: usize = 4;
-
-fn patch_dirs(root: &Path, out: &mut Vec<PathBuf>, depth: usize) {
-    if root.join("log.jsonl").is_file() && root.join("meta.toml").is_file() {
-        out.push(root.to_path_buf());
-        return;
-    }
-    if depth == 0 {
-        return;
-    }
-    for e in std::fs::read_dir(root).unwrap().flatten() {
-        if e.path().is_dir() {
-            patch_dirs(&e.path(), out, depth - 1);
-        }
-    }
-}
 
 /// Cue launches as `(block, sequencer, bank)`, in launch order.
 fn cue_launches(state: &PatchState) -> Vec<(usize, kabl_core::ModuleId, usize)> {
@@ -70,12 +56,7 @@ fn render_hash(dir: &Path) -> (String, usize) {
     let Ok(mut c) = compile(log.state(), 48000.0, 8) else {
         return ("compile-error".into(), 0);
     };
-    let mut h = 0xcbf29ce484222325u64;
-    let mut mix = |v: f32| {
-        for b in v.to_bits().to_le_bytes() {
-            h = (h ^ b as u64).wrapping_mul(0x100000001b3);
-        }
-    };
+    let mut h = SampleHash::default();
     for b in 0..BLOCKS {
         if b == 0 {
             for (v, n) in [(0usize, 0.0f32), (1, 4.0), (2, 7.0)] {
@@ -91,9 +72,10 @@ fn render_hash(dir: &Path) -> (String, usize) {
             c.arm_bank(seq, bank, 0);
         }
         c.process_block();
-        c.left().iter().chain(c.right()).for_each(|&s| mix(s));
+        h.feed(c.left());
+        h.feed(c.right());
     }
-    (format!("{h:016x}"), launches.len())
+    (h.hex(), launches.len())
 }
 
 #[test]

@@ -12,24 +12,7 @@ use std::time::Instant;
 
 use kabl_engine::compile::compile;
 use kabl_engine::ftz::FtzGuard;
-
-fn patch_dirs(root: &Path, out: &mut Vec<PathBuf>, depth: usize) {
-    if root.join("log.jsonl").is_file() && root.join("meta.toml").is_file() {
-        out.push(root.to_path_buf());
-        return;
-    }
-    if depth == 0 {
-        return;
-    }
-    let Ok(rd) = std::fs::read_dir(root) else {
-        return;
-    };
-    for e in rd.flatten() {
-        if e.path().is_dir() {
-            patch_dirs(&e.path(), out, depth - 1);
-        }
-    }
-}
+use kabl_engine::golden::patch_dirs;
 
 fn render(dir: &Path, ftz: bool, notes: bool, blocks: usize) -> Option<(Vec<f32>, f64)> {
     let log = kabl_core::load(dir).ok()?;

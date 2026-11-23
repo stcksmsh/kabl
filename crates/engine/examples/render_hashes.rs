@@ -7,6 +7,7 @@
 use std::path::{Path, PathBuf};
 
 use kabl_engine::compile::compile;
+use kabl_engine::golden::SampleHash;
 
 fn dirs(dir: &Path, out: &mut Vec<PathBuf>) {
     if dir.join("meta.toml").exists() {
@@ -26,7 +27,7 @@ fn hash(dir: &Path) -> String {
     let Ok(mut c) = compile(log.state(), 48000.0, 8) else {
         return "uncompilable".into();
     };
-    let mut h = 0xcbf2_9ce4_8422_2325u64;
+    let mut h = SampleHash::default();
     for b in 0..400 {
         if b == 0 {
             for (v, n) in [(0usize, 0.0f32), (1, 4.0), (2, 7.0)] {
@@ -39,13 +40,10 @@ fn hash(dir: &Path) -> String {
             }
         }
         c.process_block();
-        for s in c.left().iter().chain(c.right().iter()) {
-            for byte in s.to_bits().to_le_bytes() {
-                h = (h ^ byte as u64).wrapping_mul(0x0100_0000_01b3);
-            }
-        }
+        h.feed(c.left());
+        h.feed(c.right());
     }
-    format!("{h:016x}")
+    h.hex()
 }
 
 fn main() {
