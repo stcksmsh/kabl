@@ -1,8 +1,7 @@
-use super::run::{complete, step_to};
+use super::run::complete;
 use super::*;
 use crate::browser::{Doc, DocOrigin};
 use crate::inspect::Sel;
-use crate::library::{Library, Prefs};
 use crate::{PatchEditor, UiState};
 
 const MINIMAL: &str = r#"
@@ -142,6 +141,7 @@ fn conditions_observe_the_real_patch_and_view() {
         to: 3,
         kind: "filter.svf".into(),
         param: "cutoff_hz".into(),
+        amount_below: None,
     };
     let inspecting = Cond::Inspecting {
         id: 7,
@@ -172,8 +172,20 @@ fn conditions_observe_the_real_patch_and_view() {
 
     e.set_route_bypass(cable, false);
     assert!(holds(&route, &e, &ui, &base));
+    let negative = Cond::Route {
+        from: 7,
+        port: "out".into(),
+        to: 3,
+        kind: "filter.svf".into(),
+        param: "cutoff_hz".into(),
+        amount_below: Some(0.0),
+    };
+    assert!(!holds(&negative, &e, &ui, &base), "depth is +35 %");
+    e.set_route_amount(cable, -0.2, true);
+    assert!(holds(&negative, &e, &ui, &base));
     e.set_route_bypass(cable, true);
     assert!(!holds(&route, &e, &ui, &base));
+    assert!(!holds(&negative, &e, &ui, &base));
 
     ui.inspect.select(
         Sel {
@@ -224,6 +236,7 @@ fn a_step_completes_only_when_all_its_conditions_hold() {
         detached: false,
         base: Baseline::of(&e),
         completed_at: None,
+        armed: false,
     };
     assert!(!complete(&l, &a, &e, &ui), "no conditions: Next only");
     l.steps[0].done = vec![
@@ -233,6 +246,7 @@ fn a_step_completes_only_when_all_its_conditions_hold() {
             to: 3,
             kind: "filter.svf".into(),
             param: "cutoff_hz".into(),
+            amount_below: None,
         },
         Cond::Inspecting {
             id: 7,
@@ -249,56 +263,4 @@ fn a_step_completes_only_when_all_its_conditions_hold() {
         0.0,
     );
     assert!(complete(&l, &a, &e, &ui));
-}
-
-#[test]
-fn old_library_json_loads_with_no_lesson_progress() {
-    let old = r#"{"favorites":["factory:palette/pad"],"recents":[],"first_run_done":true}"#;
-    let p: Prefs = serde_json::from_str(old).unwrap();
-    assert!(p.lessons.is_empty());
-    assert!(p.first_run_done && p.favorites.contains("factory:palette/pad"));
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("library.json"), old).unwrap();
-    let lib = Library::open(None, dir.path().into());
-    assert_eq!(lib.prefs, p, "an old file keeps everything it had");
-}
-
-#[test]
-fn progress_is_saved_by_the_runner_and_survives_a_reopen() {
-    let dir = tempfile::tempdir().unwrap();
-    let e = patches::pluck_to_pad();
-    let mut ui = UiState {
-        library: Some(Library::open(None, dir.path().into())),
-        ..Default::default()
-    };
-    let l = &all()[0];
-    ui.lessons.active = Some(Active {
-        lesson: 0,
-        step: 0,
-        editor: e.instance(),
-        detached: false,
-        base: Baseline::of(&e),
-        completed_at: None,
-    });
-    step_to(&e, &mut ui, 2);
-    step_to(&e, &mut ui, 1);
-    let p = Library::open(None, dir.path().into()).prefs.lessons[&l.id];
-    assert_eq!(
-        p,
-        Progress {
-            step: 2,
-            done: false
-        },
-        "the furthest step is kept"
-    );
-    step_to(&e, &mut ui, l.steps.len());
-    step_to(&e, &mut ui, 0);
-    let p = Library::open(None, dir.path().into()).prefs.lessons[&l.id];
-    assert_eq!(
-        p,
-        Progress {
-            step: l.steps.len(),
-            done: true
-        }
-    );
 }

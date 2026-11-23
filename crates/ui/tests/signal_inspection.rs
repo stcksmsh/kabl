@@ -763,7 +763,12 @@ fn every_lesson_anchor_is_on_screen_in_its_step() {
                 h.frame();
             }
             if let Some(a) = &s.anchor {
-                assert!(h.ui.hits.contains_key(a), "{} step {}: {a}", l.id, i + 1);
+                assert!(
+                    lessons::anchor_rect(&h.ui, a).is_some(),
+                    "lesson {} step {}: anchor {a:?} is not drawn",
+                    l.id,
+                    i + 1
+                );
             }
             h.click("lesson-next");
         }
@@ -817,8 +822,9 @@ fn a_recipe_starts_through_the_unsaved_question_and_exit_keeps_the_patch() {
             .iter()
             .any(|c| matches!(c, Command::Preview { count: 1, .. })));
         h.ui.launches.clear();
-        // Step 2: Show reaches the envelope's Sustain; Back returns.
-        h.click("lesson-next");
+        // Inspecting the envelope completed step 1 by itself. Step 2: Show reaches the
+        // envelope's Sustain; Back returns.
+        assert_eq!(h.ui.lessons.active.as_ref().unwrap().step, 1);
         h.click("lesson-show");
         assert_eq!(h.ui.inspected, Some((6, "sustain".into())));
         h.click("lesson-back");
@@ -831,8 +837,10 @@ fn a_recipe_starts_through_the_unsaved_question_and_exit_keeps_the_patch() {
         h.editor.undo();
         h.frame();
         assert!(h.ui.hits.contains_key("lesson-show"));
+        // The Sustain edit is back, so step 2 completed by itself.
+        assert_eq!(h.ui.lessons.active.as_ref().unwrap().step, 2);
         // Through the last step to the unguided task; close keeps the patch and edits.
-        for _ in 0..4 {
+        for _ in 0..3 {
             h.click("lesson-next");
         }
         assert_eq!(h.ui.lessons.active.as_ref().unwrap().step, 5);

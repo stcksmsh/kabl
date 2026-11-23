@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 39] = [
+const SCENES: [&str; 41] = [
     "rack",
     "perform",
     "sounds",
@@ -36,6 +36,8 @@ const SCENES: [&str; 39] = [
     "explain",
     "inspect",
     "learn",
+    "learn-step",
+    "learn-done",
     "cable-routes-drawer",
     "cable-routes-rest",
     "cable-routes-opening",
@@ -415,7 +417,10 @@ impl App {
                 });
             }
         }
-        if matches!(j.scene, "explain" | "inspect" | "learn") {
+        if matches!(
+            j.scene,
+            "explain" | "inspect" | "learn" | "learn-step" | "learn-done"
+        ) {
             ui.drawer_open = true;
         }
         if j.scene == "explain" {
@@ -435,7 +440,7 @@ impl App {
             ui.selected_module = None;
             ui.inspect.open = true;
         }
-        if j.scene == "learn" {
+        if j.scene.starts_with("learn") {
             ui.lessons.open = true;
         }
         // Panel authoring (advanced): a "Voice" composite made from the filter, once, with one
@@ -958,6 +963,20 @@ impl eframe::App for App {
             self.ui.zoom = 1.0;
             self.ui.pan = egui::vec2(-700.0, -560.0);
         }
+        // The Filter movement lesson, started the way its card starts it: its first step with
+        // the Cutoff knob ringed, or (learn-done) its end page.
+        if self.f == 6 && matches!(self.jobs[self.i].scene, "learn-step" | "learn-done") {
+            let i = kabl_ui::lessons::all()
+                .iter()
+                .position(|l| l.id == "filter-movement")
+                .expect("the filter-movement lesson");
+            kabl_ui::lessons::start(&mut self.editor, &mut self.ui, i);
+        }
+        if self.f == 12 && self.jobs[self.i].scene == "learn-done" {
+            if let Some(a) = self.ui.lessons.active.as_mut() {
+                a.step = kabl_ui::lessons::all()[a.lesson].steps.len();
+            }
+        }
         // Panel authoring opens once the first frames, which reset its state, are past.
         if self.f == 6 && self.jobs[self.i].scene == "dev-tools" {
             let (&id, c) = self.editor.state().composites.iter().next().unwrap();
@@ -1126,6 +1145,7 @@ impl eframe::App for App {
             || self.jobs[self.i].scene.starts_with("more-controls")
             || self.jobs[self.i].scene == "dev-tools"
             || self.jobs[self.i].scene == "settings"
+            || self.jobs[self.i].scene.starts_with("learn-")
         {
             30
         } else {

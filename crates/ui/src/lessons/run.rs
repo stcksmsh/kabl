@@ -37,6 +37,10 @@ pub struct Active {
     pub base: Baseline,
     /// When the last step completed by its conditions (the panel says so briefly).
     pub completed_at: Option<f64>,
+    /// The step's conditions have not all held at some frame since it was entered. A step
+    /// whose conditions already hold when it starts waits for a change, so it is not passed
+    /// before the user has read it.
+    pub armed: bool,
 }
 
 /// Learn tab state. View only.
@@ -136,9 +140,18 @@ pub fn holds(c: &Cond, editor: &PatchEditor, ui: &UiState, base: &Baseline) -> b
             to,
             kind,
             param,
+            amount_below,
         } => {
             kind_ok(state, *to, kind)
-                && route(state, *from, port, *to, param).is_some_and(|(_, bypassed)| !bypassed)
+                && route(state, *from, port, *to, param).is_some_and(|(cable, bypassed)| {
+                    !bypassed
+                        && amount_below.is_none_or(|below| {
+                            state.cables[&cable]
+                                .params
+                                .get("amount")
+                                .is_some_and(|a| *a < below)
+                        })
+                })
         }
         Cond::Inspecting { id, port } => ui
             .inspect
@@ -169,21 +182,29 @@ pub fn frame(editor: &PatchEditor, ui: &mut UiState, now: f64) {
         let opened = editor.instance() != before
             && matches!(&ui.doc, Some(d) if d.origin == DocOrigin::Library(l.start.sound.clone()));
         if opened {
+            // Resume where the user left off; a finished lesson starts over.
+            let step = ui
+                .library
+                .as_ref()
+                .and_then(|lib| lib.prefs.lessons.get(&l.id))
+                .map_or(0, |p| p.step);
+            let step = if step < l.steps.len() { step } else { 0 };
             ui.lessons.pending = None;
             ui.lessons.active = Some(Active {
                 lesson: i,
-                step: 0,
+                step,
                 editor: editor.instance(),
                 detached: false,
                 base: Baseline::of(editor),
                 completed_at: None,
+                armed: false,
             });
             ui.lessons.open = true;
-            ui.compare.capture(editor, "the recipe");
-            log::debug!(target: "lesson", "active lesson={}", l.id);
+            ui.compare.capture(editor, "the lesson start");
+            log::debug!(target: "lesson", "active lesson={} step={step}", l.id);
         } else if ui.browser.dialog.is_none() {
             ui.lessons.pending = None;
-            ui.lessons.note = Some("The recipe did not start; your sound is unchanged.".into());
+            ui.lessons.note = Some("The lesson did not start; your sound is unchanged.".into());
             log::debug!(target: "lesson", "start cancelled lesson={}", l.id);
         }
     }
@@ -194,8 +215,15 @@ pub fn frame(editor: &PatchEditor, ui: &mut UiState, now: f64) {
         a.detached = true;
         log::debug!(target: "lesson", "detached lesson={}", all()[a.lesson].id);
     }
+    if a.detached {
+        return;
+    }
     let a = a.clone();
-    if !a.detached && complete(&all()[a.lesson], &a, editor, ui) {
+    if !complete(&all()[a.lesson], &a, editor, ui) {
+        if let Some(a) = ui.lessons.active.as_mut() {
+            a.armed = true;
+        }
+    } else if a.armed {
         step_to(editor, ui, a.step + 1);
         if let Some(a) = ui.lessons.active.as_mut() {
             a.completed_at = Some(now);
@@ -218,12 +246,13 @@ pub(super) fn step_to(editor: &PatchEditor, ui: &mut UiState, step: usize) {
     a.step = step;
     a.base = Baseline::of(editor);
     a.completed_at = None;
+    a.armed = false;
     let l: &Lesson = &all()[a.lesson];
     log::debug!(target: "lesson", "step lesson={} step={step}", l.id);
     if let Some(lib) = ui.library.as_mut() {
         let p = lib.prefs.lessons.entry(l.id.clone()).or_default();
         let next = super::Progress {
-            step: p.step.max(step),
+            step,
             done: p.done || step >= l.steps.len(),
         };
         if *p != next {

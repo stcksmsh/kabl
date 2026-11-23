@@ -11,6 +11,7 @@ back up: darker, brighter."""
 show = { control = { id = 3, kind = "filter.svf", param = "cutoff_hz" } }
 play_note = 4.0
 anchor = "knob:3.cutoff_hz"
+done = [{ param_moved = { id = 3, kind = "filter.svf", param = "cutoff_hz", by = 300.0 } }]
 
 [[step]]
 text = """
@@ -20,6 +21,7 @@ Filter #3 Cutoff."""
 show = { route = { from = 7, port = "out", to = 3, kind = "filter.svf", param = "cutoff_hz" } }
 play_note = 4.0
 anchor = "knob:3.cutoff_hz"
+done = [{ route = { from = 7, port = "out", to = 3, kind = "filter.svf", param = "cutoff_hz" } }]
 
 [[step]]
 text = """
@@ -29,6 +31,10 @@ show = { control = { id = 7, kind = "lfo", param = "rate_hz" } }
 inspect = { id = 7, kind = "lfo", port = "out" }
 play_note = 4.0
 anchor = "knob:7.rate_hz"
+done = [
+  { inspecting = { id = 7, port = "out" } },
+  { param_moved = { id = 7, kind = "lfo", param = "rate_hz", by = 0.75 } },
+]
 
 [[step]]
 text = """
@@ -37,6 +43,7 @@ other way. Bypass the route to hear the filter without it."""
 show = { route = { from = 7, port = "out", to = 3, kind = "filter.svf", param = "cutoff_hz" } }
 play_note = 4.0
 anchor = "knob:3.cutoff_hz"
+done = [{ route = { from = 7, port = "out", to = 3, kind = "filter.svf", param = "cutoff_hz", amount_below = 0.0 } }]
 
 [[step]]
 text = """
@@ -44,6 +51,7 @@ Compare: Restore the reference (route bypassed, as you started), play, \
 then Back to my version (Undo)."""
 play_note = 4.0
 compare = true
+done = ["compare_restored"]
 
 [end]
 unguided = """

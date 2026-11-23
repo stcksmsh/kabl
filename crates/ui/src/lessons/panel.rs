@@ -46,7 +46,7 @@ fn test_note(ui_state: &mut UiState, secs: f32) {
 }
 
 /// The rect recorded last frame under `anchor`; a trailing `*` takes the first key it prefixes.
-fn anchor_rect(ui_state: &UiState, anchor: &str) -> Option<Rect> {
+pub fn anchor_rect(ui_state: &UiState, anchor: &str) -> Option<Rect> {
     match anchor.strip_suffix('*') {
         Some(prefix) => ui_state
             .hits
@@ -111,7 +111,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         &st,
         crate::style::Role::H3,
         crate::kit::Tone::Text,
-        "Listening recipes",
+        "Lessons",
     );
     if let Some(n) = ui_state.lessons.note.clone() {
         para(ui, n);
@@ -150,7 +150,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
              you. Your current sound is untouched.",
         );
         ui.horizontal(|ui| {
-            let b = ui.add(kb("Open the recipe patch again".into()));
+            let b = ui.add(kb("Open the lesson patch again".into()));
             ui_state.record("lesson-reopen".into(), b.rect);
             if b.clicked() {
                 start(editor, ui_state, a.lesson);

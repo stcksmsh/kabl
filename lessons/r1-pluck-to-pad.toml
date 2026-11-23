@@ -11,6 +11,7 @@ output: it rises and falls back to 0 while the key is still held."""
 inspect = { id = 6, kind = "env.adsr", port = "out" }
 play_note = 2.0
 anchor = "module:6"
+done = [{ inspecting = { id = 6, port = "out" } }]
 
 [[step]]
 text = """
@@ -19,6 +20,7 @@ level for as long as the key is down."""
 show = { control = { id = 6, kind = "env.adsr", param = "sustain" } }
 play_note = 2.0
 anchor = "knob:6.sustain"
+done = [{ param_moved = { id = 6, kind = "env.adsr", param = "sustain", by = 0.3 } }]
 
 [[step]]
 text = """
@@ -27,6 +29,7 @@ of stopping. Release only starts when the key is released."""
 show = { control = { id = 6, kind = "env.adsr", param = "release_ms" } }
 play_note = 2.0
 anchor = "knob:6.release_ms"
+done = [{ param_moved = { id = 6, kind = "env.adsr", param = "release_ms", by = 300.0 } }]
 
 [[step]]
 text = """
@@ -35,6 +38,7 @@ plus release is a pad."""
 show = { control = { id = 6, kind = "env.adsr", param = "attack_ms" } }
 play_note = 2.0
 anchor = "knob:6.attack_ms"
+done = [{ param_moved = { id = 6, kind = "env.adsr", param = "attack_ms", by = 300.0 } }]
 
 [[step]]
 text = """
@@ -42,6 +46,7 @@ Compare: Restore the reference (the pluck you started from), play, then \
 Back to my version (Undo) to keep your pad."""
 play_note = 2.0
 compare = true
+done = ["compare_restored"]
 
 [end]
 unguided = """

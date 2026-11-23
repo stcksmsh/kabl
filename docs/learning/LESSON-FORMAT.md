@@ -41,7 +41,7 @@ Only `text` is required. Each optional field adds one button to the step, shown 
 | `play_note` | **Play test note** plays middle C for this many seconds at a fixed velocity. |
 | `compare` | **Open Compare**. |
 | `anchor` | A `UiState::hits` key (`knob:4.cutoff_hz`, `module:6`, `pcard:…`). While the step shows, it gets an accent ring with a slow pulse. The ring takes no input. A trailing `*` matches the first key with that prefix. |
-| `done` | Completion conditions. Once all of them hold, the step advances by itself and the panel shows "Step n done." for a moment. If `done` is empty, the step only advances on **Next**. **Previous** always works. |
+| `done` | Completion conditions. Once all of them hold, the step advances by itself and the panel shows "Step n done." for a moment. If they already all hold when the step starts, the step waits until they have stopped holding once and hold again, so a step is never passed before the user has read it. If `done` is empty, the step only advances on **Next**. **Previous** always works. |
 
 Targets are named by explicit module id and kind, never by name. If a target is missing or has
 another kind, the step says so and suggests Undo. It never guesses.
@@ -56,6 +56,7 @@ undo position saved when the step was entered.
 | `{ opened = "factory:…" }` | the open document is that library sound |
 | `{ param_moved = { id, kind, param, by } }` | the parameter moved by at least `by` (in its own units) since the step started |
 | `{ route = { from, port, to, kind, param } }` | that modulation route exists and is not bypassed |
+| `{ route = { from, port, to, kind, param, amount_below } }` | as above, and its depth is below `amount_below` (-1 to 1) |
 | `{ inspecting = { id, port } }` | the signal inspector has that output selected |
 | `"compare_restored"` | the Compare reference was restored during this step and not undone |
 
@@ -64,14 +65,18 @@ New conditions are new variants of `lessons::Cond`. They are not an expression l
 ## Validation
 
 Unknown fields, unknown conditions, a missing `id`/`title`/`start`/`end`, no steps, empty `text`,
-an empty `anchor`, a `play_note` out of range and a `param_moved.by` that is not above 0 are all
+an empty `anchor`, a `play_note` out of range, a `param_moved.by` that is not above 0 and a
+`route.amount_below` that is not a number are all
 rejected. The error names the file and the reason. The unit tests parse every embedded file, so
 a bad file fails CI. `crates/ui/tests/signal_inspection.rs` also opens each lesson and checks
-that every `show` target resolves and every `anchor` is drawn.
+that every `show` target resolves and every `anchor` is drawn. `crates/ui/tests/lessons.rs`
+walks every lesson on its real patch and checks that each step completes only once its
+conditions hold, and that the runner adds nothing to the op log.
 
 ## Progress
 
 `library.json` (in `KABL_USER_DIR` or `$XDG_DATA_HOME/kabl`) has
-`"lessons": { "<id>": { "step": n, "done": bool } }`, where `step` is the furthest step reached
-and `done` means the end page was reached once. The standalone app and every plugin instance
+`"lessons": { "<id>": { "step": n, "done": bool } }`, where `step` is the step the user was last
+on and `done` means the end page was reached once. Reopening a lesson resumes at `step`; a
+lesson left on its end page starts again from the first step. The standalone app and every plugin instance
 share it. Files from before lessons existed have no `lessons` field and load with no progress.

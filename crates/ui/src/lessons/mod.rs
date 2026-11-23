@@ -18,7 +18,7 @@ use std::sync::OnceLock;
 use kabl_core::ModuleId;
 use serde::{Deserialize, Serialize};
 
-pub use panel::{mark, panel};
+pub use panel::{anchor_rect, mark, panel};
 pub use run::{frame, holds, resolve, start, Active, Baseline, Learn};
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -121,13 +121,16 @@ pub enum Cond {
         param: String,
         by: f32,
     },
-    /// A modulation route from `from`'s `port` into `to`'s `param` exists and is not bypassed.
+    /// A modulation route from `from`'s `port` into `to`'s `param` exists and is not bypassed,
+    /// with its depth below `amount_below` when that is given.
     Route {
         from: ModuleId,
         port: String,
         to: ModuleId,
         kind: String,
         param: String,
+        #[serde(default)]
+        amount_below: Option<f32>,
     },
     /// The signal inspector has this output selected.
     Inspecting { id: ModuleId, port: String },
@@ -139,7 +142,8 @@ pub enum Cond {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Progress {
-    /// The furthest step reached (the step count once on the unguided page).
+    /// The step the user was last on (the step count on the unguided page); reopening the
+    /// lesson resumes there.
     pub step: usize,
     /// Reached the end at least once.
     pub done: bool,
@@ -169,10 +173,17 @@ pub fn parse(name: &str, text: &str) -> Result<Lesson, String> {
             return bad(&format!("step {n}: `anchor` is empty"));
         }
         for c in &s.done {
-            if let Cond::ParamMoved { by, .. } = c {
-                if !(by.is_finite() && *by > 0.0) {
+            match c {
+                Cond::ParamMoved { by, .. } if !(by.is_finite() && *by > 0.0) => {
                     return bad(&format!("step {n}: `param_moved.by` must be above 0"));
                 }
+                Cond::Route {
+                    amount_below: Some(a),
+                    ..
+                } if !a.is_finite() => {
+                    return bad(&format!("step {n}: `route.amount_below` must be a number"));
+                }
+                _ => {}
             }
         }
     }

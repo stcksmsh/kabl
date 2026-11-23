@@ -7,11 +7,12 @@ start = { sound = "factory:interlocking" }
 [[step]]
 text = """
 Press Start. Clock #1 drives Seq #3 (bass, 7 steps, every 16th) directly \
-and Seq #4 (lead, 5 steps) through Divider #2. The inspector counts the \
-clock's edges."""
+and Seq #4 (lead, 5 steps) through Divider #2. Inspect the clock: the \
+inspector counts its edges."""
 show = { module = { id = 1, kind = "clock" } }
 inspect = { id = 1, kind = "clock", port = "gate" }
 anchor = "module:1"
+done = [{ inspecting = { id = 1, port = "gate" } }]
 
 [[step]]
 text = """
@@ -20,6 +21,7 @@ steps on 8ths."""
 show = { module = { id = 2, kind = "clock.div" } }
 inspect = { id = 2, kind = "clock.div", port = "gate" }
 anchor = "module:2"
+done = [{ inspecting = { id = 2, port = "gate" } }]
 
 [[step]]
 text = """
@@ -27,6 +29,7 @@ Set Seq #4 Length from 5 to 4: the lead now repeats every bar while the \
 7-step bass still drifts against it."""
 show = { control = { id = 4, kind = "seq", param = "length" } }
 anchor = "knob:4.length"
+done = [{ param_moved = { id = 4, kind = "seq", param = "length", by = 1.0 } }]
 
 [[step]]
 text = """
@@ -35,12 +38,14 @@ every bar. Keep whichever you like."""
 show = { control = { id = 3, kind = "seq", param = "length" } }
 inspect = { id = 3, kind = "seq", port = "gate" }
 anchor = "knob:3.length"
+done = [{ param_moved = { id = 3, kind = "seq", param = "length", by = 1.0 } }]
 
 [[step]]
 text = """
 Compare: Restore the reference (7 against 5), listen, then Back to my \
 version (Undo)."""
 compare = true
+done = ["compare_restored"]
 
 [end]
 unguided = """
