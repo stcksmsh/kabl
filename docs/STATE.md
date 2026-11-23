@@ -11,14 +11,15 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 ## In flight
 - #205 release-mode test fix (`e81bd2c3`): 9/9 green, reviewer clean. Waits for Kosta "merge 205 and tag rc.2".
 - #207 this roadmap + state (`claude/roadmap-pivot`): docs only, reviewer minor findings all fixed. Waits for Kosta "merge 207".
-- #206 C0 golden hashes for the 129 browser patches (`claude/golden-corpus`, `f17d2194`): reworked to 8 s renders for all + each cue launched once (4 patches have cues); test moved to `crates/ui/tests/golden_corpus.rs`. Re-review and CI running.
-- L1 lesson engine (`claude/lesson-engine`, opus builder): engine + TOML format + runner + progress in library.json, recipes ported unchanged, captures to `.claude/tmp/listen/lessons/`. No PR yet when this was written. If the builder died with the session, check the branch on origin and re-dispatch from the ROADMAP L1 slice.
+ALL AGENTS STOPPED on Kosta's order (restart). Nothing is running.
+- #206 C0 golden hashes (`claude/golden-corpus`, `f17d2194`): 8 s renders for all 129 + each cue launched once (4 patches); test in `crates/ui/tests/golden_corpus.rs`. Re-review minor, two fixes left: assert patches-with-cue-launches == 4 in the check path; doc comment must say launch timing/quantisation (clock Launch, cancel) is bypassed. Partial edit stashed in worktree `.claude/worktrees/agent-a33dc2beb27fc4692` (`git stash list`); redo it if lost. CI on f17d2194 was not confirmed.
+- L1 lesson engine: WIP pushed to `claude/lesson-engine` (`a6f55cdb`, "WIP ... not yet verified"; 18 files: crates/ui/src/lessons/{mod,panel,patches,run,tests}.rs, lessons/r1..r3.toml, docs/learning/LESSON-FORMAT.md, recipes.rs removed). Not built/tested/captured yet, no PR. Re-dispatch a builder from the ROADMAP L1 slice to finish it from that branch (verify recipes unchanged, captures, draft PR). It was blocked waiting on the shared kabl-ui OUT_DIR used by the C0 build.
 - #203 promo v2 (`11c9acd3`, draft, CI green on earlier head): captioned A video at `.claude/tmp/listen/promo/promo-v2-A-captions.mp4`, zoom done in image space (no label popping), unsaved dot fixed. PARKED per pivot (E after composites). Known fix before any use: caption "More than 100 factory sounds, each played from a few named macros" is false (11 of 129 have no macros); wide racks still cut off (needs UI fit-to-view).
 
 ## Next
 1. After "merge 205": merge, tag `v1.0.0-rc.2` via gh api on the merge commit, watch release run (R2); then R3 clean-profile install (builder), then Kosta's acceptance (R4). R1 (ACCEPTANCE-V1 §1/§2 docs fix) before R4.
-2. #206: re-review after the rework push; offer merge when green.
-3. L1: review PR when it lands; then L2 (computer-key notes + key strip) and L4 (macro reveal).
+2. #206: finish the two minor fixes, confirm CI green (note test job time), offer merge.
+3. L1: finish from the WIP branch, review, PR; then L2 (computer-key notes + key strip) and L4 (macro reveal). Run C0 and L1 builds one after the other: both rebuild kabl-ui and fight over its build script/OUT_DIR.
 4. When OD-C2 answered: CI1 (factory composite ids + bank), then CI2 (generators emit composites), then CB1-CB4 (Space, Drum Kit, Sequenced Part, Glue Bus).
 5. When OD-W9 answered: W1 (RT handle Send fix + windows-latest CI).
 
