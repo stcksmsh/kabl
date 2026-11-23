@@ -61,6 +61,9 @@ pub(crate) struct OutputCallback {
     pub(crate) channels: usize,
     pub(crate) rt_tried: bool,
     /// Held while the stream lives: real-time priority ends when it drops.
+    /// Not on Windows: there the handle wraps a raw MMCSS `HANDLE`, so it is not `Send`
+    /// and cannot live in the cpal callback.
+    #[cfg(not(windows))]
     pub(crate) _rt_handle: Option<audio_thread_priority::RtPriorityHandle>,
     #[cfg(test)]
     pub(crate) warmups: u32,
@@ -84,14 +87,21 @@ impl OutputCallback {
         if !self.rt_tried {
             self.rt_tried = true;
             let frames = (data.len() / channels) as u32;
-            match audio_thread_priority::promote_current_thread_to_real_time(
+            let promoted = audio_thread_priority::promote_current_thread_to_real_time(
                 frames,
                 sample_rate as u32,
-            ) {
-                Ok(h) => {
-                    self._rt_handle = Some(h);
-                    t.rt.store(1, Ordering::Relaxed);
-                }
+            );
+            #[cfg(not(windows))]
+            let promoted = promoted.map(|h| self._rt_handle = Some(h));
+            // audio_thread_priority 0.38's Windows handle has no `Drop`: dropping it does
+            // not call `AvRevertMmThreadCharacteristics`. The thread stays in the MMCSS
+            // "Audio" class until it exits, and cpal's WASAPI stream thread exits when the
+            // stream is dropped, so the promotion lasts exactly as long as the stream. The
+            // handle is dropped here, on the audio thread, so it never needs `Send`.
+            #[cfg(windows)]
+            let promoted = promoted.map(|_mmcss_task| ());
+            match promoted {
+                Ok(()) => t.rt.store(1, Ordering::Relaxed),
                 Err(e) => {
                     let _ = t.rt_error.set(e.to_string());
                     t.rt.store(2, Ordering::Relaxed);
