@@ -559,8 +559,10 @@ pub struct FactoryEntry {
     pub definition: Definition,
 }
 /// The factory composite bank: `KABL_FACTORY_COMPOSITES_DIR`, else
-/// `<exe>/../share/kabl/composites` (the package layout), else `$XDG_DATA_DIRS/kabl/composites`,
-/// else the source checkout's `composites/` (a development build).
+/// `<exe>/../share/kabl/factory-composites` (the package layout), else
+/// `$XDG_DATA_DIRS/kabl/factory-composites`, else the source checkout's `composites/` (a
+/// development build). Not `share/kabl/composites`: installed under `~/.local` that is the user
+/// library.
 pub fn find_factory_bank() -> Option<std::path::PathBuf> {
     if let Some(d) = std::env::var_os("KABL_FACTORY_COMPOSITES_DIR") {
         return Some(d.into());
@@ -571,7 +573,7 @@ pub fn find_factory_bank() -> Option<std::path::PathBuf> {
         .and_then(|e| e.canonicalize().ok())
         .and_then(|e| e.parent().map(Path::to_path_buf))
     {
-        candidates.push(bin.join("../share/kabl/composites"));
+        candidates.push(bin.join("../share/kabl/factory-composites"));
     }
     let data_dirs = std::env::var("XDG_DATA_DIRS")
         .ok()
@@ -580,7 +582,7 @@ pub fn find_factory_bank() -> Option<std::path::PathBuf> {
     candidates.extend(
         data_dirs
             .split(':')
-            .map(|d| Path::new(d).join("kabl/composites")),
+            .map(|d| Path::new(d).join("kabl/factory-composites")),
     );
     candidates.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composites"));
     candidates.into_iter().find(|d| d.is_dir())

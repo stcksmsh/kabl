@@ -4,7 +4,7 @@
 #   ./install.sh [--prefix DIR] [--clap-dir DIR]     default: ~/.local and ~/.clap
 #   ./install.sh --uninstall [--prefix DIR] [--clap-dir DIR]
 #
-# Standalone: DIR/bin/kabl-ui, DIR/share/kabl/patches (factory sounds, found relative to the
+# Standalone: DIR/bin/kabl-ui, DIR/share/kabl/{patches,factory-composites} (found relative to the
 # binary), a desktop entry and icons under DIR/share. CLAP plugin: CLAP-DIR/kabl.clap.
 # Uninstall removes exactly those. Your own sounds (~/.local/share/kabl/sounds), library and
 # logs are never touched.
@@ -34,7 +34,7 @@ refresh_caches() {
 
 if [ "$uninstall" = 1 ]; then
   rm -f "$prefix/bin/kabl-ui" "$prefix/share/applications/kabl.desktop" "$clap/kabl.clap"
-  rm -rf "$prefix/share/kabl/patches"
+  rm -rf "$prefix/share/kabl/patches" "$prefix/share/kabl/factory-composites"
   rm -f "$prefix"/share/icons/hicolor/*/apps/kabl.png "$prefix/share/icons/hicolor/scalable/apps/kabl.svg"
   rmdir "$prefix/share/kabl" 2>/dev/null || true # only if empty: user sounds live there too
   refresh_caches
@@ -44,9 +44,10 @@ fi
 
 install -Dm755 "$src/bin/kabl-ui" "$prefix/bin/kabl-ui"
 install -Dm755 "$src/lib/clap/kabl.clap" "$clap/kabl.clap"
-rm -rf "$prefix/share/kabl/patches"
+rm -rf "$prefix/share/kabl/patches" "$prefix/share/kabl/factory-composites"
 mkdir -p "$prefix/share/kabl"
 cp -r "$src/share/kabl/patches" "$prefix/share/kabl/patches"
+cp -r "$src/share/kabl/factory-composites" "$prefix/share/kabl/factory-composites"
 mkdir -p "$prefix/share/icons"
 cp -r "$src/share/icons/hicolor" "$prefix/share/icons/"
 mkdir -p "$prefix/share/applications"

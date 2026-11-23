@@ -33,12 +33,14 @@ a read-only home next to the factory sounds.
 The first that exists of:
 
 1. `KABL_FACTORY_COMPOSITES_DIR`;
-2. `<exe>/../share/kabl/composites` (the Linux package layout);
-3. `$XDG_DATA_DIRS/kabl/composites` (default `/usr/local/share:/usr/share`);
+2. `<exe>/../share/kabl/factory-composites` (the Linux package layout);
+3. `$XDG_DATA_DIRS/kabl/factory-composites` (default `/usr/local/share:/usr/share`);
 4. the source checkout's `composites/` (a development build).
 
-`packaging/linux/package.sh` copies `composites/` to `share/kabl/composites` next to
-`share/kabl/patches`. With no bank, or an empty one, Insert shows the user library only and
+`packaging/linux/package.sh` copies `composites/` to `share/kabl/factory-composites` next to
+`share/kabl/patches`, and `install.sh` installs and uninstalls it the same way. The name is not
+`share/kabl/composites` because, installed under `~/.local`, that folder is the user's
+composite library (`<user root>/composites`). With no bank, or an empty one, Insert shows the user library only and
 reports nothing.
 
 ## Insert
