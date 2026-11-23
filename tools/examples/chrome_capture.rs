@@ -198,8 +198,11 @@ fn perform_mockup_patch() -> PatchEditor {
 impl App {
     fn prepare(&mut self) {
         let j = &self.jobs[self.i];
-        // KABL_CAPTURE_PATCH=DIR captures another patch than the mockup's.
+        // KABL_CAPTURE_PATCH=DIR (or a .kabl file) captures another patch than the mockup's.
         self.editor = match std::env::var("KABL_CAPTURE_PATCH") {
+            Ok(d) if d.ends_with(".kabl") => PatchEditor::from_log(
+                kabl_core::format::load_kabl(std::path::Path::new(&d)).expect("capture patch"),
+            ),
             Ok(d) => PatchEditor::from_log(
                 kabl_core::load(std::path::Path::new(&d)).expect("capture patch"),
             ),
@@ -597,7 +600,12 @@ impl App {
                         }
                     }
                 }
-                ui.last_cue.insert(cues, 1);
+                // KABL_CAPTURE_CUE=N: the last launched cue (default 1).
+                let last = std::env::var("KABL_CAPTURE_CUE")
+                    .ok()
+                    .and_then(|n| n.parse().ok())
+                    .unwrap_or(1);
+                ui.last_cue.insert(cues, last);
             }
         }
         // Like the mockup: the oscillator-to-filter cable and the filter are selected.

@@ -1045,9 +1045,7 @@ fn cues_card(
                 .copied()
                 .unwrap_or((crate::banks::startup(&state, s), None))
         };
-        all.iter()
-            .map(|c| crate::cues::standing_now(c, &bank_of, ui_state.last_cue.get(&id).copied()))
-            .collect()
+        crate::cues::standing_all(&all, &bank_of, ui_state.last_cue.get(&id).copied())
     };
     let current = all.iter().zip(&standing).find(|(_, s)| s.0).map(|(c, _)| c);
     let any_queued = standing.iter().any(|s| s.1);

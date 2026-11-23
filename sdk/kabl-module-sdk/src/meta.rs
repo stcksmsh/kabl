@@ -24,7 +24,11 @@ pub const ABI_MINOR: u32 = 1;
 
 /// Longest meta text the builder accepts, in bytes.
 pub const META_CAP: usize = 2048;
-const MAX_PORTS: usize = 16;
+/// Slot limits per direction, the same as kabl's engine (`MAX_INPUTS`/`MAX_OUTPUTS`): a module
+/// over them is refused by the host. A width-2 port is two slots.
+const MAX_IN_SLOTS: usize = 4;
+const MAX_OUT_SLOTS: usize = 8;
+const MAX_PORTS: usize = MAX_OUT_SLOTS;
 const MAX_PARAMS: usize = 32;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -166,7 +170,10 @@ impl Meta {
     }
 
     pub const fn port_in(mut self, ty: PortType, name: &str, width: u32) -> Self {
-        assert!(self.n_in < MAX_PORTS, "too many input ports");
+        assert!(
+            self.n_in < MAX_PORTS && self.in_slots + width as usize <= MAX_IN_SLOTS,
+            "too many input ports: kabl allows at most 4 input slots (a width-2 port is 2)"
+        );
         self.ins[self.n_in] = Entry {
             start: self.len + 8 + port_type(ty).len() + 1,
             len: name.len(),
@@ -179,7 +186,10 @@ impl Meta {
     }
 
     pub const fn port_out(mut self, ty: PortType, name: &str, width: u32) -> Self {
-        assert!(self.n_out < MAX_PORTS, "too many output ports");
+        assert!(
+            self.n_out < MAX_PORTS && self.out_slots + width as usize <= MAX_OUT_SLOTS,
+            "too many output ports: kabl allows at most 8 output slots (a width-2 port is 2)"
+        );
         self.outs[self.n_out] = Entry {
             start: self.len + 9 + port_type(ty).len() + 1,
             len: name.len(),
