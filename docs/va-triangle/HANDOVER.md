@@ -14,9 +14,11 @@ before/after, check factory levels and goldens, keep peaks <= -1 dBFS. Commit, p
   phase, scaled by `dt`). `FullOsc` uses it too.
 - `crates/modules/src/builtins/osc_va.rs`: triangle uses `triangle_blamp`; the sync edge adds a
   BLAMP term for the triangle's slope change (`kink`), next to the existing BLEP jump term.
+  Saw and square keep master's exact sync expression: an earlier reordering of the float sum
+  changed the synced square in `palette/lead` and `expressive/lead` bit for bit.
 - `crates/modules/tests/osc_palette.rs`: `triangle_aliases_far_less_than_naive_at_the_same_level`
   and `synced_triangle_is_band_limited`.
-- Golden hashes updated for `expressive/lead`, `palette/lead`, `palette/keys` only.
+- Golden hash updated for `palette/keys` only (the one triangle patch in the curated list).
 
 ## Measured
 
@@ -29,12 +31,18 @@ before/after, check factory levels and goldens, keep peaks <= -1 dBFS. Commit, p
   each by 0.01 dB. Max peak -1.04 dBFS. 31 patches use the triangle (find with
   `.claude/tmp`-style script parsing `log.jsonl` for `osc.va` waveform = 1).
 
+## Golden check (all 148 patches, master vs branch)
+
+`KABL_WRITE_GOLDEN=1 cargo test --release -p kabl-engine --test golden_renders` (chord hash)
+and `KABL_DIGEST=<file> cargo test --release -p kabl-ui --test factory_bank render_digest --
+--ignored` (24 s demo render) on both builds, then diff. Both change exactly the triangle
+patches and nothing else; `presets/chandelier` uses the triangle and does not change.
+
 ## Passing
 
-fmt, clippy `--workspace --all-targets -D warnings`, `osc_palette`, `osc_va`, `golden_renders`
-(regenerated before the hash edit; re-run to confirm).
+fmt, clippy `--workspace --all-targets -D warnings`, `cargo test --workspace`.
 
 ## Remaining
 
-1. `cargo test --workspace` (stopped while compiling), incl. `-p kabl-ui --test factory_bank`.
-2. If green, open the PR with the numbers above. Never merge.
+None. Draft PR open; never merge. Listening pair (`presets/soft-sine`, melody C6-C8):
+`.claude/tmp/listen/triangle/triangle-{before,after}.wav` in the root checkout.
