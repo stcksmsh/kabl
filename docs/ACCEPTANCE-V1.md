@@ -40,7 +40,7 @@ Tick each box when the expected result happens; note anything off next to the it
 ## 6. Look
 - [ ] Look B is the default skin: readable and consistent across Rack, Perform and Sounds.
 - [ ] Theme setting: System, Light and Dark each apply at once and survive restart.
-- [ ] Perform view uses the teal accent; each track's lane has its own colour (none amber or teal).
+- [ ] Perform view uses the teal accent; lanes are coloured per track, cycling violet, green, teal (the third lane matches the accent).
 - [ ] Settings gear, cable palette: skin default plus 4 palettes each recolor cables at once. Note your answer: should sequencer gate faders follow the palette?
 
 ## 7. Accessibility
