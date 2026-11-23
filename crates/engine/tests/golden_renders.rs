@@ -8,7 +8,7 @@
 use std::path::Path;
 
 use kabl_engine::compile::compile;
-use kabl_engine::golden::{patch_dirs, SampleHash};
+use kabl_engine::golden::{chord_hash, patch_dirs};
 
 /// FNV-1a over the bit patterns of the left and right output.
 fn render_hash(dir: &Path) -> String {
@@ -18,23 +18,7 @@ fn render_hash(dir: &Path) -> String {
     let Ok(mut c) = compile(log.state(), 48000.0, 8) else {
         return "compile-error".into();
     };
-    let mut h = SampleHash::default();
-    for b in 0..400 {
-        if b == 0 {
-            for (v, n) in [(0usize, 0.0f32), (1, 4.0), (2, 7.0)] {
-                c.note_on(v, n, 0.8);
-            }
-        }
-        if b == 150 {
-            for v in 0..3 {
-                c.note_off(v);
-            }
-        }
-        c.process_block();
-        h.feed(c.left());
-        h.feed(c.right());
-    }
-    h.hex()
+    chord_hash(&mut c, 400, 150, |_, _| {})
 }
 
 #[test]

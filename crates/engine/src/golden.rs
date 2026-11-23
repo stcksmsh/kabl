@@ -45,3 +45,31 @@ impl SampleHash {
         format!("{:016x}", self.0)
     }
 }
+
+/// Render `blocks` blocks of the golden recipe and hash them: a three-note chord on voices 0 to 2
+/// from block 0, released at `release`. `each_block` runs before every block, for extra events.
+pub fn chord_hash(
+    c: &mut crate::compile::CompiledPatch,
+    blocks: usize,
+    release: usize,
+    mut each_block: impl FnMut(&mut crate::compile::CompiledPatch, usize),
+) -> String {
+    let mut h = SampleHash::default();
+    for b in 0..blocks {
+        if b == 0 {
+            for (v, n) in [(0usize, 0.0f32), (1, 4.0), (2, 7.0)] {
+                c.note_on(v, n, 0.8);
+            }
+        }
+        if b == release {
+            for v in 0..3 {
+                c.note_off(v);
+            }
+        }
+        each_block(c, b);
+        c.process_block();
+        h.feed(c.left());
+        h.feed(c.right());
+    }
+    h.hex()
+}

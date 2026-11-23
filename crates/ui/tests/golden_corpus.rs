@@ -18,7 +18,7 @@ use std::path::Path;
 
 use kabl_core::PatchState;
 use kabl_engine::compile::compile;
-use kabl_engine::golden::{patch_dirs, SampleHash};
+use kabl_engine::golden::{chord_hash, patch_dirs};
 use kabl_ui::cues;
 
 const COUNT: usize = 129;
@@ -56,26 +56,14 @@ fn render_hash(dir: &Path) -> (String, usize) {
     let Ok(mut c) = compile(log.state(), 48000.0, 8) else {
         return ("compile-error".into(), 0);
     };
-    let mut h = SampleHash::default();
-    for b in 0..BLOCKS {
-        if b == 0 {
-            for (v, n) in [(0usize, 0.0f32), (1, 4.0), (2, 7.0)] {
-                c.note_on(v, n, 0.8);
+    (
+        chord_hash(&mut c, BLOCKS, 3000, |c, b| {
+            for &(_, seq, bank) in launches.iter().filter(|l| l.0 == b) {
+                c.arm_bank(seq, bank, 0);
             }
-        }
-        if b == 3000 {
-            for v in 0..3 {
-                c.note_off(v);
-            }
-        }
-        for &(_, seq, bank) in launches.iter().filter(|l| l.0 == b) {
-            c.arm_bank(seq, bank, 0);
-        }
-        c.process_block();
-        h.feed(c.left());
-        h.feed(c.right());
-    }
-    (h.hex(), launches.len())
+        }),
+        launches.len(),
+    )
 }
 
 #[test]
