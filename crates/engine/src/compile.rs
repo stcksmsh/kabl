@@ -88,11 +88,11 @@ pub type BufIdx = usize;
 /// inputs; `seq`: 655 params) — `compile()` checks every module against these bounds and
 /// returns `CompileError::TooManyPorts` rather than silently truncating if a future built-in
 /// needs more.
-const MAX_INPUTS: usize = 4;
+const MAX_INPUTS: usize = kabl_modules::code::MAX_INPUTS;
 /// Output arity the audio-thread match in `process_block` handles directly (0–8; `macro`'s 8
 /// outputs is the largest). Bump alongside a new match arm if a module ever needs more, not just
 /// this constant.
-const MAX_OUTPUTS: usize = 8;
+const MAX_OUTPUTS: usize = kabl_modules::code::MAX_OUTPUTS;
 const MAX_PARAMS: usize = 655;
 
 /// Route amount when a `PortRef::Param` cable has no stored `amount` (+25 % of knob travel, the

@@ -561,10 +561,7 @@ pub(crate) fn cues_panel(
             .unwrap_or((banks::startup(state, s), None))
     };
     let last = ui_state.last_cue.get(&id).copied();
-    let standing: Vec<(bool, bool)> = all
-        .iter()
-        .map(|c| cues::standing_now(c, &bank_of, last))
-        .collect();
+    let standing = cues::standing_all(&all, &bank_of, last);
     let open_id = Id::new(("cue-open", id));
     let mut open: Option<usize> = ui.data(|d| d.get_temp(open_id)).flatten();
     let r = &st.roles;

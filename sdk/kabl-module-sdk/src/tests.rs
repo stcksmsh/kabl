@@ -67,6 +67,28 @@ mod meta {
     }
 
     #[test]
+    #[should_panic(expected = "at most 4 input slots")]
+    fn a_fifth_input_slot_is_refused() {
+        let mut m = Meta::new("a.b", 1);
+        for n in ["a", "b", "c", "d", "e"] {
+            m = m.port_in(PortType::Audio, n, 1);
+        }
+        let _ = m;
+    }
+
+    #[test]
+    fn four_inputs_and_eight_outputs_are_accepted() {
+        const OK: Meta = Meta::new("a.b", 1)
+            .port_in(PortType::Audio, "a", 2)
+            .port_in(PortType::Audio, "b", 2)
+            .port_out(PortType::Audio, "o1", 2)
+            .port_out(PortType::Audio, "o2", 2)
+            .port_out(PortType::Audio, "o3", 2)
+            .port_out(PortType::Audio, "o4", 2);
+        assert_eq!((OK.in_slots, OK.out_slots), (4, 8));
+    }
+
+    #[test]
     #[should_panic(expected = "spaces")]
     fn names_cannot_hold_spaces() {
         let _ = Meta::new("a.b", 1).param("two words", "0", "1", "0", Taper::Linear, 0, "");
