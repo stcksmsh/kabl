@@ -1,0 +1,49 @@
+# Listening recipe (docs/signal-inspection/design.md §4). Format: docs/learning/LESSON-FORMAT.md
+id = "pluck-to-pad"
+title = "Pluck to pad"
+summary = "Turn a short pluck into a slow pad with one envelope, one control at a time."
+start = { sound = "factory:recipes/pluck-to-pad" }
+
+[[step]]
+text = """
+Play the 2-second test note: a short pluck. The inspector shows ADSR #6's \
+output: it rises and falls back to 0 while the key is still held."""
+inspect = { id = 6, kind = "env.adsr", port = "out" }
+play_note = 2.0
+anchor = "module:6"
+
+[[step]]
+text = """
+Raise Sustain to about 70 % and play again: the note now holds at that \
+level for as long as the key is down."""
+show = { control = { id = 6, kind = "env.adsr", param = "sustain" } }
+play_note = 2.0
+anchor = "knob:6.sustain"
+
+[[step]]
+text = """
+Raise Release to about 1 s: after the key goes up the note fades instead \
+of stopping. Release only starts when the key is released."""
+show = { control = { id = 6, kind = "env.adsr", param = "release_ms" } }
+play_note = 2.0
+anchor = "knob:6.release_ms"
+
+[[step]]
+text = """
+Raise Attack to about 600 ms: the note swells in. Slow attack plus sustain \
+plus release is a pad."""
+show = { control = { id = 6, kind = "env.adsr", param = "attack_ms" } }
+play_note = 2.0
+anchor = "knob:6.attack_ms"
+
+[[step]]
+text = """
+Compare: Restore the reference (the pluck you started from), play, then \
+Back to my version (Undo) to keep your pad."""
+play_note = 2.0
+compare = true
+
+[end]
+unguided = """
+On your own: make a bowed string from the same envelope — medium attack, \
+full sustain, short release — then compare it with your pad."""

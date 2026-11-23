@@ -56,7 +56,7 @@ fn macros(e: &mut PatchEditor, names: [&str; 4], row: usize) -> ModuleId {
 }
 
 pub fn keyboard(bass: bool) -> PatchEditor {
-    let mut e = kabl_ui::recipes::pluck_to_pad();
+    let mut e = kabl_ui::lessons::patches::pluck_to_pad();
     let old_pins: Vec<_> = kabl_ui::perform::pins(e.state())
         .into_iter()
         .map(|p| (p.id, format!("pin.{}", p.key), None))

@@ -38,6 +38,7 @@ pub mod help;
 pub mod inspect;
 pub mod kit;
 mod label_dim;
+pub mod lessons;
 pub mod library;
 pub mod module_install;
 pub mod panels;
@@ -50,7 +51,6 @@ pub mod rack;
 mod rack_editor;
 mod wheel;
 use wheel::OwnedScroll;
-pub mod recipes;
 pub mod record;
 pub mod routing;
 mod seq_editor;
@@ -425,8 +425,8 @@ pub struct UiState {
     pub inspect: inspect::Inspect,
     /// The comparison reference (D03, session only).
     pub compare: compare::Compare,
-    /// The listening recipes (D03, view only).
-    pub recipes: recipes::Learn,
+    /// The Learn tab and the running lesson (view only).
+    pub lessons: lessons::Learn,
 }
 
 struct Moving {
@@ -585,7 +585,7 @@ impl Default for UiState {
             explain: Default::default(),
             inspect: Default::default(),
             compare: Default::default(),
-            recipes: Default::default(),
+            lessons: Default::default(),
         }
     }
 }
@@ -1037,8 +1037,8 @@ pub fn show_with(
     ui_state.validate(editor);
     ui_state.explain.validate(editor);
     ui_state.compare.validate(editor);
-    recipes::frame(editor, ui_state);
     let now = ui.input(|i| i.time);
+    lessons::frame(editor, ui_state, now);
     if let Some(c) = ui_state.inspect.frame(editor, ui_state.drawer_open, now) {
         ui_state.launches.push(c);
     }
@@ -1298,6 +1298,7 @@ pub fn show_with(
     }
     browser::dialogs(editor, ui_state, ui.ctx());
     tour::frame(editor, ui_state, ui, &st, page);
+    lessons::mark(ui_state, ui.ctx(), &st, page, now);
     show_toasts(ui_state, ui, &st, page);
     ui_state.explain.typing =
         routing::wants_text_input(ui.ctx()) || egui::Popup::is_any_open(ui.ctx());
@@ -1315,12 +1316,12 @@ fn drawer(
 ) {
     drawer::tabs(ui_state, ui, st);
     // Learn and Compare are tabs of their own: each replaces the drawer's body.
-    if ui_state.recipes.open {
+    if ui_state.lessons.open {
         egui::ScrollArea::vertical()
             .id_salt("kabl-recipes")
             .show_owned(ui, |ui| {
                 ui.set_max_width(DRAWER_W - 24.0);
-                recipes::panel(editor, ui_state, ui, now);
+                lessons::panel(editor, ui_state, ui, now);
             });
         return;
     }

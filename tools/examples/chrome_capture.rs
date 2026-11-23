@@ -436,7 +436,7 @@ impl App {
             ui.inspect.open = true;
         }
         if j.scene == "learn" {
-            ui.recipes.open = true;
+            ui.lessons.open = true;
         }
         // Panel authoring (advanced): a "Voice" composite made from the filter, once, with one
         // control and two jacks exposed. Last in SCENES, so no other scene sees the composite.

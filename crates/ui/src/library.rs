@@ -154,6 +154,8 @@ pub struct Prefs {
     pub preview_on_select: bool,
     /// The first-run tour was finished or skipped: it is not shown again.
     pub first_run_done: bool,
+    /// Lesson progress by lesson id. Missing in files written before lessons: no progress.
+    pub lessons: std::collections::BTreeMap<String, crate::lessons::Progress>,
 }
 
 #[derive(Debug)]
