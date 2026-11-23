@@ -216,13 +216,29 @@ def board(fullbar=False, dock_pulse=False, pad_flash=False):
             visual="end card: \"kabl 1.0: a whole song in one patch\"",
             macros={"1": 1.0, "3": 1.0}, hits=held([50, 57], 0, 2.0, 127)),
     ]
+    # The video's captions as (from bar, to bar, text): one line each, two bars or more so
+    # they can be read, every claim taken from README.md, CHANGELOG.md or this storyboard.
+    captions = [
+        (0, 2, "kabl: a legible modular synthesizer"),
+        (2, 4, "Perform: launch scenes and cues, they land on the bar"),
+        (4, 7, "More than 100 factory sounds, each played from a few named macros"),
+        (7, 9, "Cables glow from the live signal, in switchable palettes"),
+        (9, 10 + 2 * q, "53 built-in module kinds: FM, wavetable, filters, drums, a vocoder"),
+        (10 + 2 * q, drop, "Functional cables: step patterns, probability, A/B morph and glide"),
+        (drop, drop + 4, "Lichen-plus: Lichen's loops and Balcony's chords in one patch"),
+        (drop + 4, drop + 6, "Perform: transport, scenes, four macros and the step lanes"),
+        (drop + 6, drop + 8, "Write your own modules in Rust or C with the creator SDK"),
+        (drop + 8, drop + 10, "Estuary at 62 BPM: bell cables blinking in 5, 7 and 11"),
+        (drop + 10, drop + 12, "A standalone app and a CLAP plugin, on Linux"),
+    ]
     # Two bars of end card; the last 1.5 s fade to silence on the bar line.
-    return s, 28 + d
+    return s, 28 + d, captions
 
 
-def render(segs, board, end):
+def render(segs, board, end, captions):
     # `bar_secs`, `end` and each segment's placement are for `promo_render video`.
-    spec = {"bar_secs": BAR, "end": end, "segments": []}
+    spec = {"bar_secs": BAR, "end": end, "segments": [],
+            "captions": [dict(bar=a, bars=b - a, text=t) for a, b, t in captions]}
     for s in board:
         secs = max(s["offset"] + s["bars"] * BAR, (s["render_bars"] or 0) * BAR)
         spec["segments"].append(dict(name=s["name"], patch=s["patch"], preroll=s["preroll"],
@@ -363,11 +379,11 @@ if __name__ == "__main__":
     ap.add_argument("--pad-flash", action="store_true", help="Glacier pad in place of Pulpit")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
-    S, END = board(args.fullbar, args.dock_pulse, args.pad_flash)
+    S, END, CAPS = board(args.fullbar, args.dock_pulse, args.pad_flash)
     segs = os.path.join(args.out, args.name + "-segments")
     os.makedirs(segs, exist_ok=True)
     if os.environ.get("PROMO_SKIP_RENDER") is None:
-        render(segs, S, END)
+        render(segs, S, END, CAPS)
     bus, levels = mix(segs, S, END)
     lufs, tp = master(bus, args.out, args.name)
     n = cuesheet(args.out, args.name, S, END, levels, lufs, tp)

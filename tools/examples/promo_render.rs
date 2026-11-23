@@ -26,7 +26,8 @@
 //! `render` does, so the faces, cables, knobs and pads move with the sound in the mix. The visual
 //! text picks the view: the Sounds page, Perform, or the Rack. The frames and `MIX.wav` are muxed
 //! into `OUT.mp4` (H.264 and AAC, needs `ffmpeg`), and a still of every cut is written next to it
-//! in `OUT-stills/`. Nothing is played: the engine's audio is thrown away.
+//! in `OUT-stills/`. The spec's `captions` (`[{bar, bars, text}]`) are drawn as one line each in
+//! the lower third. Nothing is played: the engine's audio is thrown away.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -298,18 +299,29 @@ struct Cur {
     editor: PatchEditor,
     ui: UiState,
     warm: usize,
-    /// The view the rack's fit chose, for the camera push.
-    base: Option<(f32, egui::Vec2)>,
+}
+
+/// The screenshot the app waits for: the bare UI, or the finished frame drawn over it.
+#[derive(Clone, Copy, PartialEq)]
+enum Shot {
+    Ui,
+    Frame,
 }
 
 struct Video {
     slots: Vec<Slot>,
     si: usize,
     cur: Option<Cur>,
-    /// Next frame to draw, frames written.
+    /// The frame being drawn; frames before it are written.
     frame: usize,
-    got: usize,
     total: usize,
+    /// Captions as frames `start..end` and their text.
+    captions: Vec<(usize, usize, String)>,
+    /// The bare UI of this frame, which the finished frame scales and draws over.
+    shot: Option<egui::TextureHandle>,
+    want: Option<Shot>,
+    /// The UI shot of this frame is in: draw the finished frame next.
+    compose: bool,
     beat: f32,
     ffmpeg: Child,
     stills: PathBuf,
@@ -392,7 +404,6 @@ impl Video {
             editor,
             ui,
             warm: 0,
-            base: None,
         };
         cur.apply(events);
         cur
@@ -401,6 +412,9 @@ impl Video {
 
 impl Cur {
     fn apply(&mut self, events: Vec<Event>) {
+        if events.is_empty() {
+            return;
+        }
         for e in events {
             match e {
                 Event::Macro(k, v) => {
@@ -425,6 +439,10 @@ impl Cur {
                     self.ui.last_cue.insert(id, n);
                 }
             }
+        }
+        // The moves are the performance, not edits: keep the title free of the unsaved mark.
+        if let Some(doc) = self.ui.doc.as_mut() {
+            doc.saved = self.editor.state().clone();
         }
     }
 
@@ -467,31 +485,47 @@ impl eframe::App for Video {
             let egui::Event::Screenshot { image, .. } = e else {
                 continue;
             };
-            let raw: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
-            self.ffmpeg.stdin.as_mut().unwrap().write_all(&raw).unwrap();
-            if let Some((_, name)) = self.keep.iter().find(|k| k.0 == self.got) {
-                let p = self.stills.join(name);
-                image::save_buffer(&p, &raw, SIZE.0, SIZE.1, image::ColorType::Rgba8).unwrap();
-            }
-            self.got += 1;
-            self.idle = 0;
-            if self.got.is_multiple_of(FPS) {
-                println!("  {} s", self.got / FPS);
+            match self.want.take() {
+                Some(Shot::Ui) => {
+                    let img = (*image).clone();
+                    match &mut self.shot {
+                        Some(t) => t.set(img, egui::TextureOptions::LINEAR),
+                        None => {
+                            self.shot =
+                                Some(ctx.load_texture("ui", img, egui::TextureOptions::LINEAR));
+                        }
+                    }
+                    self.compose = true;
+                }
+                Some(Shot::Frame) => {
+                    let raw: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
+                    self.ffmpeg.stdin.as_mut().unwrap().write_all(&raw).unwrap();
+                    for (_, name) in self.keep.iter().filter(|k| k.0 == self.frame) {
+                        let p = self.stills.join(name);
+                        image::save_buffer(&p, &raw, SIZE.0, SIZE.1, image::ColorType::Rgba8)
+                            .unwrap();
+                    }
+                    self.frame += 1;
+                    self.compose = false;
+                    self.idle = 0;
+                    if self.frame.is_multiple_of(FPS) {
+                        println!("  {} s", self.frame / FPS);
+                    }
+                }
+                None => {}
             }
         }
-        if self.got >= self.total {
+        if self.frame >= self.total {
             drop(self.ffmpeg.stdin.take());
             assert!(self.ffmpeg.wait().unwrap().success(), "ffmpeg failed");
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             return;
         }
         ctx.request_repaint();
-        if self.frame >= self.total {
-            self.idle += 1;
-            assert!(self.idle < 120, "screenshots stopped at frame {}", self.got);
-            return;
-        }
-        if self.frame >= self.slots[self.si].end {
+        // A new frame moves the take on; while a shot is pending, and for the finished frame,
+        // the UI is drawn again at the same moment so nothing in it moves or restarts.
+        let fresh = self.want.is_none() && !self.compose;
+        if fresh && self.frame >= self.slots[self.si].end {
             self.si += 1;
             self.cur = None;
         }
@@ -502,32 +536,24 @@ impl eframe::App for Video {
         }
         let cur = self.cur.as_mut().unwrap();
         let now = self.frame as f64 / FPS as f64;
+        let dt = if fresh { 1.0 / FPS as f32 } else { 0.0 };
         ctx.input_mut(|i| {
             i.time = now;
-            i.stable_dt = 1.0 / FPS as f32;
-            i.unstable_dt = 1.0 / FPS as f32;
+            i.stable_dt = dt;
+            i.unstable_dt = dt;
         });
         let (w, h) = (SIZE.0 as f32, SIZE.1 as f32);
         let local = (self.frame - slot.start) as f32 / FPS as f32;
         let span = (slot.end - slot.start) as f32 / FPS as f32;
         let visual = slot.seg["visual"].as_str().unwrap_or("");
         let recording = cur.warm >= WARM;
-        if recording {
+        if fresh && recording {
             let offset = slot.seg.get("offset").map_or(0.0, f);
             cur.play(offset + local + 1.0 / FPS as f32, now);
-            if visual.contains("push") {
-                let (z0, p0) = *cur.base.get_or_insert((cur.ui.zoom, cur.ui.pan));
-                let z = z0 * (1.0 + 0.18 * ease(local / span));
-                let c = egui::vec2(w / 2.0, h / 2.0);
-                cur.ui.zoom = z;
-                cur.ui.pan = c - (c - p0) * (z / z0);
-            }
             if visual.contains("palette") {
                 let all = kabl_ui::style::CablePalette::ALL;
                 cur.ui.cable_palette = Some(all[(local / self.beat) as usize % all.len()]);
             }
-        } else {
-            cur.warm += 1;
         }
         let mut ui = egui::Ui::new(
             ctx.clone(),
@@ -535,11 +561,40 @@ impl eframe::App for Video {
             egui::UiBuilder::new().max_rect(Rect::from_min_size(Pos2::ZERO, egui::vec2(w, h))),
         );
         show(&mut cur.editor, &mut cur.ui, &mut ui);
+        if !recording {
+            cur.warm += 1;
+            return;
+        }
+        // A shot may come from a frame after the one that asked for it, so every frame until
+        // it arrives draws the same picture.
+        let ask = |want: &mut Option<Shot>, idle: &mut usize, shot: Shot| {
+            if want.is_none() {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(Default::default()));
+                *want = Some(shot);
+            } else {
+                *idle += 1;
+                assert!(*idle < 120, "screenshots stopped");
+            }
+        };
+        if !self.compose {
+            ask(&mut self.want, &mut self.idle, Shot::Ui);
+            return;
+        }
+        // The finished frame covers the UI: its shot, scaled for the camera push (the UI
+        // itself stays at one zoom, so its labels never switch detail mid-move), and the
+        // overlays on top.
         let painter = ctx.layer_painter(egui::LayerId::new(
-            egui::Order::Foreground,
-            egui::Id::new("promo overlay"),
+            egui::Order::Debug,
+            egui::Id::new("promo frame"),
         ));
         let screen = Rect::from_min_size(Pos2::ZERO, egui::vec2(w, h));
+        let z = if visual.contains("push") {
+            1.0 + 0.18 * ease(local / span)
+        } else {
+            1.0
+        };
+        let uv = Rect::from_center_size(Pos2::new(0.5, 0.5), egui::vec2(1.0 / z, 1.0 / z));
+        painter.image(self.shot.as_ref().unwrap().id(), screen, uv, Color32::WHITE);
         let shade = |a: f32, c: Color32| {
             if a > 0.0 {
                 painter.rect_filled(screen, 0.0, c.gamma_multiply(a.min(1.0)));
@@ -578,14 +633,33 @@ impl eframe::App for Video {
         if visual.contains("dims") {
             shade(0.45 * ease(local / span), Color32::BLACK);
         }
+        // Captions: one line on a dark plate in the lower third, in and out over half a beat
+        // on their bar lines.
+        let fade = self.beat / 2.0 * FPS as f32;
+        for (s, e, text) in &self.captions {
+            if !(*s..*e).contains(&self.frame) {
+                continue;
+            }
+            let a = ease((self.frame - s) as f32 / fade).min(ease((e - self.frame) as f32 / fade));
+            let galley = painter.layout_no_wrap(
+                text.clone(),
+                FontId::proportional(44.0),
+                Color32::WHITE.gamma_multiply(a),
+            );
+            let at = Pos2::new(w / 2.0, h - 120.0);
+            let plate = Rect::from_center_size(at, galley.size() + egui::vec2(56.0, 28.0));
+            painter.rect_filled(
+                plate,
+                12.0,
+                Color32::from_black_alpha(170).gamma_multiply(a),
+            );
+            painter.galley(at - galley.size() / 2.0, galley, Color32::WHITE);
+        }
         // In from black; out to black with the mix's last 1.5 s.
         shade(1.0 - now as f32 / 0.4, Color32::BLACK);
         let left = (self.total - self.frame) as f32 / FPS as f32;
         shade(1.0 - ease(left / 1.5), Color32::BLACK);
-        if recording {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
-            self.frame += 1;
-        }
+        ask(&mut self.want, &mut self.idle, Shot::Frame);
     }
 }
 
@@ -639,6 +713,21 @@ fn video(spec: &Value, audio: &Path, out: &Path) {
             keep.push((m, format!("{m:05}-{name}-mid.png")));
         }
     }
+    let captions: Vec<(usize, usize, String)> = spec["captions"]
+        .as_array()
+        .map_or(&[][..], Vec::as_slice)
+        .iter()
+        .map(|c| {
+            let s = at(f(&c["bar"]));
+            let text = c["text"].as_str().expect("caption text").to_owned();
+            (s, at(f(&c["bar"]) + f(&c["bars"])), text)
+        })
+        .collect();
+    // A still in the middle of every caption.
+    for (i, (s, e, _)) in captions.iter().enumerate() {
+        let m = (s + e) / 2;
+        keep.push((m, format!("{m:05}-caption-{:02}.png", i + 1)));
+    }
     keep.push((
         total - 2 * FPS,
         format!("{:05}-end-card.png", total - 2 * FPS),
@@ -672,8 +761,11 @@ fn video(spec: &Value, audio: &Path, out: &Path) {
         si: 0,
         cur: None,
         frame: 0,
-        got: 0,
         total,
+        captions,
+        shot: None,
+        want: None,
+        compose: false,
         beat: bar / 4.0,
         ffmpeg,
         stills,

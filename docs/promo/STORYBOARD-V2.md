@@ -101,8 +101,34 @@ faces, cables, macro knobs and scene pads move with what is heard. The visual te
 the Sounds page (searched to the preset, its card selected), Perform (for presets with scenes), or
 the Rack, fitted. "push" zooms in over the cut, "palette" steps the cable palette each beat,
 "dims" darkens; the last cut flashes white for a beat, then the end card. It opens from black and
-fades to black with the mix. The mix is muxed in (AAC 320k), and a still just after every cut goes
-to `NAME-stills/`.
+fades to black with the mix. The mix is muxed in (AAC 320k), and a still just after every cut and
+in the middle of every caption goes to `NAME-stills/`.
+
+The UI is always drawn at the zoom its fit chose. The push scales the finished picture instead,
+because the rack switches its labels on and off at fixed zoom levels, and a zoom that crossed one
+would make text pop in or out mid-move.
+
+#### Captions
+
+One line each, in the lower third on a dark plate, in the end card's typeface. Each fades in and
+out over half a beat on its bar lines. They live in `board()` in `build_animatic.py` and reach the
+video through `spec.json`. Every claim comes from the README, the changelog or this storyboard.
+The bars are variant A's; the build captions stretch with `--fullbar`, and the later ones move
+with the drop.
+
+| Bars | Caption |
+|---|---|
+| 0-2 | kabl: a legible modular synthesizer |
+| 2-4 | Perform: launch scenes and cues, they land on the bar |
+| 4-7 | More than 100 factory sounds, each played from a few named macros |
+| 7-9 | Cables glow from the live signal, in switchable palettes |
+| 9-11 | 53 built-in module kinds: FM, wavetable, filters, drums, a vocoder |
+| 11-14 | Functional cables: step patterns, probability, A/B morph and glide |
+| 14-18 | Lichen-plus: Lichen's loops and Balcony's chords in one patch |
+| 18-20 | Perform: transport, scenes, four macros and the step lanes |
+| 20-22 | Write your own modules in Rust or C with the creator SDK |
+| 22-24 | Estuary at 62 BPM: bell cables blinking in 5, 7 and 11 |
+| 24-26 | A standalone app and a CLAP plugin, on Linux |
 
 ## Variants
 
