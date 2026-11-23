@@ -38,7 +38,7 @@ The brief sets this order: roadmap; first-run and learning foundation; composite
 
 Release 1.0 on Linux finishes first and blocks nothing in A to D.
 
-In practice the streams overlap. A/B and C share no files until L8. The Windows path, filesystem and CI slices (W1 to W5) touch different files from A, B and C, so they can run beside them, within the three-build limit. W6 and later (VST3, editor, installer) wait until A1 is in place, because the editor work should see the first-run UI it has to host.
+In practice the streams overlap. A/B and C share no files until L8. The Windows path, filesystem and CI slices (W1 to W5) touch different files from A, B and C, so they can run beside them. W6 and later (VST3, editor, installer) wait until A1 is in place, because the editor work should see the first-run UI it has to host.
 
 ---
 
@@ -163,7 +163,7 @@ The plugin shows no first-run card at all (`crates/clap/src/lib.rs:853-858`).
 
 | id | slice | status | effort | depends |
 |---|---|---|---|---|
-| L1 | Lesson engine core with the recipes migrated: `crates/ui/src/lessons/{mod,run,panel}.rs`; the TOML format; the predicate enum (the recipes' predicates plus `opened`, `param_moved`, `route`, `inspecting`, `compare_restored`); `lessons/` embedded by `crates/ui/build.rs`; progress in `library::Prefs`; the Learn tab as hub; delete `recipes.rs`; port the recipe checks in `tests/signal_inspection.rs:725` | In flight (builder running, branch `claude/lesson-engine`) | M: well-bounded; the new code is the runner | - |
+| L1 | Lesson engine core with the recipes migrated: `crates/ui/src/lessons/{mod,run,panel}.rs`; the TOML format; the predicate enum (the recipes' predicates plus `opened`, `param_moved`, `route`, `inspecting`, `compare_restored`); `lessons/` embedded by `crates/ui/build.rs`; progress in `library::Prefs`; the Learn tab as hub; delete `recipes.rs`; port the recipe checks in `tests/signal_inspection.rs:725` | WORK: PR #209, waits on D03-R | M: well-bounded; the new code is the runner | - |
 | L5 | Lessons 1, 2, 3 (content, teaching patches under `patches/lessons/` from test generators, the remaining predicates) | DEP | M | L1, L3 (L2 for lesson 1) |
 | L6 | Lessons 6 and 8; the automation-lane hook in `crates/clap` (`lib.rs:646-660`) | DEP | M | L1 |
 | L7 | Lessons 4 and 5 on primitives; bindings by `added_in_step` | DEP; OWNER D5 | M | L1, L2 |
@@ -230,7 +230,7 @@ D10 panel UX is "changes requested" (`docs/panel-authoring/design.md:3`). The DS
 
 | id | slice | status | effort | depends |
 |---|---|---|---|---|
-| C0 | Golden render hashes for the whole Sounds corpus (129 patches), recorded on the base commit before any migration (G7). Each migration PR must then pass `cargo test -p kabl-engine --test golden_renders` unchanged | WORK: **PR #206 in review** | S | - |
+| C0 | Golden render hashes for the whole Sounds corpus (129 patches), recorded on the base commit before any migration (G7). Each migration PR must then pass `cargo test -p kabl-engine --test golden_renders` unchanged | DONE #206 | S | - |
 | CI1 | G4: deterministic factory definition ids (for example `kabl.space` v1) and a read-only factory `composites/` bank packed like `patches/`, for Insert. Instances embed and never auto-update | OWNER (OD-C2, id scheme) | M | C0 |
 | CI2 | G5: `encapsulate_with(definition, exposures{target,label,mapping}, panel)` so the generators in `tools/examples/presets_*.rs` emit stable logs; migration appends `SetComposite` after existing ops and keeps leaf and cable ids and order | DEP | M | CI1 |
 | CB1 | Space composite (C2) plus nested Space Return (C6); interface as in the catalogue's C2 section; standalone test plus a test inside a parent | DEP; OWNER (OD-C interface) | M | CI1, CI2 |
@@ -328,7 +328,7 @@ Order: W1; W2-W4 beside W5; W6; W7 and W8; W9 and W10; WA.
 
 | id | slice | status | effort | depends |
 |---|---|---|---|---|
-| E1 | Finish the #203 captions pass and park it as a draft. No video recording until E2 | WORK, in flight | S | - |
+| E1 | Finish the #203 captions pass and park it as a draft. No video recording until E2 | PARKED (#203 draft) | S | - |
 | E2 | Trailer: redo the Lichen sequence on the migrated patch (high-level patch, inspect a composite, change a control, back to the music; no huge flat rack). Lichen Plus's "Disco" becomes a parent with four C3 children | DEP; OWNER (taste on clips) | M | CM1, CP1 |
 | E3 | Walkthrough: record lesson 00 and lessons 1-3 through the real app, plus composites and Perform (learning report L9) | DEP | S-M | L3, L5, CM1 |
 
