@@ -13,7 +13,8 @@ kabl_ui::composites::encapsulate_with(
     name: &str,
     definition: kabl_core::Definition,
     members: BTreeSet<ModuleId>,
-    exposures: &[kabl_core::Exposure],   // { label, target }
+    ports: &[kabl_core::Exposure],      // { label, target }
+    controls: &[kabl_core::Exposure],
     panel: Option<kabl_core::panel::Panel>,
 ) -> Result<CompositeId, String>
 ```
@@ -21,11 +22,13 @@ kabl_ui::composites::encapsulate_with(
 - `members` are leaf modules that no composite owns yet. The new composite is top level.
 - `definition` is the caller's. A composite that stands for a factory definition uses its
   factory id and version, `kabl.<name>` vN (see `FACTORY-BANK.md`).
-- `exposures` become interface keys `1..=n` in the order given, so a `panel` can place them by
-  key. A `PortRef::Module` target becomes a port, a `PortRef::Param` target a control.
-- Every cable that crosses the boundary and is not already covered by a curated port is
-  exposed as a port after the curated ones, in cable-id order, with the label interactive
-  encapsulation gives it (`binding_label`, for example `out · #7`).
+- `ports` then `controls` become interface keys `1..=n` in the order given, so a `panel` can
+  place them by key. A port binds a module port or a parameter (a route into it); a control
+  binds a parameter.
+- The interface is exactly what the caller lists; nothing is added. Every cable that crosses
+  the boundary must have its inside end listed as a port, and every pinned parameter inside
+  the set must be listed as a control (interactive encapsulation keeps pins as controls, so a
+  curated interface must say what to call them).
 - The candidate patch is validated and compiled before anything is written.
 
 The `mapping` part of an exposure (display range, unit, curve, scaled multi-target) is gap G2,
@@ -39,8 +42,11 @@ Each returns an error and leaves the log untouched:
 | Case | Error names |
 |---|---|
 | An exposure target outside `members` (or a cable parameter) | the exposure's label and target |
+| A control whose target is not a parameter | the label and target |
 | Two exposures with the same label | the label |
-| The same target exposed twice | the label and target |
+| The same target listed twice as a port, or twice as a control | the label and target |
+| A boundary crossing no port covers | every such cable, with its inside and outside ends (`#<module>.<port>`) |
+| A pinned parameter no control covers | the pin (`#<module>.<param>`) |
 | A route moving a cable parameter across the boundary (G1, CI3) | the route, with the same text interactive encapsulation uses |
 | One outside source feeding two inside targets (fan-in, G3, CI4) | both cables and the source |
 | A member that is missing or already owned | the module |
@@ -54,7 +60,8 @@ which `Exposure` cannot hold until CI4.
 - The call appends exactly one entry, `Op::SetComposite`, after the existing ones. No earlier
   entry, module, cable, module id, cable id or id order changes. The flat leaf graph is the
   same, so the sound is bit-identical, and everything that addresses leaf ids keeps working:
-  macro routes, cues, MIDI CC maps (`cc.<param>`), pins and host automation lanes.
+  macro routes, cues, MIDI CC maps (`cc.<param>`) and host automation lanes. Pins keep
+  working because each must be a curated control.
 - The composite id is the next id the log has never used, counting composites in the state and
   every `SetComposite` in the log, undone ones included.
 - The entry's timestamp is the previous entry's (`0` for an empty log). Nothing in the entry
@@ -79,14 +86,15 @@ kabl_ui::composites::encapsulate_with(
     "Space",
     Definition { id: "kabl.space".into(), version: 1 },
     BTreeSet::from([echo, room, mix]),
+    // Ports: one per boundary crossing (here the send in and the return out).
     &[
         Exposure { label: "In".into(), target: jack(echo, "in") },
         Exposure { label: "Out".into(), target: jack(mix, "out") },
-        Exposure {
-            label: "Echo".into(),
-            target: PortRef::Param { id: echo, param: "mix".into() },
-        },
     ],
+    &[Exposure {
+        label: "Echo".into(),
+        target: PortRef::Param { id: echo, param: "mix".into() },
+    }],
     None,
 )
 .expect("Space wraps");

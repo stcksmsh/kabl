@@ -26,6 +26,9 @@ struct Fixture {
     delay: ModuleId,
     macros: ModuleId,
     cues: ModuleId,
+    osc: ModuleId,
+    env: ModuleId,
+    out: ModuleId,
 }
 
 /// The default voice (midi → osc → filter → VCA → out) with a delay before the output, a macro
@@ -65,6 +68,9 @@ fn fixture() -> Fixture {
         delay,
         macros,
         cues: cue_module,
+        osc: id(&e, "osc.va"),
+        env: id(&e, "env.adsr"),
+        out,
     }
 }
 
@@ -75,26 +81,40 @@ fn definition() -> Definition {
     }
 }
 
-fn exposures(f: &Fixture) -> Vec<Exposure> {
+fn exposure(label: &str, target: PortRef) -> Exposure {
+    Exposure {
+        label: label.into(),
+        target,
+    }
+}
+
+/// One port for every boundary crossing.
+fn ports(f: &Fixture) -> Vec<Exposure> {
     vec![
-        Exposure {
-            label: "Input".into(),
-            target: jack(f.filter, "in"),
-        },
-        Exposure {
-            label: "Cutoff".into(),
-            target: param(f.filter, "cutoff_hz"),
-        },
+        exposure("Input", jack(f.filter, "in")),
+        exposure("Envelope", jack(f.vca, "cv")),
+        exposure("Cutoff mod", param(f.filter, "cutoff_hz")),
+        exposure("Output", jack(f.delay, "out")),
     ]
 }
 
-fn wrap(log: &mut PatchLog, f: &Fixture, exposures: &[Exposure]) -> Result<u64, String> {
+fn controls(f: &Fixture) -> Vec<Exposure> {
+    vec![exposure("Cutoff", param(f.filter, "cutoff_hz"))]
+}
+
+fn wrap(
+    log: &mut PatchLog,
+    f: &Fixture,
+    ports: &[Exposure],
+    controls: &[Exposure],
+) -> Result<u64, String> {
     composites::encapsulate_with(
         log,
         "Tone",
         definition(),
         BTreeSet::from([f.filter, f.vca, f.delay]),
-        exposures,
+        ports,
+        controls,
         None,
     )
 }
@@ -122,7 +142,7 @@ fn wrapping_appends_one_set_composite_and_keeps_ids_sound_and_references() {
     let f = fixture();
     let flat = f.log.clone();
     let mut log = f.log.clone();
-    let id = wrap(&mut log, &f, &exposures(&f)).unwrap();
+    let id = wrap(&mut log, &f, &ports(&f), &controls(&f)).unwrap();
 
     // Earlier entries untouched; one SetComposite appended after them.
     assert_eq!(log.entries().len(), flat.entries().len() + 1);
@@ -145,15 +165,22 @@ fn wrapping_appends_one_set_composite_and_keeps_ids_sound_and_references() {
     assert!(a.modules.keys().eq(b.modules.keys()));
     assert!(a.cables.keys().eq(b.cables.keys()));
 
-    // Curated exposures get keys 1, 2 in order; the uncovered crossings follow as ports.
-    assert_eq!(c.ports[&1].label, "Input");
-    assert_eq!(c.ports[&1].target, jack(f.filter, "in"));
-    assert_eq!(c.controls[&2].label, "Cutoff");
-    assert_eq!(c.controls[&2].target, param(f.filter, "cutoff_hz"));
-    let crossing: Vec<_> = c.ports.values().map(|e| e.target.clone()).collect();
-    assert!(crossing.contains(&param(f.filter, "cutoff_hz")));
-    assert!(crossing.contains(&jack(f.vca, "cv")));
-    assert!(crossing.contains(&jack(f.delay, "out")));
+    // Exactly the curated interface: ports take keys 1..=4, then the control key 5.
+    let listed = |m: &std::collections::BTreeMap<u64, Exposure>| {
+        m.iter()
+            .map(|(&k, e)| (k, e.label.clone(), e.target.clone()))
+            .collect::<Vec<_>>()
+    };
+    let expected_ports: Vec<_> = ports(&f)
+        .into_iter()
+        .zip(1..)
+        .map(|(e, k)| (k, e.label, e.target))
+        .collect();
+    assert_eq!(listed(&c.ports), expected_ports);
+    assert_eq!(
+        listed(&c.controls),
+        vec![(5, "Cutoff".into(), param(f.filter, "cutoff_hz"))]
+    );
 
     // Sound: bit-identical, idle and with the macro moved to the cue's value.
     assert_eq!(render(a, |_| {}), render(b, |_| {}));
@@ -219,41 +246,35 @@ fn the_same_call_twice_gives_byte_identical_logs() {
     let f = fixture();
     let mut one = f.log.clone();
     let mut two = f.log.clone();
-    wrap(&mut one, &f, &exposures(&f)).unwrap();
-    wrap(&mut two, &f, &exposures(&f)).unwrap();
+    wrap(&mut one, &f, &ports(&f), &controls(&f)).unwrap();
+    wrap(&mut two, &f, &ports(&f), &controls(&f)).unwrap();
     assert_eq!(serialized(&one), serialized(&two));
 }
 
 #[test]
 fn edges_fail_with_a_named_error() {
     let f = fixture();
-    let refused = |log: &mut PatchLog, exposures: &[Exposure]| {
+    let refused = |log: &mut PatchLog, ports: &[Exposure], controls: &[Exposure]| {
         let before = serialized(log);
-        let err = wrap(log, &f, exposures).unwrap_err();
+        let err = wrap(log, &f, ports, controls).unwrap_err();
         assert_eq!(serialized(log), before, "a refusal appends nothing");
         err
     };
 
     // Target outside the wrapped set.
     let mut log = f.log.clone();
-    let mut outside = exposures(&f);
-    outside.push(Exposure {
-        label: "Macro".into(),
-        target: jack(f.macros, "m1"),
-    });
-    let err = refused(&mut log, &outside);
+    let mut outside = ports(&f);
+    outside.push(exposure("Macro", jack(f.macros, "m1")));
+    let err = refused(&mut log, &outside, &controls(&f));
     assert!(
         err.contains("\"Macro\"") && err.contains("not inside"),
         "{err}"
     );
 
     // Two exposures with the same label.
-    let mut twice = exposures(&f);
-    twice.push(Exposure {
-        label: "Cutoff".into(),
-        target: param(f.filter, "resonance"),
-    });
-    let err = refused(&mut log, &twice);
+    let mut twice = controls(&f);
+    twice.push(exposure("Cutoff", param(f.filter, "resonance")));
+    let err = refused(&mut log, &ports(&f), &twice);
     assert!(
         err.contains("Two exposures are labelled \"Cutoff\""),
         "{err}"
@@ -272,7 +293,7 @@ fn edges_fail_with_a_named_error() {
         .connect_cable_route(jack(f.macros, "m2"), route, kabl_engine::compile::DEPTH)
         .unwrap();
     let mut log = e.log().clone();
-    let err = refused(&mut log, &exposures(&f));
+    let err = refused(&mut log, &ports(&f), &controls(&f));
     assert!(
         err.contains(&format!("Route {g1} moves a cable parameter")),
         "{err}"
@@ -282,9 +303,61 @@ fn edges_fail_with_a_named_error() {
     let mut e = PatchEditor::from_log(f.log.clone());
     let fan = e.connect_route(jack(f.macros, "m1"), f.delay, "mix");
     let mut log = e.log().clone();
-    let err = refused(&mut log, &exposures(&f));
+    let err = refused(&mut log, &ports(&f), &controls(&f));
     assert!(
         err.contains(&format!("{fan} carry m1 · #{}", f.macros)) && err.contains("several targets"),
         "{err}"
     );
+
+    // A crossing no curated port covers: every one is named, with both ends.
+    let mut log = f.log.clone();
+    let err = refused(&mut log, &ports(&f)[1..3], &controls(&f));
+    let input = *f
+        .log
+        .state()
+        .cables
+        .iter()
+        .find(|(_, c)| c.to == jack(f.filter, "in"))
+        .unwrap()
+        .0;
+    let output = *f
+        .log
+        .state()
+        .cables
+        .iter()
+        .find(|(_, c)| c.from == jack(f.delay, "out"))
+        .unwrap()
+        .0;
+    assert!(
+        err.contains(&format!(
+            "cable {input} (#{}.in inside, #{}.out outside)",
+            f.filter, f.osc
+        )) && err.contains(&format!(
+            "cable {output} (#{}.out inside, #{}.in outside)",
+            f.delay, f.out
+        )) && !err.contains(&format!("#{}.out outside", f.env)),
+        "{err}"
+    );
+
+    // A pinned parameter must be a curated control, as interactive encapsulation keeps pins.
+    let mut e = PatchEditor::from_log(f.log.clone());
+    perform::toggle_pin(&mut e, f.vca, "gain");
+    let mut log = e.log().clone();
+    let err = refused(&mut log, &ports(&f), &controls(&f));
+    assert!(
+        err.contains(&format!("Pinned parameter #{}.gain", f.vca)),
+        "{err}"
+    );
+    let mut pinned = controls(&f);
+    pinned.push(exposure("Level", param(f.vca, "gain")));
+    wrap(&mut log, &f, &ports(&f), &pinned).unwrap();
+
+    // A control must bind a parameter.
+    let mut log = f.log.clone();
+    let err = refused(
+        &mut log,
+        &ports(&f),
+        &[exposure("Jack", jack(f.filter, "in"))],
+    );
+    assert!(err.contains("Control \"Jack\""), "{err}");
 }
