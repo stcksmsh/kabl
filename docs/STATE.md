@@ -11,7 +11,7 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 ## In flight
 - #205 release-mode test fix (`e81bd2c3`): 9/9 green, reviewer clean. Waits for Kosta "merge 205 and tag rc.2".
 - #207 this roadmap + state (`claude/roadmap-pivot`): docs only, reviewer minor findings all fixed. Waits for Kosta "merge 207".
-- #206 C0 golden hashes for the 129 browser patches (`claude/golden-corpus`): reviewer minor (render 0.53 s reaches only 4-5 sequencer steps). Builder sent back to render non-preset folders ~8 s and launch each cue once; re-review and re-run CI after its push.
+- #206 C0 golden hashes for the 129 browser patches (`claude/golden-corpus`, `f17d2194`): reworked to 8 s renders for all + each cue launched once (4 patches have cues); test moved to `crates/ui/tests/golden_corpus.rs`. Re-review and CI running.
 - L1 lesson engine (`claude/lesson-engine`, opus builder): engine + TOML format + runner + progress in library.json, recipes ported unchanged, captures to `.claude/tmp/listen/lessons/`. No PR yet when this was written. If the builder died with the session, check the branch on origin and re-dispatch from the ROADMAP L1 slice.
 - #203 promo v2 (`11c9acd3`, draft, CI green on earlier head): captioned A video at `.claude/tmp/listen/promo/promo-v2-A-captions.mp4`, zoom done in image space (no label popping), unsaved dot fixed. PARKED per pivot (E after composites). Known fix before any use: caption "More than 100 factory sounds, each played from a few named macros" is false (11 of 129 have no macros); wide racks still cut off (needs UI fit-to-view).
 
@@ -30,6 +30,7 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 
 ## Hard-won facts
 - **Builds are serial.** Shared target `/secondary/Programming/Github/kabl-target` via untracked `kabl/.cargo/config.toml` (`jobs = 8`); cargo's lock serialises agents. Every build/render under `systemd-run --user --scope -p MemoryMax=10G -p MemorySwapMax=2G`. Never `cargo clean`, never `CARGO_TARGET_DIR` (parallel only with Kosta's OK). OOM 11-23: two uncapped builders + Kosta's Java build on a 30 GB box.
+- **Shared target pitfall.** A build script from another branch can go stale (kabl-ui build.rs panicked on L1's `lessons/` dir); fix by touching `crates/ui/build.rs`. Tell builders.
 - **Coordinator merges only on Kosta's "merge <n>"** in the conversation; tags likewise.
 - **GitHub CLI.** `gh pr edit` fails: use `gh api -X PATCH repos/stcksmsh/kabl/pulls/N -F body=@file`. Update branch: `gh api -X PUT .../pulls/N/update-branch`. Tags: `gh api repos/stcksmsh/kabl/git/refs -f ref=refs/tags/<t> -f sha=<c>` (triggers release.yml). `gh pr checks --watch` can exit before checks register: re-check. Draft PRs need `gh pr ready` before merge.
 - **Release tests.** release.yml runs `cargo test --workspace --release`; PR CI is debug only.
