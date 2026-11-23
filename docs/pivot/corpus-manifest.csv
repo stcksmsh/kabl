@@ -1,0 +1,161 @@
+path,kind,category,name,user_facing,modules,cables,jack_cables,mod_routes,cable_param_routes,composites,cues,cues_yes,macros,keys,clock,candidate_instances,generator,golden_hash,notes
+docs/composites/examples/flat-voice,fixture,,,no,6,6,6,0,0,0,0,no,0,yes,no,voicex1,,no,D09/D10 composite/panel example + evidence
+docs/composites/examples/two-instances,fixture,,,no,12,11,11,0,0,3,0,no,0,yes,no,voicex2,,no,D09/D10 composite/panel example + evidence
+docs/composites/examples/voice,fixture,,,no,6,6,6,0,0,1,0,no,0,yes,no,voicex1,crates/ui/tests/composites.rs,no,D09/D10 composite/panel example + evidence
+docs/composites/examples/workflow,fixture,,,no,10,10,10,0,0,2,0,no,0,yes,no,voicex2,,no,D09/D10 composite/panel example + evidence
+docs/factory-performance-bank/performance-project,dev-only,,,no,94,156,121,35,0,0,5,yes,4,yes,yes,voicex3,crates/ui/tests/factory_bank.rs,no,evidence project
+docs/midi-timing/fixtures/gate-probe,fixture,,,no,3,2,2,0,0,0,0,no,0,yes,no,,crates/ui/tests/expressive.rs,no,MIDI timing probe
+docs/panel-authoring/examples/portable,fixture,,,no,6,5,5,0,0,2,0,no,0,no,no,voicex1,,no,D09/D10 composite/panel example + evidence
+docs/panel-authoring/examples/stereo-effect,fixture,,,no,2,2,2,0,0,1,0,no,0,no,no,,,no,D09/D10 composite/panel example + evidence
+docs/panel-authoring/examples/voice,fixture,,,no,4,3,3,0,0,1,0,no,0,no,no,voicex1,crates/ui/tests/composites.rs,no,D09/D10 composite/panel example + evidence
+docs/promo-demo/patch/morph-suite,promo,,,no,35,54,52,2,0,0,0,no,1,no,yes,clockdivx1 seqvoicex2 voicex3,,no,promo video source (docs/promo/CUT1-NOTES.md)
+docs/promo/empty.kabl,promo,,,no,0,0,0,0,0,0,0,no,0,no,no,,,no,promo video source (docs/promo/CUT1-NOTES.md)
+docs/promo/lichen-plus.kabl,promo,,,no,112,192,157,25,10,0,5,yes,6,yes,yes,busx1 clockdivx4 drumsx1 randmelx2 seqvoicex7 spacex2 voicex10,,no,promo video source (docs/promo/CUT1-NOTES.md)
+patches/composition,piece,Piece,Composition,yes,45,80,61,19,0,0,5,yes,4,yes,yes,voicex2,crates/ui/tests/composition.rs,yes,
+patches/crowded,fixture,Study,Crowded Rack,yes,16,29,18,11,0,0,0,no,0,yes,no,,crates/ui/tests/library.rs,yes,written by ui test interaction.rs:1225; listed in Sounds browser (Study)
+patches/cue-macros,piece,Piece,Cue Macros,yes,13,18,13,5,0,0,4,yes,3,no,yes,seqvoicex1 spacex1 voicex1,tools/examples/chrome_capture.rs,no,
+patches/echo,piece,Piece,Echo Sequence,yes,20,37,26,11,0,0,0,no,4,no,yes,seqvoicex2 voicex2,tools/examples/presets_pad.rs,yes,
+patches/expressive/lead,factory preset,Lead,Expressive Lead,yes,15,28,16,12,0,0,0,no,4,yes,no,spacex1 voicex1,crates/ui/tests/expressive.rs,yes,
+patches/expressive/split,example-demo,Study,Keys and Bass by Channel,yes,14,18,17,1,0,0,0,no,0,yes,no,voicex2,tools/examples/presets_pad.rs,yes,
+patches/functional-cables/echo-throws,piece,Piece,Echo Throws,yes,10,14,14,0,0,0,0,no,0,no,yes,seqvoicex1 voicex1,tools/examples/cable_capture.rs,no,
+patches/functional-cables/five-against-eight,piece,Piece,Five Against Eight,yes,10,11,10,1,0,0,0,no,1,no,yes,seqvoicex1 voicex1,crates/ui/tests/library.rs,no,
+patches/functional-cables/macro-morph,piece,Piece,Macro Morph,yes,13,16,13,0,3,0,0,no,0,no,yes,voicex3,crates/ui/tests/library.rs,no,
+patches/functional-cables/morph-arc,piece,Piece,Morph Arc,yes,24,31,29,2,0,0,0,no,1,no,yes,seqvoicex2 voicex2,crates/ui/tests/library.rs,no,
+patches/grid-cues,piece,Piece,Grid Cues,yes,11,15,15,0,0,0,4,yes,0,no,yes,drumsx1,crates/ui/tests/library.rs,no,
+patches/init-keyboard,factory preset,Basic,Init Keyboard,yes,6,6,6,0,0,0,0,no,0,yes,no,voicex1,crates/ui/tests/library.rs,yes,init/starting patch (browser.rs:35)
+patches/interlocking,piece,Piece,Interlocking Sequences,yes,16,28,19,9,0,0,0,no,4,no,yes,seqvoicex2 voicex2,crates/ui/tests/interlocking.rs,yes,
+patches/macros-eight,piece,Piece,Eight Macros,yes,10,17,7,9,1,0,0,no,8,no,yes,spacex1,crates/ui/tests/library.rs,no,
+patches/palette/bass,factory preset,Bass,Sequence Bass,yes,13,22,15,7,0,0,0,no,4,no,yes,,crates/ui/tests/sound_palette.rs,yes,
+patches/palette/breath,factory preset,Wind,Breath,yes,15,24,15,9,0,0,0,no,4,yes,no,voicex1,crates/ui/tests/sound_palette.rs,yes,
+patches/palette/keyboard-bass,factory preset,Bass,Round Keyboard Bass,yes,10,14,10,4,0,0,0,no,4,yes,no,,crates/ui/tests/library.rs,yes,
+patches/palette/keys,factory preset,Keys,Glass Keys,yes,10,14,10,4,0,0,0,no,4,yes,no,,crates/ui/tests/library.rs,yes,
+patches/palette/lead,factory preset,Lead,Singing Lead,yes,15,27,16,11,0,0,0,no,4,yes,no,spacex1 voicex1,crates/ui/tests/expressive.rs,yes,
+patches/palette/pad,factory preset,Pad,Evolving Pad,yes,22,33,24,9,0,0,0,no,4,yes,no,voicex1,crates/ui/tests/sound_palette.rs,yes,
+patches/palette/perc,factory preset,Percussion,Noise Percussion,yes,27,42,33,9,0,0,0,no,4,no,yes,,crates/ui/tests/sound_palette.rs,yes,
+patches/palette/progression,factory preset,Pad,Slow Horizons,yes,14,21,16,5,0,0,0,no,4,no,yes,seqvoicex1 voicex1,tools/examples/presets_pad.rs,yes,
+patches/palette/strings,factory preset,Strings,Ensemble Strings,yes,15,28,14,14,0,0,0,no,4,yes,no,,crates/ui/tests/sound_palette.rs,yes,
+patches/performance,piece,Piece,Performance,yes,39,57,50,7,0,0,0,no,0,yes,yes,voicex1,crates/ui/tests/performance.rs,yes,
+patches/presets/acid-line,factory preset,Groove,Acid Line,yes,45,72,62,10,0,0,0,no,4,yes,yes,busx1 drumsx1 seqvoicex1 spacex1 voicex2,tools/examples/presets_groove.rs,no,
+patches/presets/acid-rain,factory preset,Bass,Acid Rain,yes,16,26,16,10,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/afterglow,factory preset,Lead,Afterglow,yes,21,36,21,13,2,0,0,no,5,yes,yes,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/automaton,voice,Voice,Automaton,yes,21,29,21,7,1,0,0,no,4,yes,no,voicex1,tools/examples/presets_voice.rs,no,
+patches/presets/balcony,piece,Piece,Balcony,yes,77,118,109,9,0,0,5,yes,4,yes,yes,busx1 clockdivx3 drumsx1 seqvoicex5 spacex1 voicex6,tools/examples/presets_piece.rs,no,
+patches/presets/boxwood,factory preset,Pluck,Boxwood,yes,11,30,11,19,0,0,0,no,4,yes,no,spacex1,tools/examples/presets_pilot.rs,no,
+patches/presets/brass-filament,factory preset,Keys,Brass Filament,yes,11,28,11,17,0,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/brick-dust,factory preset,Groove,Brick Dust,yes,42,68,55,13,0,0,0,no,4,yes,yes,drumsx1 seqvoicex1 spacex1 voicex2,tools/examples/presets_groove.rs,no,
+patches/presets/cellar-door,factory preset,Keys,Cellar Door,yes,12,24,11,12,1,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/bank.rs,no,
+patches/presets/chandelier,FX,FX,Chandelier,yes,24,40,25,13,2,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_voice.rs,no,
+patches/presets/checkerboard,factory preset,Keys,Checkerboard,yes,16,31,16,14,1,0,0,no,4,yes,no,busx1 spacex1 voicex1,tools/examples/presets_keys_pluck/bank.rs,no,
+patches/presets/cinder-block,factory preset,Bass,Cinder Block,yes,17,32,17,14,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pilot.rs,no,
+patches/presets/cold-cut,factory preset,Pluck,Cold Cut,yes,11,20,11,9,0,0,0,no,4,yes,no,busx1 spacex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/concrete-cloud,factory preset,Pad,Concrete Cloud,yes,18,33,19,14,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/copper-mile,factory preset,Groove,Copper Mile,yes,48,76,65,11,0,0,0,no,4,yes,yes,drumsx1 seqvoicex2 spacex1 voicex3,tools/examples/presets_groove.rs,no,
+patches/presets/copper-wire,factory preset,Bass,Copper Wire,yes,17,28,19,9,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/corduroy,factory preset,Keys,Corduroy,yes,16,32,16,13,3,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/corner-store,factory preset,Groove,Corner Store,yes,49,75,66,9,0,0,0,no,4,yes,yes,busx1 drumsx1 seqvoicex2 spacex1 voicex3,tools/examples/presets_groove.rs,no,
+patches/presets/cotton-mill,factory preset,Pad,Cotton Mill,yes,18,31,18,12,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/dead-calm,piece,Piece,Dead Calm,yes,77,125,110,14,1,0,4,yes,4,yes,yes,clockdivx4 drumsx1 seqvoicex5 spacex1 voicex6,tools/examples/presets_piece.rs,no,
+patches/presets/deep-field,factory preset,Pad,Deep Field,yes,18,32,20,11,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/depth-charge,FX,FX,Depth Charge,yes,24,39,25,12,2,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_voice.rs,no,
+patches/presets/dry-cleaner,factory preset,Pad,Dry Cleaner,yes,18,33,19,14,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/dry-creek,factory preset,Pluck,Dry Creek,yes,11,24,11,13,0,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/dune-buggy,factory preset,Groove,Dune Buggy,yes,48,74,65,9,0,0,0,no,4,yes,yes,busx1 drumsx1 seqvoicex2 spacex1 voicex3,tools/examples/presets_groove.rs,no,
+patches/presets/estuary,piece,Piece,Estuary,yes,103,187,147,31,9,0,4,yes,4,yes,yes,clockdivx6 seqvoicex10 spacex1 voicex11,tools/examples/presets_piece.rs,no,
+patches/presets/fault-line,factory preset,Groove,Fault Line,yes,41,63,54,9,0,0,0,no,4,yes,yes,busx1 drumsx1 seqvoicex1 spacex1 voicex2,tools/examples/presets_groove.rs,no,
+patches/presets/fire-escape,factory preset,Lead,Fire Escape,yes,17,29,17,10,2,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/fog-bank,factory preset,Pad,Fog Bank,yes,19,35,18,14,3,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/gantry,piece,Piece,Gantry,yes,62,100,87,13,0,0,5,yes,4,yes,yes,clockdivx2 drumsx1 seqvoicex4 voicex5,tools/examples/presets_piece.rs,no,
+patches/presets/glacier,factory preset,Pad,Glacier,yes,18,30,18,12,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/glass-coast,factory preset,Groove,Glass Coast,yes,49,76,66,10,0,0,0,no,4,yes,yes,drumsx1 seqvoicex2 spacex1 voicex3,tools/examples/presets_groove.rs,no,
+patches/presets/glass-elevator,factory preset,Keys,Glass Elevator,yes,12,28,11,16,1,0,0,no,4,yes,no,spacex1,tools/examples/presets_pilot.rs,no,
+patches/presets/glass-needle,factory preset,Lead,Glass Needle,yes,18,30,17,9,4,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/gossamer,factory preset,Pluck,Gossamer,yes,11,31,11,20,0,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/gumdrop,factory preset,Pluck,Gumdrop,yes,16,30,16,12,2,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/gutter,factory preset,Bass,Gutter,yes,18,30,19,10,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/hand-bell,factory preset,Keys,Hand Bell,yes,11,22,11,11,0,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/horn-section,factory preset,Lead,Horn Section,yes,17,28,16,9,3,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/hot-wire,factory preset,Lead,Hot Wire,yes,17,27,16,10,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/lamp-oil,factory preset,Groove,Lamp Oil,yes,50,79,68,11,0,0,0,no,4,yes,yes,busx1 drumsx1 seqvoicex2 spacex1 voicex3,tools/examples/presets_groove.rs,no,
+patches/presets/lantern,factory preset,Lead,Lantern,yes,18,31,17,12,2,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/laundromat,piece,Piece,Laundromat,yes,52,80,69,11,0,0,4,yes,4,yes,yes,drumsx1 seqvoicex3 voicex4,tools/examples/presets_piece.rs,no,
+patches/presets/lichen,piece,Piece,Lichen,yes,76,135,101,24,10,0,4,yes,5,yes,yes,busx1 clockdivx1 drumsx1 randmelx2 seqvoicex3 spacex2 voicex6,tools/examples/presets_piece.rs,no,
+patches/presets/linoleum,factory preset,Keys,Linoleum,yes,12,25,12,13,0,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/bank.rs,no,
+patches/presets/loading-dock,factory preset,Groove,Loading Dock,yes,42,69,58,11,0,0,5,yes,4,yes,yes,seqvoicex2 spacex1 voicex3,tools/examples/presets_pilot.rs,no,
+patches/presets/loud-mouth,factory preset,Lead,Loud Mouth,yes,19,28,19,8,1,0,0,no,4,yes,yes,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/low-tide,factory preset,Bass,Low Tide,yes,18,28,17,10,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/matinee,factory preset,Keys,Matinee,yes,16,26,16,10,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/maw,voice,Voice,Maw,yes,19,30,19,10,1,0,0,no,4,yes,no,voicex1,tools/examples/presets_voice.rs,no,
+patches/presets/neon-highway,factory preset,Lead,Neon Highway,yes,16,26,15,11,0,0,0,no,4,yes,no,voicex1,tools/examples/presets_pilot.rs,no,
+patches/presets/oak-stave,factory preset,Bass,Oak Stave,yes,16,25,16,7,2,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/oatmeal,factory preset,Bass,Oatmeal,yes,17,26,16,9,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/oracle,voice,Voice,Oracle,yes,23,36,23,13,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_voice.rs,no,
+patches/presets/ore-cart,factory preset,Groove,Ore Cart,yes,47,73,64,9,0,0,0,no,4,yes,yes,busx1 drumsx1 seqvoicex2 spacex1 voicex3,tools/examples/presets_groove.rs,no,
+patches/presets/parquet-loop,factory preset,Keys,Parquet Loop,yes,19,31,20,10,1,0,0,no,4,yes,yes,spacex1 voicex1,tools/examples/presets_pilot.rs,no,
+patches/presets/pawn-shop,piece,Piece,Pawn Shop,yes,61,93,79,11,3,0,4,yes,4,yes,yes,drumsx1 seqvoicex4 spacex1 voicex5,tools/examples/presets_piece.rs,no,
+patches/presets/picture-window,factory preset,Pad,Picture Window,yes,17,27,17,10,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/pig-iron,factory preset,Lead,Pig Iron,yes,17,27,17,9,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/pulpit,factory preset,Keys,Pulpit,yes,11,28,11,17,0,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/bank.rs,no,
+patches/presets/pump-house,factory preset,Pad,Pump House,yes,19,32,20,11,1,0,0,no,4,yes,yes,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/rail-yard,factory preset,Bass,Rail Yard,yes,19,31,20,9,2,0,0,no,4,yes,yes,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/rain-gutter,factory preset,Pluck,Rain Gutter,yes,11,22,11,11,0,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/bank.rs,no,
+patches/presets/rivet-gun,factory preset,Pluck,Rivet Gun,yes,17,30,17,13,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/roller-rink,piece,Piece,Roller Rink,yes,74,114,104,10,0,0,4,yes,4,yes,yes,busx1 clockdivx3 drumsx1 seqvoicex5 spacex1 voicex6,tools/examples/presets_piece.rs,no,
+patches/presets/rooftop,factory preset,Pad,Rooftop,yes,17,33,18,14,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/rope-walk,factory preset,Groove,Rope Walk,yes,50,81,67,14,0,0,0,no,4,yes,yes,drumsx1 seqvoicex2 spacex1 voicex3,tools/examples/presets_groove.rs,no,
+patches/presets/rosewood,factory preset,Pluck,Rosewood,yes,12,20,11,8,1,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/bank.rs,no,
+patches/presets/rubber-band,factory preset,Bass,Rubber Band,yes,16,28,16,12,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/salt-flat,factory preset,Pad,Salt Flat,yes,17,27,16,11,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pilot.rs,no,
+patches/presets/scaffold,factory preset,Keys,Scaffold,yes,17,31,17,14,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/scrap-metal,factory preset,Groove,Scrap Metal,yes,50,77,67,10,0,0,0,no,4,yes,yes,drumsx1 seqvoicex2 spacex1 voicex3,tools/examples/presets_groove.rs,no,
+patches/presets/short-circuit,factory preset,Lead,Short Circuit,yes,20,32,22,8,2,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/slab-city,factory preset,Groove,Slab City,yes,42,66,56,10,0,0,0,no,4,yes,yes,busx1 drumsx1 seqvoicex1 spacex1 voicex2,tools/examples/presets_groove.rs,no,
+patches/presets/slate-roof,factory preset,Bass,Slate Roof,yes,19,29,19,9,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/snowmelt,factory preset,Keys,Snowmelt,yes,11,25,11,14,0,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/sock-puppet,voice,Voice,Sock Puppet,yes,24,36,24,11,1,0,0,no,4,yes,yes,voicex1,tools/examples/presets_voice.rs,no,
+patches/presets/soft-sine,factory preset,Lead,Soft Sine,yes,17,27,16,9,2,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/spark-plug,factory preset,Pluck,Spark Plug,yes,16,30,16,11,3,0,0,no,4,yes,no,busx1 spacex1 voicex1,tools/examples/presets_keys_pluck/bank.rs,no,
+patches/presets/spillway,piece,Piece,Spillway,yes,62,94,85,9,0,0,4,yes,4,yes,yes,busx1 clockdivx2 drumsx1 seqvoicex4 spacex1 voicex5,tools/examples/presets_piece.rs,no,
+patches/presets/spinet,factory preset,Keys,Spinet,yes,16,25,16,9,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/spun-sugar,factory preset,Lead,Spun Sugar,yes,18,30,17,11,2,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/static-garden,factory preset,Pad,Static Garden,yes,23,39,21,14,4,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/steel-toe,factory preset,Bass,Steel Toe,yes,19,33,20,11,2,0,0,no,4,yes,yes,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/still-water,factory preset,Groove,Still Water,yes,47,72,64,8,0,0,0,no,4,yes,yes,busx1 drumsx1 seqvoicex2 spacex1 voicex3,tools/examples/presets_groove.rs,no,
+patches/presets/stoop-sale,factory preset,Groove,Stoop Sale,yes,49,77,65,10,2,0,0,no,4,yes,yes,busx1 drumsx1 seqvoicex2 spacex1 voicex3,tools/examples/presets_groove.rs,no,
+patches/presets/tail-light,factory preset,Bass,Tail Light,yes,18,30,19,10,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/tar-pit,factory preset,Bass,Tar Pit,yes,16,25,16,8,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_bass_lead.rs,no,
+patches/presets/temple-bowl,FX,FX,Temple Bowl,yes,25,42,28,14,0,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_voice.rs,no,
+patches/presets/tidepool,factory preset,Pad,Tidepool,yes,20,34,16,14,4,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/tin-roof,factory preset,Keys,Tin Roof,yes,11,22,11,11,0,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/tin-voice,factory preset,Pad,Tin Voice,yes,20,33,18,14,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/turnstile,factory preset,Keys,Turnstile,yes,20,35,21,13,1,0,0,no,4,yes,yes,spacex1 voicex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/presets/undertow,factory preset,Bass,Undertow,yes,17,26,17,9,0,0,0,no,4,yes,no,voicex1,tools/examples/presets_pilot.rs,no,
+patches/presets/updraft,FX,FX,Updraft,yes,18,31,18,11,2,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_voice.rs,no,
+patches/presets/velvet-tine,factory preset,Keys,Velvet Tine,yes,11,22,11,11,0,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/bank.rs,no,
+patches/presets/vox-chop,voice,Voice,Vox Chop,yes,24,35,25,8,2,0,0,no,4,yes,yes,spacex1 voicex1,tools/examples/presets_voice.rs,no,
+patches/presets/waiting-room,factory preset,Pad,Waiting Room,yes,21,38,20,13,5,0,0,no,4,yes,yes,spacex1 voicex1,tools/examples/presets_pad.rs,no,
+patches/presets/whiteout,FX,FX,Whiteout,yes,22,35,22,12,1,0,0,no,4,yes,no,spacex1 voicex1,tools/examples/presets_voice.rs,no,
+patches/presets/willow,factory preset,Pluck,Willow,yes,11,21,11,10,0,0,0,no,4,yes,no,spacex1,tools/examples/presets_keys_pluck/group2.rs,no,
+patches/recipes/filter-movement,example-demo,Study,Recipe: Filter Movement,yes,7,7,6,1,0,0,0,no,0,yes,no,voicex1,crates/ui/tests/library.rs,yes,Learn recipe patch (recipes.rs:666-689)
+patches/recipes/pluck-to-pad,example-demo,Study,Recipe: Pluck to Pad,yes,7,7,7,0,0,0,0,no,0,yes,no,voicex1,crates/ui/tests/library.rs,yes,Learn recipe patch (recipes.rs:666-689)
+patches/reference,example-demo,Study,Reference Voice,yes,8,12,6,6,0,0,0,no,0,yes,no,voicex1,tools/examples/cable_capture.rs,yes,"Study; also UI test fixture (interaction.rs, drawer.rs)"
+patches/sequence,piece,Piece,First Sequence,yes,8,8,8,0,0,0,0,no,0,no,yes,seqvoicex1 voicex1,crates/ui/tests/sound_engines.rs,yes,
+patches/sound-engines/demos/arp-cable,example-demo,Keys,Arp Cable,no,10,15,14,1,0,0,0,no,0,no,yes,voicex1,crates/ui/tests/arp_demos.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/arp-chord,example-demo,Keys,Arp Chord,no,9,12,11,1,0,0,0,no,0,no,yes,voicex1,crates/ui/tests/arp_demos.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/clock-logic,example-demo,Sequence,Clock Logic,no,18,24,24,0,0,0,0,no,0,no,yes,randmelx1 voicex1,crates/ui/tests/sound_engines.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/dx-keys,example-demo,Keys,DX Keys,no,5,6,6,0,0,0,0,no,0,yes,no,,crates/ui/tests/sound_engines.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/four-floor,example-demo,Sequence,Four On The Floor,no,10,15,15,0,0,0,0,no,0,no,yes,drumsx1,crates/ui/tests/drum_demos.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/glass-bells,example-demo,Keys,Glass Bells,no,15,22,19,3,0,0,0,no,0,yes,no,voicex2,crates/ui/tests/sound_engines.rs,yes,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/imported-morph,example-demo,Bass,Imported Morph,no,10,13,11,2,0,0,0,no,0,yes,no,voicex1,crates/ui/tests/sound_engines.rs,yes,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/iron-bell,example-demo,Keys,Iron Bell,no,5,6,6,0,0,0,0,no,0,yes,no,,crates/ui/tests/sound_engines.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/live-voice,example-demo,Lead,Live Voice,no,13,14,14,0,0,0,0,no,0,yes,no,voicex1,,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/pump,example-demo,Sequence,Kick Pump,no,15,23,23,0,0,0,0,no,0,no,yes,,tools/examples/presets_groove.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/ratchet-roll,example-demo,Sequence,Ratchet Roll,no,9,12,11,1,0,0,0,no,0,no,yes,seqvoicex1 voicex1,crates/ui/tests/arp_demos.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/rising-pad,example-demo,Pad,Rising Pad,no,12,17,13,4,0,0,0,no,0,yes,no,voicex1,crates/ui/tests/sound_engines.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/robot-voice,example-demo,Lead,Robot Voice,no,26,30,29,1,0,0,0,no,0,yes,yes,randmelx1 voicex3,,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/rust-bass,example-demo,Bass,Rust Bass,no,5,6,6,0,0,0,0,no,0,yes,no,,crates/ui/tests/sound_engines.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/scale-walk,example-demo,Sequence,Scale Walk,no,11,12,11,1,0,0,0,no,0,no,yes,randmelx1 spacex1 voicex1,crates/ui/tests/sound_engines.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/stepped-sweep,example-demo,Pad,Stepped Sweep,no,20,23,22,1,0,0,0,no,0,no,yes,,crates/ui/tests/sound_engines.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/swing-seq,example-demo,Sequence,Swing Seq,no,12,15,14,1,0,0,0,no,0,no,yes,seqvoicex1 voicex2,crates/ui/tests/arp_demos.rs,no,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/tine-keys,example-demo,Keys,Tine Keys,no,12,18,14,4,0,0,0,no,0,yes,no,voicex1,crates/ui/tests/sound_engines.rs,yes,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-engines/demos/vowel-drift,example-demo,Pad,Vowel Drift,no,13,15,14,1,0,0,0,no,0,yes,no,voicex1,crates/ui/tests/sound_engines.rs,yes,packed but below library scan depth (library.rs:518-532); engine demo
+patches/sound-palette,piece,Piece,Sound Palette Piece,yes,100,160,125,35,0,0,5,yes,4,yes,yes,voicex3,crates/ui/tests/explain.rs,yes,
