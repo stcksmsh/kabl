@@ -34,13 +34,13 @@ Tick each box when the expected result happens; note anything off next to the it
 
 ## 5. Code modules and SDK
 - [ ] Add a code module (for example `demo.bitfilter`). It loads, processes audio and shows its controls.
-- [ ] Add many instances. Past the fuel budget an overrun toast appears and the module goes quiet instead of glitching the engine; a crashing module shows a crash toast; the rest of the patch keeps playing.
-- [ ] Follow the SDK quick start (`docs/sdk`): build and install a package, then load it. It appears in the browser and runs.
+- [ ] Add many instances. Past the fuel budget the overrunning module goes quiet (a short fade) instead of glitching the engine, and comes back by itself when the load drops; the rest of the patch keeps playing. A crashed module stays silent until you reset or reload it. There is no toast for either.
+- [ ] Follow the SDK quick start (`sdk/SDK.md`): build and install a package, then load it. It appears in the browser and runs.
 
 ## 6. Look
 - [ ] Look B is the default skin: readable and consistent across Rack, Perform and Sounds.
 - [ ] Theme setting: System, Light and Dark each apply at once and survive restart.
-- [ ] Perform view uses the teal accent; the Drums lane is green.
+- [ ] Perform view uses the teal accent; each track's lane has its own colour (none amber or teal).
 - [ ] Settings gear, cable palette: skin default plus 4 palettes each recolor cables at once. Note your answer: should sequencer gate faders follow the palette?
 
 ## 7. Accessibility
