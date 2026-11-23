@@ -1,7 +1,7 @@
 //! `osc.va` (brief section 8's v1 built-in table: "saw/square/tri/sine, PolyBLEP, hard sync
-//! input"). Saw and square are PolyBLEP-corrected; triangle and sine are not (triangle needs
-//! polyBLAMP for its corners, not implemented; its harmonics fall at 12 dB/octave, so it aliases
-//! far less than an uncorrected saw would).
+//! input"). Saw and square are PolyBLEP-corrected, the triangle is PolyBLAMP-corrected at its
+//! two corners (`dsp::triangle_blamp`; same peaks and zero crossings as the naive triangle), and
+//! the sine needs no correction.
 //!
 //! Sound palette batch (docs/sound-palette-batch/README.md): pulse width (`pw`, 5–95 %, the
 //! square only, ramped per sample across each block so a modulated width never steps, DC
@@ -34,7 +34,7 @@
 
 use std::f32::consts::PI;
 
-use crate::dsp::OscWaveform;
+use crate::dsp::{triangle_blamp, OscWaveform};
 use crate::info::{
     Category, ModuleInfo, ParamInfo, PortDirection, PortInfo, PortType, QualitySupport, Rate, Taper,
 };
@@ -180,7 +180,7 @@ pub static OSC_VA_INFO: ModuleInfo = ModuleInfo {
     params: PARAMS,
     quality: QualitySupport {
         oversampling: false,
-        anti_aliasing: true, // PolyBLEP -- saw/square only, see dsp::FullOsc's doc.
+        anti_aliasing: true, // PolyBLEP saw/square, PolyBLAMP triangle; see dsp::FullOsc's doc.
         interpolation: false,
     },
     skin: None,
@@ -302,7 +302,8 @@ fn sample(p: f32, dt: f32, w: OscWaveform, pw: f32) -> f32 {
             v -= poly_blep((p + (1.0 - pw)).fract(), dt);
             v - (2.0 * pw - 1.0)
         }
-        _ => naive(p, w, pw),
+        OscWaveform::Triangle => triangle_blamp(p, dt),
+        OscWaveform::Sine => naive(p, w, pw),
     }
 }
 
@@ -522,7 +523,15 @@ impl Module for OscVa {
                     let at_edge = (*p - dt * (1.0 - f)).rem_euclid(1.0);
                     let jump = naive(s0, waveform, pw) - naive(at_edge, waveform, pw);
                     *p = s0 + dt * (1.0 - f);
-                    naive(*p, waveform, pw) - 0.5 * f * f * jump - dc(waveform, pw)
+                    if waveform == OscWaveform::Triangle {
+                        // `sample` keeps the corner correction when a restart lands near a
+                        // corner; the BLAMP term covers the slope change at the edge.
+                        sample(*p, dt, waveform, pw) - 0.5 * f * f * jump
+                            + kink(s0, at_edge, dt) * f * f * f * (1.0 / 6.0)
+                    } else {
+                        // Saw and square keep their slope across the edge: BLEP only.
+                        naive(*p, waveform, pw) - 0.5 * f * f * jump - dc(waveform, pw)
+                    }
                 } else {
                     sample(*p, dt, waveform, pw)
                 };
@@ -530,6 +539,10 @@ impl Module for OscVa {
                     let at_edge = (*p + dt * fn_).rem_euclid(1.0);
                     let jump = naive(s0, waveform, pw) - naive(at_edge, waveform, pw);
                     y += 0.5 * (1.0 - fn_) * (1.0 - fn_) * jump;
+                    if waveform == OscWaveform::Triangle {
+                        let g = 1.0 - fn_;
+                        y += kink(s0, at_edge, dt) * g * g * g * (1.0 / 6.0);
+                    }
                 }
                 *p += dt;
                 if *p >= 1.0 {
@@ -580,6 +593,15 @@ impl Module for OscVa {
             self.c = o.c;
         }
     }
+}
+
+/// The triangle's change of slope per sample when a sync edge restarts it from `at_edge` to
+/// `s0`, for the PolyBLAMP term at the edge (the same residual as `dsp::poly_blamp`). The saw
+/// keeps its slope and the square has none, so only the triangle needs it.
+#[inline]
+fn kink(s0: f32, at_edge: f32, dt: f32) -> f32 {
+    let slope = |p: f32| if (0.25..0.75).contains(&p) { -4.0 } else { 4.0 };
+    (slope(s0) - slope(at_edge)) * dt
 }
 
 /// The DC the square's `sample` removes (the naive pulse's mean).

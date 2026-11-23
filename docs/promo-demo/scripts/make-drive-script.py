@@ -16,7 +16,8 @@ Optional 4th argument: a storyboard JSON, a bar-timed list of any drive command:
 Each shot writes `wait t0+bar*bar_seconds` and then its raw commands. They are merged with the
 morph gestures by time. `anchor` (else targets.json "anchor", else "restart") is the bar-0 click
 key; `bpm` (else timeline bar_seconds) sets the bar length. The timeline may be "-" to script
-only a storyboard.
+only a storyboard. `setup` (a list of drive commands) replaces the click on targets.json
+`fit_view` that runs before the anchor (an empty rack has nothing to fit).
 """
 import json
 import sys
@@ -30,7 +31,7 @@ anchor = sb.get("anchor", targets.get("anchor", targets["restart"])).format(**sb
 t0 = t["restart_at_s"] + t["restart_latency_s"]
 lines = [
     f"sleep {t['settle_s']}",
-    f"click {targets['fit_view']}",
+    *sb.get("setup", [f"click {targets['fit_view']}"]),
     f"aim {anchor}",
     f"wait {t['restart_at_s']}",
     f"click {anchor}",

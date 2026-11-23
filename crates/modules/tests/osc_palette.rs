@@ -8,6 +8,7 @@ use common::*;
 
 use kabl_modules::dsp::{FullOsc, OscWaveform};
 
+const TRI: f32 = 1.0;
 const SQR: f32 = 3.0;
 const SINE: f32 = 0.0;
 const N: usize = 16384;
@@ -183,6 +184,90 @@ fn saw_and_pulse_alias_far_less_than_naive() {
             );
             assert!(w < nw - 8.0 && t < nt - 12.0);
         }
+    }
+}
+
+/// The naive triangle the PolyBLAMP one replaced: 0 at phase 0, +1 at 0.25, -1 at 0.75.
+fn naive_tri_at(p: f32) -> f32 {
+    if p < 0.25 {
+        4.0 * p
+    } else if p < 0.75 {
+        2.0 - 4.0 * p
+    } else {
+        4.0 * p - 4.0
+    }
+}
+
+fn naive_tri(f0: f32, len: usize) -> Vec<f32> {
+    let mut p = 0.0f32;
+    (0..len)
+        .map(|_| {
+            let v = naive_tri_at(p);
+            p = (p + f0 / SR).fract();
+            v
+        })
+        .collect()
+}
+
+#[test]
+fn triangle_aliases_far_less_than_naive_at_the_same_level() {
+    // 4186 Hz (C8), not 4000: at 48 kHz a 4 kHz note's aliases fold onto its own harmonics.
+    for f0 in [1760.0f32, 3520.0, 4186.0] {
+        let mut r = osc(&[("base_hz", f0), ("waveform", TRI)]);
+        let x = r.render(N, 0, |_, _| 0.0);
+        let (w, t) = measure(&format!("triangle {f0} Hz"), &x, f0);
+        let (nw, nt) = measure(&format!("naive triangle {f0} Hz"), &naive_tri(f0, N), f0);
+        assert!(w < nw - 10.0 && t < nt - 10.0, "{w} {t} vs {nw} {nt}");
+    }
+    // A mid note keeps its level (within 0.1 dB), its peaks and its zero crossings.
+    for f0 in [110.0f32, 440.0, 880.0] {
+        let mut r = osc(&[("base_hz", f0), ("waveform", TRI)]);
+        let x = r.render(N, 0, |_, _| 0.0);
+        let n = naive_tri(f0, N);
+        let delta = 20.0 * (rms(&x) / rms(&n)).log10();
+        let dpeak = 20.0 * (peak(&x) / peak(&n)).log10();
+        println!("triangle {f0} Hz vs naive: level {delta:+.4} dB, peak {dpeak:+.4} dB");
+        assert!(delta.abs() < 0.1, "{f0} Hz level moved {delta} dB");
+        // Only the corner sample is rounded, by at most 8·dt/6 (0.2 dB at 880 Hz).
+        assert!(peak(&x) <= 1.0 && dpeak > -0.25, "{f0} Hz peak {dpeak} dB");
+        assert!((frequency(&x, SR) - frequency(&n, SR)).abs() < 1e-3 * f0);
+        // Away from the corners the samples are the naive triangle's, so every zero crossing
+        // falls where it did.
+        let dt = f0 / SR;
+        let mut p = 0.0f32;
+        for (a, b) in x.iter().zip(&n) {
+            if (p - 0.25).abs() > dt && (p - 0.75).abs() > dt {
+                assert!((a - b).abs() < 1e-5);
+            }
+            p = (p + dt).fract();
+        }
+    }
+}
+
+#[test]
+fn synced_triangle_is_band_limited() {
+    for (fm, ratio) in [(220.0f32, 2.37f32), (440.0, 1.61), (880.0, 3.3)] {
+        let mut master = osc(&[("base_hz", fm), ("waveform", SQR)]);
+        let m = master.render(N, 0, |_, _| 0.0);
+        let mut slave = osc(&[("base_hz", fm * ratio), ("waveform", TRI)]);
+        let x = slave.render(N, 0, |k, i| if k == 1 { m[i] } else { 0.0 });
+        // Naive reference: the naive triangle, snapped to phase 0 at the sample after an edge.
+        let (mut p, mut was) = (0.0f32, false);
+        let old: Vec<f32> = m
+            .iter()
+            .map(|&s| {
+                if s > 0.5 && !was {
+                    p = 0.0;
+                }
+                was = s > 0.5;
+                let v = naive_tri_at(p);
+                p = (p + fm * ratio / SR).fract();
+                v
+            })
+            .collect();
+        let (w, t) = measure(&format!("sync triangle {fm}×{ratio}"), &x, fm);
+        let (ow, ot) = measure(&format!("naive sync triangle {fm}×{ratio}"), &old, fm);
+        assert!(w < ow - 6.0 && t < ot - 6.0, "{w} {t} vs {ow} {ot}");
     }
 }
 
