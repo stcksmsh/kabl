@@ -675,7 +675,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-kabl"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "kabl-engine",
  "kabl-modules",
@@ -2050,11 +2050,11 @@ dependencies = [
 
 [[package]]
 name = "kabl-cables"
-version = "0.1.0"
+version = "1.0.0"
 
 [[package]]
 name = "kabl-clap"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "assert_no_alloc",
  "basedrop",
@@ -2076,7 +2076,7 @@ dependencies = [
 
 [[package]]
 name = "kabl-core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "proptest",
  "serde",
@@ -2089,7 +2089,7 @@ dependencies = [
 
 [[package]]
 name = "kabl-engine"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "assert_no_alloc",
  "basedrop",
@@ -2105,7 +2105,7 @@ dependencies = [
 
 [[package]]
 name = "kabl-modules"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "assert_no_alloc",
  "crc32fast",
@@ -2120,7 +2120,7 @@ dependencies = [
 
 [[package]]
 name = "kabl-standalone"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "assert_no_alloc",
  "basedrop",
@@ -2136,7 +2136,7 @@ dependencies = [
 
 [[package]]
 name = "kabl-tools"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "basedrop",
  "eframe",
@@ -2159,7 +2159,7 @@ dependencies = [
 
 [[package]]
 name = "kabl-ui"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "assert_no_alloc",
  "audio_thread_priority",

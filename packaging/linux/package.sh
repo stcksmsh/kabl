@@ -15,7 +15,8 @@
 # checkout at run time.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+# KABL_VERSION overrides the name only (release candidates: 1.0.0-rc.1); Cargo.toml stays X.Y.Z.
+VERSION=${KABL_VERSION:-$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)}
 NAME="kabl-$VERSION-linux-$(uname -m)"
 OUT=${OUT:-target/dist}
 # Two invocations: with one, --bin applies to every -p and silently drops the plugin's cdylib.
