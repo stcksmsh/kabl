@@ -27,8 +27,9 @@ Notes on the job:
 - Tests that open a real audio stream are already `#[ignore]` (they need an ALSA null PCM),
   so the runner needing no audio device is fine.
 - Lint stays on Linux (`.github/scripts/clippy.sh`). A Windows clippy run of kabl-ui and
-  kabl-clap with `--all-targets -- -D warnings` was clean from Linux (see below), so a
-  `cargo clippy` step can be added later without code changes for those two crates.
+  kabl-clap with `--all-targets -- -D warnings` was clean from Linux (see below), and so was
+  kabl-standalone apart from the one test file listed below, so a `cargo clippy` step can be
+  added once that file is gated.
 
 ## Tests that must be skipped on Windows before this job is green
 
