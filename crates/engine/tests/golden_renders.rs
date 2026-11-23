@@ -5,27 +5,10 @@
 //! `KABL_WRITE_GOLDEN=1 cargo test -p kabl-engine --test golden_renders` (only when a sound is
 //! meant to change).
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use kabl_engine::compile::compile;
-
-fn patch_dirs(root: &Path, out: &mut Vec<PathBuf>, depth: usize) {
-    if root.join("log.jsonl").is_file() && root.join("meta.toml").is_file() {
-        out.push(root.to_path_buf());
-        return;
-    }
-    if depth == 0 {
-        return;
-    }
-    let Ok(rd) = std::fs::read_dir(root) else {
-        return;
-    };
-    for e in rd.flatten() {
-        if e.path().is_dir() {
-            patch_dirs(&e.path(), out, depth - 1);
-        }
-    }
-}
+use kabl_engine::golden::{chord_hash, patch_dirs};
 
 /// FNV-1a over the bit patterns of the left and right output.
 fn render_hash(dir: &Path) -> String {
@@ -35,27 +18,7 @@ fn render_hash(dir: &Path) -> String {
     let Ok(mut c) = compile(log.state(), 48000.0, 8) else {
         return "compile-error".into();
     };
-    let mut h = 0xcbf29ce484222325u64;
-    let mut mix = |v: f32| {
-        for b in v.to_bits().to_le_bytes() {
-            h = (h ^ b as u64).wrapping_mul(0x100000001b3);
-        }
-    };
-    for b in 0..400 {
-        if b == 0 {
-            for (v, n) in [(0usize, 0.0f32), (1, 4.0), (2, 7.0)] {
-                c.note_on(v, n, 0.8);
-            }
-        }
-        if b == 150 {
-            for v in 0..3 {
-                c.note_off(v);
-            }
-        }
-        c.process_block();
-        c.left().iter().chain(c.right()).for_each(|&s| mix(s));
-    }
-    format!("{h:016x}")
+    chord_hash(&mut c, 400, 150, |_, _| {})
 }
 
 #[test]
