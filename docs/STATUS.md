@@ -243,8 +243,8 @@ container (Xvfb, PipeWire null sink, fifo MIDI stand-in; 5 xruns / 2 late execut
 late arrivals at 256 frames on the VM) — not laptop, controller or beginner evidence.
 Test counts: see the report (rerun at the submitted head).
 
-    packaging/linux/package.sh && mkdir -p ~/opt && tar -xzf target/dist/kabl-0.1.0-linux-x86_64.tar.gz -C ~/opt
-    ~/opt/kabl-0.1.0-linux-x86_64/bin/kabl-ui --rate 48000 --frames 256
+    packaging/linux/package.sh && mkdir -p ~/opt && tar -xzf target/dist/kabl-1.0.0-linux-x86_64.tar.gz -C ~/opt
+    ~/opt/kabl-1.0.0-linux-x86_64/bin/kabl-ui --rate 48000 --frames 256
 
 **D01-R1 saving repairs (owner-authorized, 2026-09-25): merged (PR #4); owner checks pending.** Save As
 "Replace it" now applies only to the name it was offered for (a stale offer overwrote and
