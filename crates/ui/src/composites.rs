@@ -1,6 +1,9 @@
 //! Instance editing and immutable portable definitions, entirely on the control/UI side.
 use crate::PatchEditor;
-use kabl_core::{Composite, CompositeId, Definition, Exposure, ModuleId, Op, PatchState, PortRef};
+use kabl_core::{
+    Composite, CompositeId, Definition, Exposure, ModuleId, Op, PatchLog, PatchState, PortRef,
+    Source,
+};
 use kabl_modules::{registry, PortDirection};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -101,7 +104,7 @@ fn commit(editor: &mut PatchEditor, candidate: PatchState) -> Result<(), String>
     editor.restore_to(ops);
     Ok(())
 }
-fn next_group(editor: &PatchEditor) -> Result<u64, String> {
+fn next_group(log: &PatchLog) -> Result<u64, String> {
     fn visit(op: &Op, max: &mut u64) {
         match op {
             Op::SetComposite { id, .. } => *max = (*max).max(*id),
@@ -113,8 +116,8 @@ fn next_group(editor: &PatchEditor) -> Result<u64, String> {
             _ => {}
         }
     }
-    let mut max = editor.state().composites.keys().copied().max().unwrap_or(0);
-    for entry in editor.log().all_entries() {
+    let mut max = log.state().composites.keys().copied().max().unwrap_or(0);
+    for entry in log.all_entries() {
         visit(&entry.op, &mut max);
         visit(&entry.inverse, &mut max)
     }
@@ -162,7 +165,7 @@ pub fn encapsulate(
         return Err("Select modules or composites first".into());
     }
     let mut p = editor.state().clone();
-    let id = next_group(editor)?;
+    let id = next_group(editor.log())?;
     if members
         .iter()
         .any(|m| p.composites.values().any(|c| c.members.contains(m)))
@@ -190,19 +193,8 @@ pub fn encapsulate(
         .map(|m| m.pos)
         .ok_or("Missing selected module")?;
     let mut c=Composite{name:name.trim().into(),help:"Open internals to inspect the real modules and routes. Editing affects this instance only.".into(),definition:definition(id),parent:None,members,pos,ports:BTreeMap::new(),controls:BTreeMap::new(),next_interface:1,panel:None};
-    for (cid, cable) in &p.cables {
-        let a = cable.from.module_id().is_some_and(|m| all.contains(&m));
-        let b = p.end_module(*cid).is_some_and(|m| all.contains(&m));
-        if a != b {
-            if matches!(cable.to, PortRef::CableParam { .. }) {
-                return Err(format!(
-                    "Route {cid} moves a cable parameter across the group boundary. Move the \
-                     route's source or the cable it moves into the group, or remove the route."
-                ));
-            }
-            let target = if a { &cable.from } else { &cable.to };
-            expose(&mut c, target.clone(), binding_label(target), false)?;
-        }
+    for (_, target) in crossings(&p, &all)? {
+        expose(&mut c, target.clone(), binding_label(&target), false)?;
     }
     // Preserve pinned public controls as aliases of the original parameters.
     for pin in crate::perform::pins(&p)
@@ -229,6 +221,188 @@ pub fn encapsulate(
     p.composites.insert(id, c);
     commit(editor, p)?;
     Ok(id)
+}
+/// Cables that cross the boundary of `inside`, in cable-id order, each with its inside end.
+/// A route that moves a cable parameter across the boundary (G1) is refused.
+fn crossings(
+    p: &PatchState,
+    inside: &BTreeSet<ModuleId>,
+) -> Result<Vec<(kabl_core::CableId, PortRef)>, String> {
+    let mut out = Vec::new();
+    for (&cid, cable) in &p.cables {
+        let a = cable.from.module_id().is_some_and(|m| inside.contains(&m));
+        let b = p.end_module(cid).is_some_and(|m| inside.contains(&m));
+        if a != b {
+            if matches!(cable.to, PortRef::CableParam { .. }) {
+                return Err(format!(
+                    "Route {cid} moves a cable parameter across the group boundary. Move the \
+                     route's source or the cable it moves into the group, or remove the route."
+                ));
+            }
+            out.push((cid, if a { &cable.from } else { &cable.to }.clone()));
+        }
+    }
+    Ok(out)
+}
+/// Wraps the leaf modules `members` into a new top-level composite whose whole interface is
+/// curated, and appends it to `log` as one `SetComposite` entry, leaving every earlier entry,
+/// leaf id and cable id as it was. For patch generators: the same `log` and arguments always
+/// append the same bytes. The entry reuses the last entry's timestamp, and the composite id is
+/// the next one `log` has never used.
+///
+/// `ports` then `controls` become interface keys `1..=n` in the order given (so a `panel` can
+/// place them). Nothing is exposed that the caller did not list. Refused, with nothing
+/// appended: a target outside `members`, a control that is not a parameter, a repeated label
+/// or target, a boundary crossing no port covers, a pinned parameter no control covers, and
+/// crossings a composite cannot express yet (a cable parameter moved across the boundary, or
+/// one outside source feeding several inside targets).
+pub fn encapsulate_with(
+    log: &mut PatchLog,
+    name: &str,
+    definition: Definition,
+    members: BTreeSet<ModuleId>,
+    ports: &[Exposure],
+    controls: &[Exposure],
+    panel: Option<kabl_core::panel::Panel>,
+) -> Result<CompositeId, String> {
+    let p = log.state();
+    if members.is_empty() {
+        return Err("Select modules first".into());
+    }
+    for m in &members {
+        if !p.modules.contains_key(m) {
+            return Err(format!("Module {m} does not exist"));
+        }
+        if p.composites.values().any(|c| c.members.contains(m)) {
+            return Err(format!("Module {m} is already owned by a composite"));
+        }
+    }
+    let mut labels = BTreeSet::new();
+    for (list, control) in [(ports, false), (controls, true)] {
+        let mut targets = Vec::new();
+        for e in list {
+            if !e.target.module_id().is_some_and(|m| members.contains(&m))
+                || matches!(e.target, PortRef::CableParam { .. })
+            {
+                return Err(format!(
+                    "Exposure \"{}\": target {} is not inside the wrapped modules",
+                    e.label,
+                    end(&e.target)
+                ));
+            }
+            if control && !matches!(e.target, PortRef::Param { .. }) {
+                return Err(format!(
+                    "Control \"{}\": {} is not a parameter",
+                    e.label,
+                    end(&e.target)
+                ));
+            }
+            if !labels.insert(e.label.as_str()) {
+                return Err(format!("Two exposures are labelled \"{}\"", e.label));
+            }
+            if targets.contains(&&e.target) {
+                return Err(format!(
+                    "Exposure \"{}\": {} is exposed twice",
+                    e.label,
+                    end(&e.target)
+                ));
+            }
+            targets.push(&e.target);
+        }
+    }
+    let crossing = crossings(p, &members)?;
+    // A curated port is one target; a source feeding two inside targets needs fan-in (G3).
+    let mut fed: Vec<(&PortRef, kabl_core::CableId, &PortRef)> = Vec::new();
+    for (cid, target) in &crossing {
+        let cable = &p.cables[cid];
+        if cable.to != *target {
+            continue;
+        }
+        if let Some((_, first, _)) = fed
+            .iter()
+            .find(|(f, _, t)| **f == cable.from && *t != target)
+        {
+            return Err(format!(
+                "Cables {first} and {cid} carry {} into two targets inside the group; one \
+                 public input cannot feed several targets yet",
+                binding_label(&cable.from)
+            ));
+        }
+        fed.push((&cable.from, *cid, target));
+    }
+    let uncovered: Vec<String> = crossing
+        .iter()
+        .filter(|(_, inside)| !ports.iter().any(|e| e.target == *inside))
+        .map(|(cid, inside)| {
+            let cable = &p.cables[cid];
+            let outside = if cable.from == *inside {
+                &cable.to
+            } else {
+                &cable.from
+            };
+            format!(
+                "cable {cid} ({} inside, {} outside)",
+                end(inside),
+                end(outside)
+            )
+        })
+        .collect();
+    if !uncovered.is_empty() {
+        return Err(format!("No curated port covers {}", uncovered.join("; ")));
+    }
+    // Interactive encapsulation keeps pins as controls; a curated interface must list them.
+    for pin in crate::perform::pins(p)
+        .into_iter()
+        .filter(|pin| members.contains(&pin.id))
+    {
+        let target = PortRef::Param {
+            id: pin.id,
+            param: pin.key.clone(),
+        };
+        if registry::info_for(&p.modules[&pin.id].kind)
+            .is_some_and(|i| i.params.iter().any(|param| param.name == pin.key))
+            && !controls.iter().any(|e| e.target == target)
+        {
+            return Err(format!(
+                "Pinned parameter {} is not a curated control",
+                end(&target)
+            ));
+        }
+    }
+    let id = next_group(log)?;
+    let mut c = Composite {
+        name: name.trim().into(),
+        help: "Open internals to inspect the real modules and routes. Editing affects this \
+               instance only."
+            .into(),
+        definition,
+        parent: None,
+        pos: p.modules[members.first().unwrap()].pos,
+        members,
+        ports: BTreeMap::new(),
+        controls: BTreeMap::new(),
+        next_interface: 1,
+        panel: panel.map(Box::new),
+    };
+    for (list, control) in [(ports, false), (controls, true)] {
+        for e in list {
+            expose(&mut c, e.target.clone(), e.label.clone(), control)?;
+        }
+    }
+    let mut candidate = p.clone();
+    candidate.composites.insert(id, c.clone());
+    compile(&candidate)?;
+    let t_ms = log.entries().last().map_or(0, |e| e.t_ms);
+    log.append_new(Op::SetComposite { id, value: Some(c) }, t_ms, Source::User);
+    Ok(id)
+}
+/// `#<module>.<port or param>`, as refusals name the ends of a crossing.
+fn end(t: &PortRef) -> String {
+    match t {
+        PortRef::Module { id, port } => format!("#{id}.{port}"),
+        PortRef::Param { id, param } => format!("#{id}.{param}"),
+        PortRef::CableParam { cable, param } => format!("cable #{cable}.{param}"),
+    }
 }
 pub fn binding_label(t: &PortRef) -> String {
     match t {
@@ -355,7 +529,7 @@ fn insert_inner(
 ) -> Result<CompositeId, String> {
     kabl_engine::compile::validate_composites(&pkg.patch)?;
     let (mut next_module, mut next_cable) = editor.reserved_ids();
-    let mut next_group = next_group(editor)?;
+    let mut next_group = next_group(editor.log())?;
     let mut modules = BTreeMap::new();
     let mut groups = BTreeMap::new();
     for &id in pkg.patch.modules.keys() {
