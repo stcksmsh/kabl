@@ -20,8 +20,8 @@ engine and assembles the audio animatic; the video is cut to that audio in phase
   cut so they arrive already open.
 - Cuts land on bar lines, placed to the sample. The incoming segment starts on the bar line with a
   3 ms raised-cosine fade-in, short enough to keep its first transient, and the outgoing one fades
-  out under it over 12 ms, so no cut clicks. The cut into the drop is hard, after an eighth of a
-  bar of silence. Depth Charge hits sit on the big cuts.
+  out under it over 12 ms, so no cut clicks. There is no silence before the drop: the Siren, the pulse
+  and the riser all run up to its bar line, and the riser's release rings into the hit. Depth Charge hits sit on the big cuts.
 
 ## The arc
 
@@ -40,7 +40,7 @@ engine and assembles the audio animatic; the video is cut to that audio in phase
 | 0:19.4 | 10 | Build, half bars | **Oracle**, Dm choir, Vowel a to o; then **Undertow**, D wobble bass; Depth Charge thump | Sounds page, Voice row; the Wobble macro flicks |
 | 0:21.3 | 11 | Build, half bars | **Pawn Shop**, cue Hook; then **Spark Plug**, Bb arpeggio in sixteenths | Perform, the Hook pad; sequencer steps lighting |
 | 0:23.2 | 12 | Build, half bars | **Fault Line** (reese and break, at 124); then **Copper Mile**, Sweep up | The reese's cables glowing hot; the Sweep knob turning |
-| 0:25.2 | 13 | Build, half bars | **Hot Wire**, C squelch in sixteenths with Squelch up; then **Short Circuit**, Siren on; then an eighth of a bar of silence | Squelch sweep; the Siren knob slammed; one black frame |
+| 0:25.2 | 13 | Build, half bars | **Hot Wire**, C squelch in sixteenths with Squelch up; then **Short Circuit**, Siren on, held into the drop | Squelch sweep; the Siren knob slammed |
 | 0:21.3-0:26.9 | 11-13.9 | Riser (layer) | **Updraft** on D3, Build 0.45, Lift 1, Air 0.4, swelling 16 dB | Updraft's Build knob; the filter cables brighten to white |
 | 0:03.9-0:26.9 | 2-13.9 | Pulse (layer) | **Loading Dock**, cue Intro, Stabs 0: the kick and hats under every flash except the Piece ones (Laundromat, Balcony, Pawn Shop bring their own drums; variant C keeps it under them too); Sweep opens over bars 12-14 | (under everything) |
 | 0:27.1 | 14-17 | DROP | **Lichen-plus**, cue Bloom+ (Focus and Chords at 1: Lichen's loops plus Balcony's chords and arpeggio); Depth Charge impact, Boom 0.9 | The full rack with every cable glowing and the Bloom+ pad lit; the camera pushes in |
@@ -86,6 +86,23 @@ sets each to its loudness target over its placed bars, applies the crossfades, f
 riser's swell, and masters with ffmpeg. It writes `NAME.wav`, `NAME.mp3` (320k) and
 `NAME-cuesheet.txt` (with each segment's raw loudness and the level it is set to); `--name` sets
 NAME, default `promo-v2-animatic`. `PROMO_SKIP_RENDER=1` re-mixes from existing renders.
+
+### The video
+
+```sh
+xvfb-run -a -s "-screen 0 1920x1080x24" target/release/examples/promo_render video \
+  OUT_DIR/NAME-segments/spec.json OUT_DIR/NAME.wav NAME.mp4
+```
+
+`video` draws the real UI offline (look B, dark, 1920x1080, 60 frames a second of virtual time,
+so a slow software renderer gives the same clip) and cuts on the same frames as the mix. Each cut
+loads its preset and plays its segment through the engine exactly as the audio render did, so the
+faces, cables, macro knobs and scene pads move with what is heard. The visual text picks the view:
+the Sounds page (searched to the preset, its card selected), Perform (for presets with scenes), or
+the Rack, fitted. "push" zooms in over the cut, "palette" steps the cable palette each beat,
+"dims" darkens; the last cut flashes white for a beat, then the end card. It opens from black and
+fades to black with the mix. The mix is muxed in (AAC 320k), and a still just after every cut goes
+to `NAME-stills/`.
 
 ## Variants
 

@@ -17,8 +17,10 @@ Pulpit's bar with a Glacier pad chord.
 Run from the repository root. Needs the release build of the renderer
 (`cargo build --release -p kabl-tools --example promo_render`; `PROMO_RENDER` overrides its path),
 numpy, scipy and ffmpeg. Writes OUT_DIR/NAME.wav and .mp3 (320k) and OUT_DIR/NAME-cuesheet.txt
-(NAME defaults to promo-v2-animatic); the segment renders go to OUT_DIR/segments/.
-`PROMO_SKIP_RENDER=1` re-mixes from existing renders.
+(NAME defaults to promo-v2-animatic); the segment renders and their spec.json go to
+OUT_DIR/NAME-segments/. `PROMO_SKIP_RENDER=1` re-mixes from existing renders. The video is drawn
+from the same spec.json: `promo_render video OUT_DIR/NAME-segments/spec.json OUT_DIR/NAME.wav
+NAME.mp4`.
 """
 
 import argparse
@@ -154,21 +156,21 @@ def board(fullbar=False, dock_pulse=False, pad_flash=False):
         seg("17-hot-wire", fast[6], q, P + "hot-wire", what="Lead: C squelch in 16ths",
             visual="Squelch macro sweep", ramps=[[1, 0.0, q * BAR, 0.3, 1.0]],
             hits=line([(i * .25, .2, [48, 60][i % 2]) for i in range(sixteenths)])),
-        seg("18-short-circuit", fast[7], q - .125, P + "short-circuit",
-            what="Lead: Siren on, G held; then 1/8 bar of silence",
-            visual="Siren knob slammed, then a black frame", macros={"4": 1.0},
-            hits=held([67], 0, 4 * q - .5, 120)),
+        seg("18-short-circuit", fast[7], q, P + "short-circuit",
+            what="Lead: Siren on, G held into the drop",
+            visual="Siren knob slammed", macros={"4": 1.0},
+            hits=held([67], 0, 4 * q, 120)),
         # Layers of the build.
-        seg("bed-loading-dock", 2, drop - 2.125, P + "loading-dock", gain=-24, layer=True,
+        seg("bed-loading-dock", 2, drop - 2, P + "loading-dock", gain=-24, layer=True,
             what="bed: Loading Dock Intro, Stabs 0; Sweep opens over the last two bars"
                  + ("" if dock_pulse else "; out under the Piece flashes"),
             visual="(the pulse under the build)", bpm=BPM, preroll=2 * BAR,
             mute=() if dock_pulse else pieces, cues=[[-2 * BAR, 1]], macros={"2": 0.0},
             ramps=[[1, (drop - 4) * BAR, (drop - 2.2) * BAR, 0.12, 1.0]]),
-        seg("riser-updraft", drop - 3, 2.875, P + "updraft", gain=-19, layer=True,
+        seg("riser-updraft", drop - 3, 3, P + "updraft", gain=-19, layer=True,
             shape=(-14.0, 2.0), what="riser: Updraft on D3, Lift 1, Build 0.45",
             visual="Updraft's Build knob, the Rack's filter cable brightening to white",
-            macros={"1": 0.45, "2": 1.0, "3": 0.4}, hits=[[0.0, 50, 115], [2.9 * BAR, 50, 0]]),
+            macros={"1": 0.45, "2": 1.0, "3": 0.4}, hits=[[0.0, 50, 115], [3 * BAR, 50, 0]]),
         impact("hit-bar2", 2, 38, boom=0.3, gain=-19),
         impact("hit-bar6", 6, 38, boom=0.2, gain=-21),
         impact("hit-bar10", 10, 38, boom=0.2, gain=-20),
@@ -218,13 +220,15 @@ def board(fullbar=False, dock_pulse=False, pad_flash=False):
     return s, 28 + d
 
 
-def render(segs, board):
-    spec = {"segments": []}
+def render(segs, board, end):
+    # `bar_secs`, `end` and each segment's placement are for `promo_render video`.
+    spec = {"bar_secs": BAR, "end": end, "segments": []}
     for s in board:
         secs = max(s["offset"] + s["bars"] * BAR, (s["render_bars"] or 0) * BAR)
         spec["segments"].append(dict(name=s["name"], patch=s["patch"], preroll=s["preroll"],
                                      secs=secs + max(s["tail"], s["fade_out"]) + 0.05,
-                                     **s["spec"]))
+                                     bar=s["bar"], bars=s["bars"], layer=s["layer"],
+                                     offset=s["offset"], visual=s["visual"], **s["spec"]))
     path = os.path.join(segs, "spec.json")
     json.dump(spec, open(path, "w"), indent=1)
     exe = os.environ.get("PROMO_RENDER", os.environ.get("CARGO_TARGET_DIR", "target")
@@ -363,7 +367,7 @@ if __name__ == "__main__":
     segs = os.path.join(args.out, args.name + "-segments")
     os.makedirs(segs, exist_ok=True)
     if os.environ.get("PROMO_SKIP_RENDER") is None:
-        render(segs, S)
+        render(segs, S, END)
     bus, levels = mix(segs, S, END)
     lufs, tp = master(bus, args.out, args.name)
     n = cuesheet(args.out, args.name, S, END, levels, lufs, tp)
