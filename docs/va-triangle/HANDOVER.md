@@ -44,5 +44,11 @@ fmt, clippy `--workspace --all-targets -D warnings`, `cargo test --workspace`.
 
 ## Remaining
 
-None. Draft PR open; never merge. Listening pair (`presets/soft-sine`, melody C6-C8):
-`.claude/tmp/listen/triangle/triangle-{before,after}.wav` in the root checkout.
+None. Draft PR open; never merge. Listening pairs in the root checkout's
+`.claude/tmp/listen/triangle/`: `triangle-dry-{before,after}.wav` (bare `osc.va` triangle,
+melody C6-C8 then a C5-C8 sweep) and `triangle-spark-plug-{before,after}.wav`.
+
+Inharmonic energy vs harmonic, dry clip, before -> after: melody mean -38.1 -> -46.9 dB, C8
+-31.4 -> -44.9 dB, sweep -38.3 -> -45.8 dB. Factory patches mask it: the largest
+before/after difference among the 30 that change is Spark Plug at -32.3 dB of the signal
+(Soft Sine, filtered at 1.4 kHz, is far below that).

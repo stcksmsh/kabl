@@ -529,7 +529,7 @@ impl Module for OscVa {
                         sample(*p, dt, waveform, pw) - 0.5 * f * f * jump
                             + kink(s0, at_edge, dt) * f * f * f * (1.0 / 6.0)
                     } else {
-                        // Unchanged expression, so saw and square stay bit-identical.
+                        // Saw and square keep their slope across the edge: BLEP only.
                         naive(*p, waveform, pw) - 0.5 * f * f * jump - dc(waveform, pw)
                     }
                 } else {
