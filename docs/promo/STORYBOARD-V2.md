@@ -11,14 +11,17 @@ engine and assembles the audio animatic; the video is cut to that audio in phase
 
 ## Grid
 
-- 124 BPM, one bar = 1.935 s, 28 bars plus a one-second fade: 55.4 s.
+- 124 BPM, one bar = 1.935 s, 28 bars: 54.2 s. The file ends on the bar line after two bars of end
+  card, the last 1.5 s fading to silence (the first animatic ran a further 2 s of near-silence).
 - Every keyboard-played sound is in D minor over one progression, a chord a bar: Dm, Bb, F, C.
 - Every clocked preset is rendered at 124 BPM (its clock's `bpm` set before the run), from enough
   bars of pre-roll that it is already in full swing on its first bar. Estuary runs at 62 BPM, half
   of 124, so its slow bars still land on the grid. Pads and choirs are pressed a second before their
   cut so they arrive already open.
-- Cuts land on bar lines with an 8 ms crossfade; the cut into the drop is hard, after an eighth of
-  a bar of silence. Depth Charge hits sit on the big cuts.
+- Cuts land on bar lines, placed to the sample. The incoming segment starts on the bar line with a
+  3 ms raised-cosine fade-in, short enough to keep its first transient, and the outgoing one fades
+  out under it over 12 ms, so no cut clicks. The cut into the drop is hard, after an eighth of a
+  bar of silence. Depth Charge hits sit on the big cuts.
 
 ## The arc
 
@@ -33,13 +36,13 @@ engine and assembles the audio animatic; the video is cut to that audio in phase
 | 0:11.6 | 6 | Build | **Balcony**, cue Chorus; Depth Charge thump | Perform scenes: the Chorus pad fires, macro rings jump |
 | 0:13.5 | 7 | Build | **Vox Chop**, Bb house stabs, Vowels up | The cable palette switches: every cable re-colours at once |
 | 0:15.5 | 8 | Build | **Dune Buggy**, as stored | Rack zoomed out, every cable pulsing on the beat |
-| 0:17.4 | 9 | Build | **Pulpit**, C organ chord, Rotor 0.2 to 1 | Rotor knob sweep; a code module's scope speeding up |
+| 0:17.4 | 9 | Build | **Pulpit**, C organ chord, Rotor 0.2 to 1 (variant D: **Glacier**, C pad chord already bloomed, Frost 0.2 to 0.8) | Rotor knob sweep; a code module's scope speeding up (D: the Glacier card, the Frost knob turning) |
 | 0:19.4 | 10 | Build, half bars | **Oracle**, Dm choir, Vowel a to o; then **Undertow**, D wobble bass; Depth Charge thump | Sounds page, Voice row; the Wobble macro flicks |
 | 0:21.3 | 11 | Build, half bars | **Pawn Shop**, cue Hook; then **Spark Plug**, Bb arpeggio in sixteenths | Perform, the Hook pad; sequencer steps lighting |
 | 0:23.2 | 12 | Build, half bars | **Fault Line** (reese and break, at 124); then **Copper Mile**, Sweep up | The reese's cables glowing hot; the Sweep knob turning |
 | 0:25.2 | 13 | Build, half bars | **Hot Wire**, C squelch in sixteenths with Squelch up; then **Short Circuit**, Siren on; then an eighth of a bar of silence | Squelch sweep; the Siren knob slammed; one black frame |
 | 0:21.3-0:26.9 | 11-13.9 | Riser (layer) | **Updraft** on D3, Build 0.45, Lift 1, Air 0.4, swelling 16 dB | Updraft's Build knob; the filter cables brighten to white |
-| 0:03.9-0:26.9 | 2-13.9 | Pulse (layer) | **Loading Dock**, cue Intro, Stabs 0: the kick and hats under every flash; Sweep opens over bars 12-14 | (under everything) |
+| 0:03.9-0:26.9 | 2-13.9 | Pulse (layer) | **Loading Dock**, cue Intro, Stabs 0: the kick and hats under every flash except the Piece ones (Laundromat, Balcony, Pawn Shop bring their own drums; variant C keeps it under them too); Sweep opens over bars 12-14 | (under everything) |
 | 0:27.1 | 14-17 | DROP | **Lichen-plus**, cue Bloom+ (Focus and Chords at 1: Lichen's loops plus Balcony's chords and arpeggio); Depth Charge impact, Boom 0.9 | The full rack with every cable glowing and the Bloom+ pad lit; the camera pushes in |
 | 0:34.8 | 18-19 | DROP | **Gantry**, cue Peak, at 124; Depth Charge on A1 | Perform: the Peak pad fires, every macro ring full |
 | 0:38.7 | 20-21 | DROP | Back to **Lichen-plus** (the take kept running); Echo 0.35 to 1 in the last bar, its tail crossfades into the breath | Rack again, the Echo macro sweeping, cables fading into the echo's colour |
@@ -57,8 +60,11 @@ and Estuary).
 
 ## Loudness shape
 
-The build sits around -17 dBFS RMS a bar, the drop and the final hit 3 to 6 dB louder (-11 to
--14), the breath at about -20. The master is the video mix, not a preset: a limiter (ceiling -2 dBFS
+Every segment is set by its loudness (BS.1770 K-weighted, over its placed bars), not its RMS, so a
+bright lead and a bass-heavy groove sit at the same perceived level: the build at -16 LUFS each,
+the drop 4 dB louder (-12), the final hit -11, the breath -18.5 (all before the master). The first
+animatic matched RMS, which left the build's presets 4.1 dB apart in loudness (Horn Section -14.2 to
+Undertow -18.3); now they are within 0.1 dB. The master is the video mix, not a preset: a limiter (ceiling -2 dBFS
 sample peak) and gain to -14 LUFS integrated, true peak at or under -1 dBFS after the mp3 encode.
 The limiter works about 2 to 5 dB on the drop's and the final hit's transients and under half a
 dB elsewhere.
@@ -76,13 +82,25 @@ python3 docs/promo/build_animatic.py OUT_DIR
 `.kabl` file, a clock tempo, pre-roll, macro values, macro ramps at runtime, cue launches and
 keyboard notes (`promo_render list PATCH...` prints a patch's tempo, macros and cues). The script
 holds the storyboard as data (`S`), writes the spec, renders, places each render on the bar grid,
-sets each to its RMS target over its placed bars, applies the crossfades, fades and the riser's
-swell, and masters with ffmpeg. It writes `promo-v2-animatic.wav`, `promo-v2-animatic.mp3` (320k)
-and `promo-v2-cuesheet.txt`. `PROMO_SKIP_RENDER=1` re-mixes from existing renders.
+sets each to its loudness target over its placed bars, applies the crossfades, fades and the
+riser's swell, and masters with ffmpeg. It writes `NAME.wav`, `NAME.mp3` (320k) and
+`NAME-cuesheet.txt` (with each segment's raw loudness and the level it is set to); `--name` sets
+NAME, default `promo-v2-animatic`. `PROMO_SKIP_RENDER=1` re-mixes from existing renders.
+
+## Variants
+
+Three switches of the script answer the open questions by ear; every variant has the same timing
+and mix.
+
+| File | Command | What changes |
+|---|---|---|
+| `promo-v2-A-polished` | `build_animatic.py OUT --name promo-v2-A-polished` | Nothing: the storyboard above |
+| `promo-v2-B-fullbar` | `... --fullbar` | A full bar per flash from bar 10 (eight bars instead of four, so the drop is at bar 18 and the promo is 61.9 s); the riser still starts three bars before the drop |
+| `promo-v2-C-dockpulse` | `... --dock-pulse` | The Loading Dock pulse keeps playing under Laundromat, Balcony and Pawn Shop |
+| `promo-v2-D-padflash` | `... --pad-flash` | Glacier, a Pad, in place of Pulpit at bar 9 |
 
 ## Open for the owner
 
-- Whether the half-bar flashes in bars 10-13 are fast enough, or too fast, against the 1-bar ones.
-- Whether the Loading Dock pulse should stay under the Piece flashes (Laundromat, Balcony, Pawn Shop
-  bring their own drums, so those bars carry two kits on the same grid).
-- Pad has no flash of its own; Fog Bank or Glacier could replace one of the build's 1-bar keys.
+- Half-bar or full-bar flashes in bars 10-13 (A or B).
+- The Loading Dock pulse under the Piece flashes or not (C or A).
+- A Pad flash in place of Pulpit (D or A).
