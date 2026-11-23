@@ -420,3 +420,47 @@ fn instance_pool_is_built_off_thread() {
     assert_eq!(g.pooled(), 0);
     assert_eq!(vs.len(), 16);
 }
+
+fn with_ports(kind: &str, ins: usize, outs: usize) -> kabl_modules::code::CodeMeta {
+    use kabl_modules::code::CodePort;
+    use kabl_modules::{PortDirection, PortType};
+    let mut m = fake_meta(kind);
+    m.ports.clear();
+    for (n, dir) in [(ins, PortDirection::Input), (outs, PortDirection::Output)] {
+        for i in 0..n {
+            m.ports.push(CodePort {
+                name: format!("p{i}"),
+                port_type: PortType::Audio,
+                direction: dir,
+                width: 1,
+            });
+        }
+    }
+    m
+}
+
+fn register(meta: kabl_modules::code::CodeMeta) -> Result<Arc<CodeGroup>, LoadError> {
+    let mut e = FakeEngine::new("x", vec![Behavior::Gain]);
+    e.meta = meta;
+    let compiled = e.compile(&[0u8; 8])?;
+    CodeGroup::new(compiled, cfg(), 1_000_000, Duration::from_secs(1))
+}
+
+#[test]
+fn too_many_inputs_are_refused_at_registration() {
+    let err = register(with_ports("t.five_in", 5, 1)).err().unwrap();
+    assert!(
+        err.to_string()
+            .contains("code module 't.five_in' declares 5 inputs; kabl supports at most 4"),
+        "{err}"
+    );
+    let err = register(with_ports("t.nine_out", 1, 9)).err().unwrap();
+    assert!(err
+        .to_string()
+        .contains("declares 9 outputs; kabl supports at most 8"));
+}
+
+#[test]
+fn four_inputs_and_eight_outputs_are_accepted() {
+    assert!(register(with_ports("t.max_ports", 4, 8)).is_ok());
+}

@@ -8,6 +8,13 @@ use crate::info::{
 };
 use std::sync::Mutex;
 
+/// Most input slots a module may have (a width-2 port is two slots). The engine's per-step
+/// arrays are sized to this; a code module over it is refused at registration.
+pub const MAX_INPUTS: usize = 4;
+/// Most output slots a module may have. The engine's audio-thread match handles 0 to this many
+/// outputs; bump it together with a new match arm in the engine.
+pub const MAX_OUTPUTS: usize = 8;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct CodePort {
     pub name: String,
@@ -56,6 +63,18 @@ impl CodeMeta {
     pub fn validate(&self) -> Result<(), String> {
         if self.kind.is_empty() {
             return Err("empty kind".into());
+        }
+        for (dir, what, max) in [
+            (PortDirection::Input, "inputs", MAX_INPUTS),
+            (PortDirection::Output, "outputs", MAX_OUTPUTS),
+        ] {
+            let n = self.slots(dir);
+            if n > max {
+                return Err(format!(
+                    "code module '{}' declares {n} {what}; kabl supports at most {max} (a stereo port counts as 2)",
+                    self.kind
+                ));
+            }
         }
         for (i, p) in self.ports.iter().enumerate() {
             if !(1..=2).contains(&p.width) {
