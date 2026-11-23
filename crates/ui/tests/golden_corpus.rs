@@ -8,7 +8,8 @@
 //!   at block 3000, long enough for sequencers to pass their later steps and wrap.
 //! - Cues: every cue of every `cues` module (in module-id order, then cue order) is launched
 //!   once, immediately, at block `1000 + 500 * i` for the i-th cue: each of its sequencer or
-//!   drum-grid targets is armed on its bank. Cue macro values and morphs are not exercised.
+//!   drum-grid targets is armed on its bank. Cue macro values and morphs are not exercised, and
+//!   the cue's launch timing (clock quantisation, `Launch`, cancel) is bypassed.
 //!
 //! Regenerate deliberately, only when a sound is meant to change:
 //! `KABL_WRITE_GOLDEN=1 cargo test -p kabl-ui --test golden_corpus`.
@@ -21,6 +22,8 @@ use kabl_ui::cues;
 
 const COUNT: usize = 129;
 const BLOCKS: usize = 6000;
+/// Patches with at least one cue launch; guards against `cues()` silently returning nothing.
+const CUE_PATCHES: usize = 4;
 
 fn patch_dirs(root: &Path, out: &mut Vec<PathBuf>, depth: usize) {
     if root.join("log.jsonl").is_file() && root.join("meta.toml").is_file() {
@@ -131,11 +134,11 @@ fn browser_corpus_renders_as_it_did() {
         names,
         "golden_corpus.txt and the patches folder list different patches"
     );
+    let mut with_cues = 0;
     for (name, want) in recorded {
-        assert_eq!(
-            render_hash(&root.join(name)).0,
-            want,
-            "{name} sounds different"
-        );
+        let (hash, launches) = render_hash(&root.join(name));
+        assert_eq!(hash, want, "{name} sounds different");
+        with_cues += usize::from(launches > 0);
     }
+    assert_eq!(with_cues, CUE_PATCHES, "patches with cue launches changed");
 }
