@@ -19,5 +19,5 @@ kabl-core = { path = "../core" }
 
 [dev-dependencies]
 basedrop = "0.1.3"
-assert_no_alloc = "1.1.2"
+assert_no_alloc = { version = "1.1.2", default-features = false }
 tempfile = "3.27.0"
