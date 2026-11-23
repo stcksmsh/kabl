@@ -8,7 +8,7 @@ patches/interlocking 08621c6a015358b1
 patches/palette/bass fdacfd987e1d38cd
 patches/palette/breath cef535d81c5e6822
 patches/palette/keyboard-bass 0412b0b64f8b6cd9
-patches/palette/keys e0286b3e27bf562e
+patches/palette/keys 00b1cc0f7e36d706
 patches/palette/lead f07c9de69a325e54
 patches/palette/pad da7f70649a5c9d08
 patches/palette/perc 4eaf3e905593b158
