@@ -19,6 +19,12 @@ Joining takes (each already finished by this script, so t=0 is 0.5 s before bar 
 
 Take i plays up to cut i, take i+1 from there on, with a 20 ms audio crossfade at the cut.
 Cut seconds = 0.5 + bar * bar_seconds.
+
+Environment for --join: END=S ends the video at S seconds; FADE=D fades the audio out over the
+last D seconds (and the picture over the last second); CARD="TITLE|LINE" draws an end card over
+those D seconds; LUFS=-14 normalizes the audio in two loudnorm passes (true peak -2 dBTP, AAC
+192 kb/s at 48 kHz); RATE=30 sets the output frame rate (a 60 fps capture of a UI that draws
+slower than that).
 """
 import sys
 
@@ -45,10 +51,49 @@ if sys.argv[1] == "--join":
         chain.append(f"[{last}][a{i}]acrossfade=d={X}[x{i}]")
         last = f"x{i}"
     fc = ";".join(v + a + chain + ["".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[vo]"])
-    cmd += ["-filter_complex", fc, "-map", "[vo]", "-map", f"[{last}]", "-c:v", "libx264", "-crf",
-            os.environ.get("CRF", "18"), "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
-            "-movflags", "+faststart", out]
+    vf, af = [], []
+    end, fade = os.environ.get("END"), float(os.environ.get("FADE", "0"))
+    if end:
+        end = float(end)
+        vf.append(f"trim=end={end}")
+        af.append(f"atrim=end={end}")
+        if fade:
+            af.append(f"afade=t=out:st={end - fade}:d={fade}")
+            vf.append(f"fade=t=out:st={end - 1}:d=1")
+            if os.environ.get("CARD"):
+                on = f"enable='gte(t,{end - fade})'"
+                title, line = (t.replace(":", "\\:").replace("'", "") for t in os.environ["CARD"].split("|"))
+                vf += [f"drawbox=x=0:y=0:w=iw:h=ih:color=black@0.7:t=fill:{on}",
+                       f"drawtext=font=Lato:text='{title}':fontsize=160:fontcolor=white:"
+                       f"x=(w-text_w)/2:y=h/2-text_h:{on}",
+                       f"drawtext=font=Lato:text='{line}':fontsize=52:fontcolor=white@0.85:"
+                       f"x=(w-text_w)/2:y=h/2+40:{on}"]
+    if os.environ.get("RATE"):
+        vf.append(f"fps={os.environ['RATE']}")
+    if vf:
+        fc += ";[vo]" + ",".join(vf) + "[vf]"
+    if af:
+        fc += f";[{last}]" + ",".join(af) + "[af]"
+    lufs = os.environ.get("LUFS")
+    first = out + ".pre.mkv" if lufs else out
+    acodec = ["-c:a", "pcm_s16le"] if lufs else ["-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart"]
+    cmd += ["-filter_complex", fc, "-map", "[vf]" if vf else "[vo]", "-map", "[af]" if af else f"[{last}]",
+            "-c:v", "libx264", "-crf", os.environ.get("CRF", "18"), "-pix_fmt", "yuv420p", *acodec, first]
     subprocess.run(cmd, check=True)
+    if lufs:
+        import json
+
+        ln = f"loudnorm=I={lufs}:TP=-2:LRA=11"  # -2 so the AAC encode stays under -1 dBTP
+        err = subprocess.run(["ffmpeg", "-hide_banner", "-i", first, "-vn", "-af", ln + ":print_format=json",
+                              "-f", "null", "-"], capture_output=True, text=True, check=True).stderr
+        m = json.loads(err[err.rindex("{"):err.rindex("}") + 1])
+        ln += (f":measured_I={m['input_i']}:measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}"
+               f":measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true")
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", first, "-c:v", "copy", "-af", ln,
+                        "-ar", "48000", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out],
+                       check=True)
+        os.remove(first)
+        print(f"loudnorm pass 1: {m['input_i']} LUFS, {m['input_tp']} dBTP, LRA {m['input_lra']}")
     print(f"wrote {out}")
     sys.exit(0)
 

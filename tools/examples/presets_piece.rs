@@ -11,6 +11,9 @@
 //! what they do (CC 20-23), the first cue is the stored macro values, the cues move macros only
 //! and every sequencer keeps playing. No limiter: headroom comes from the patch gain.
 
+#[path = "presets_piece/promo_v1.rs"]
+mod promo_v1;
+
 use kabl_modules::builtins::{cell_index, make_code, with_code};
 
 use std::path::Path;
@@ -2476,6 +2479,11 @@ fn lichen_voices(r: &mut Rack, clock: ModuleId) -> Vec<(ModuleId, &'static str)>
 }
 
 fn lichen() -> (Rack, Vec<CueDef>) {
+    lichen_with(lichen_voices)
+}
+
+/// Lichen with `extra` as its voices (the promo patch adds a layer to `lichen_voices`).
+fn lichen_with(extra: ExtraFn) -> (Rack, Vec<CueDef>) {
     let s = Spec {
         names: ["Mutate", "Reach", "Gate", "Echo"],
         stored: [0.05, 0.30, 0.40, 0.35],
@@ -2555,7 +2563,7 @@ fn lichen() -> (Rack, Vec<CueDef>) {
         space_macro: 4,
         crush: false,
         chorus: false,
-        extra: Some(lichen_voices),
+        extra: Some(extra),
     };
     let (mut r, h) = assemble(&s);
     let k = h.knob;
@@ -3317,7 +3325,8 @@ fn main() {
                 println!("{line}");
             }
         }
-        _ => eprintln!("usage: presets_piece write|clips|phrases|levels <patches dir> ..."),
+        Some("promo") => promo_v1::main(&args[2..]),
+        _ => eprintln!("usage: presets_piece write|clips|phrases|levels|promo <patches dir> ..."),
     }
 }
 

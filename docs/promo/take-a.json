@@ -1,0 +1,18 @@
+{
+  "_comment": "Take A of STORYBOARD-V1.md (shots 1-2, bars 0-8): an empty rack, a voice patched on camera. Bar 0 is the click on Add module. Module ids are the order they are added: 1 osc.va, 2 filter.ladder, 3 out, 4 lfo. Each drive line costs about 0.3 s and a drag about 1.4 s, so the gestures are spread out; the voice sounds from about bar 4. The Output level comes down 14 dB first (40 px at 0.36 dB/px) so the bare oscillator is not louder than Lichen.",
+  "bpm": 112,
+  "anchor": "empty-add",
+  "setup": [],
+  "shots": [
+    {"bar": 0, "do": ["type osc.va", "key Return"]},
+    {"bar": 0.8, "do": ["click add-menu", "sleep 0.1", "type filter.ladder", "key Return"]},
+    {"bar": 1.6, "do": ["click add-menu", "sleep 0.1", "type out", "key Return"]},
+    {"bar": 2.3, "do": ["aim knob:3.level_db", "slidey 40 0.3"]},
+    {"bar": 2.8, "do": ["drag out:1.out in:2.in", "drag out:2.out in:3.in"]},
+    {"bar": 4.3, "do": ["clickat 146 357"]},
+    {"bar": 5, "do": ["click add-menu", "sleep 0.1", "type lfo", "key Return"]},
+    {"bar": 5.8, "do": ["drag out:4.out in:2.cutoff_cv"]},
+    {"bar": 6.6, "do": ["aim knob:2.cutoff_hz", "slidey -80 2.5"]},
+    {"bar": 9, "do": []}
+  ]
+}
