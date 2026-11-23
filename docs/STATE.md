@@ -1,55 +1,40 @@
-# State 2026-11-23
+# State 2026-11-23 (late)
 
 ## Goal
-Make kabl easy to start, learn, understand and reuse, and bring it to Windows through VST3, without losing musical depth. The plan is `docs/ROADMAP.md` (canonical since 2026-11-23). Release 1.0 on Linux comes first.
+Make kabl easy to start, learn, understand and reuse, and bring it to Windows through VST3, without losing musical depth. The plan is `docs/ROADMAP.md` (canonical since 2026-11-23; owner brief in `docs/pivot/BRIEF-2026-11-23.md`). Release 1.0 on Linux comes first.
 
 ## Done
-- Release 1.0.0 prep: #196 merged at `89d9c1be`.
-- Triangle polyBLAMP: #204 merged.
-- Perform scenes fix: #199 merged.
-- SDK port limits: #198 merged.
-- Pivot investigations (read-only): corpus manifest, composite catalogue, first-run and learning design, Windows/VST3 feasibility. Copied to `docs/pivot/`.
-- Canonical roadmap: branch `claude/roadmap-pivot` (this PR).
+- Release 1.0.0 prep #196 (`89d9c1be`), triangle polyBLAMP #204 (`c294d702`), Perform scenes #199 (`8c42c40f`), promo cut 1 #197 (`55b317bf`), SDK port limits #198.
+- `v1.0.0-rc.1` tagged on `89d9c1be`: release run failed at `cargo test --workspace --release` (assert_no_alloc). Nothing published.
+- Pivot investigations (read-only) in `docs/pivot/`: corpus manifest, composite catalogue, first-run and learning design, Windows/VST3 feasibility.
 
 ## In flight
-- Promo v2 captions pass on `claude/promo-v2` (#203, draft). Not approved; no video until E2.
-- #205, the release-mode test build fix (`assert_no_alloc` disable_release). Green and reviewed clean; awaiting Kosta's merge, then rc.2.
-- #206, golden render hashes for the 129 browser patches (C0). In review.
-- L1, the lesson engine core with the recipes migrated. In flight (builder running, branch `claude/lesson-engine`).
+- #205 release-mode test fix (`e81bd2c3`): 9/9 green, reviewer clean. Waits for Kosta "merge 205 and tag rc.2".
+- #207 this roadmap + state (`claude/roadmap-pivot`): docs only, reviewer minor findings all fixed. Waits for Kosta "merge 207".
+- #206 C0 golden hashes for the 129 browser patches (`claude/golden-corpus`): reviewer minor (render 0.53 s reaches only 4-5 sequencer steps). Builder sent back to render non-preset folders ~8 s and launch each cue once; re-review and re-run CI after its push.
+- L1 lesson engine (`claude/lesson-engine`, opus builder): engine + TOML format + runner + progress in library.json, recipes ported unchanged, captures to `.claude/tmp/listen/lessons/`. No PR yet when this was written. If the builder died with the session, check the branch on origin and re-dispatch from the ROADMAP L1 slice.
+- #203 promo v2 (`11c9acd3`, draft, CI green on earlier head): captioned A video at `.claude/tmp/listen/promo/promo-v2-A-captions.mp4`, zoom done in image space (no label popping), unsaved dot fixed. PARKED per pivot (E after composites). Known fix before any use: caption "More than 100 factory sounds, each played from a few named macros" is false (11 of 129 have no macros); wide racks still cut off (needs UI fit-to-view).
 
 ## Next
-1. After Kosta merges #205: tag `v1.0.0-rc.2` and watch the release run (R2).
-2. R1: align `docs/ACCEPTANCE-V1.md` §1/§2 with 1.0 and drop the stale [PR] markers. Docs only.
-3. R3: install the rc.2 tarball on a clean profile. Then Kosta runs the acceptance checklist (R4).
-4. L2 (computer-key notes and key strip) and L4 (macro reveal), alongside L1.
-5. When OD-C2 is answered: CI1 (factory composite ids and bank), then CI2.
-6. When OD-W9 is answered: W1 (RT handle `Send` fix plus a `windows-latest` CI job).
+1. After "merge 205": merge, tag `v1.0.0-rc.2` via gh api on the merge commit, watch release run (R2); then R3 clean-profile install (builder), then Kosta's acceptance (R4). R1 (ACCEPTANCE-V1 §1/§2 docs fix) before R4.
+2. #206: re-review after the rework push; offer merge when green.
+3. L1: review PR when it lands; then L2 (computer-key notes + key strip) and L4 (macro reveal).
+4. When OD-C2 answered: CI1 (factory composite ids + bank), then CI2 (generators emit composites), then CB1-CB4 (Space, Drum Kit, Sequenced Part, Glue Bus).
+5. When OD-W9 answered: W1 (RT handle Send fix + windows-latest CI).
 
 ## Waiting on owner
-- Merge #205.
-- Acceptance run on rc.2.
-- Promo v2 questions: are the half-bar cuts too fast; the Loading Dock pulse; a Pad flash.
-- First run and learning: D1-D7 and D03-R (ROADMAP "Owner decisions").
-- Acid Line mix values 0.16/0.08 on 0-100 % params (OD-1); the `crowded` fixture in the browser (OD-3).
-- Composites: first-batch interface approval (OD-C), id scheme (OD-C2), format impact of G2/G3 (OD-C3).
-- Windows: test machine, Live licence, signing, installer, class id freeze, VST logo, Windows CLAP, ASIO, toolchain (OD-W1 to OD-W9).
+- `auto_clean = false` committed to master `.nonslop.toml` (urgent: every finishing builder wipes the shared target). Local copy already false.
+- "merge 205 and tag rc.2"; "merge 207".
+- D1-D7 + D03 reversal (learning), OD-1 Acid Line mix 0.16/0.08, OD-3 `crowded` fixture, OD-C/C2/C3 (composites), OD-W1..W9 (Windows: test machine, Live trial, signing, installer, class id, logo, Windows CLAP, ASIO, MSVC).
+- Promo: parked unless Kosta asks; old v2 variant questions superseded (A is the base).
 
 ## Hard-won facts
-- **Cargo setup**
-  - Shared cargo target: `/secondary/Programming/Github/kabl-target`.
-  - Untracked `kabl/.cargo/config.toml` sets it, with `jobs = 8`.
-  - Run every build under `systemd-run --user --scope -p MemoryMax=10G -p MemorySwapMax=2G`. An OOM on 11-23 came from unbounded builds.
-  - At most 3 building agents at once.
-- **auto_clean.** `.nonslop.toml` on master has `[done] auto_clean = true`, which ran `cargo clean` and wiped the shared target. It must become `false`. Agents cannot edit that file; Kosta changes it.
-- **GitHub CLI**
-  - `gh pr edit` fails on this machine. Set PR bodies and bases with `gh api -X PATCH repos/stcksmsh/kabl/pulls/N -F body=@file`.
-  - Update a PR branch with `gh api -X PUT repos/stcksmsh/kabl/pulls/N/update-branch`.
-  - Create tags with `gh api` on `repos/stcksmsh/kabl/git/refs` (`ref=refs/tags/<tag>`, `sha=<commit>`).
-- **Release tests.** `release.yml` runs `cargo test --workspace --release`, but PR CI builds debug only, so release-only compile errors surface only on a tag. That is what broke rc.1.
-- **Golden renders.** `crates/engine/tests/golden_renders.rs` walks `patches/` to depth 3. Before #206 it covered 26 patches and none of the presets.
-- **Corpus facts**
-  - No shipped patch uses a composite.
-  - 54 browser patches have 121 cable-param routes, the G1 blocker.
-  - The Sounds browser scans two directory levels: 129 listed, 19 engine demos hidden.
-- **Windows.** The workspace cross-compiles for `x86_64-pc-windows-gnu` with one real error: the RT priority handle is not `Send` (`crates/ui/src/app/callback.rs`).
-- **Branch hygiene.** The root checkout's `master` is stale; use `origin/master`. `ccr-1adff24f-zzq23d` (`docs/v2/PLAN.md`) is unreviewed and must not be merged.
+- **Builds are serial.** Shared target `/secondary/Programming/Github/kabl-target` via untracked `kabl/.cargo/config.toml` (`jobs = 8`); cargo's lock serialises agents. Every build/render under `systemd-run --user --scope -p MemoryMax=10G -p MemorySwapMax=2G`. Never `cargo clean`, never `CARGO_TARGET_DIR` (parallel only with Kosta's OK). OOM 11-23: two uncapped builders + Kosta's Java build on a 30 GB box.
+- **Coordinator merges only on Kosta's "merge <n>"** in the conversation; tags likewise.
+- **GitHub CLI.** `gh pr edit` fails: use `gh api -X PATCH repos/stcksmsh/kabl/pulls/N -F body=@file`. Update branch: `gh api -X PUT .../pulls/N/update-branch`. Tags: `gh api repos/stcksmsh/kabl/git/refs -f ref=refs/tags/<t> -f sha=<c>` (triggers release.yml). `gh pr checks --watch` can exit before checks register: re-check. Draft PRs need `gh pr ready` before merge.
+- **Release tests.** release.yml runs `cargo test --workspace --release`; PR CI is debug only.
+- **Golden renders.** Standard render = 3-note chord, 400 blocks of 64 = 0.53 s; too short for pieces (see #206 rework).
+- **Corpus.** No shipped patch uses a composite; G1 (macro routes on cable amounts can't cross a composite boundary) blocks 40 patches incl. Lichen; browser scans 2 levels: 129 listed, 19 engine demos hidden.
+- **Windows.** Cross-compiles for x86_64-pc-windows-gnu with one real error (RT priority handle not Send, `crates/ui/src/app/callback.rs:64`). Route: clap-wrapper around the CLAP.
+- **Agents and the worktree guard.** Report files must be written inside the agent's worktree or handed back; investigators could not write to `.claude/tmp/coordinator/reports/`.
+- **Branch hygiene.** Root checkout `master` is stale; use `origin/master`. `ccr-1adff24f-zzq23d` (docs/v2/PLAN.md) unreviewed, never merge.
