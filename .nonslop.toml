@@ -26,7 +26,7 @@ run = []
 gate_timeout_s = 1800
 # CLAUDE.md: run `cargo clean` before stopping; /secondary fills with target/ directories.
 auto_clean = true
-# CLAUDE.md: under 30 GB free on /secondary, tell "Kabl overseer" before building.
+# CLAUDE.md: under 30 GB free on /secondary, tell the coordinator before building.
 min_free_gb = 30
 stop_retries = 2
 
@@ -44,7 +44,7 @@ audio_sink = "kabl_agents"
 # Extra one-line rules for this project, shown to every agent.
 notes = [
   "Caveman and Ponytail run at ultra in this project, from the first message and after every context clear.",
-  "Stay under 50% context; at 50% follow the checkpoint protocol in CLAUDE.md and report to the session named \"Kabl overseer\".",
+  "Stay under 50% context; at 50% follow the checkpoint protocol in CLAUDE.md and report to the coordinator session.",
   "Confirm with `pactl list sink-inputs` that your streams are on `kabl_agents`; move any that are not. If the sink is missing, recreate it with `pactl load-module module-null-sink sink_name=kabl_agents sink_properties=device.description=kabl-agents-silent`. Never change the default sink.",
   "Never write to /home. All scratch, including CARGO_TARGET_DIR, goes under the scratch directory above.",
   "The root checkout's master is stale: use origin/master and the worktrees. Never work in a worktree another session is using.",
