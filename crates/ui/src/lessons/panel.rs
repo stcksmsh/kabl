@@ -116,7 +116,13 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     if let Some(n) = ui_state.lessons.note.clone() {
         para(ui, n);
     }
-    let Some(a) = ui_state.lessons.active.clone() else {
+    // Copied fields only: cloning `Active` would copy its baseline patch every frame.
+    let Some((lesson, step, completed_at, detached, step_done)) =
+        ui_state.lessons.active.as_ref().map(|a| {
+            let done = a.done.get(a.step).copied().unwrap_or(false);
+            (a.lesson, a.step, a.completed_at, a.detached, done)
+        })
+    else {
         crate::kit::label(
             ui,
             &st,
@@ -141,9 +147,9 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         }
         return;
     };
-    let l = &all()[a.lesson];
+    let l = &all()[lesson];
     ui.label(egui::RichText::new(&l.title).strong());
-    if a.detached {
+    if detached {
         para(
             ui,
             "Another sound was opened, so these steps no longer apply to the patch in front of \
@@ -153,27 +159,30 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             let b = ui.add(kb("Open the lesson patch again".into()));
             ui_state.record("lesson-reopen".into(), b.rect);
             if b.clicked() {
-                start(editor, ui_state, a.lesson);
+                start(editor, ui_state, lesson);
             }
         });
         return;
     }
     weak(ui, &l.summary);
     let n = l.steps.len();
-    if a.completed_at.is_some_and(|t| now - t < COMPLETED_SECS) && a.step > 0 {
-        weak(ui, format!("Step {} done.", a.step));
+    if completed_at.is_some_and(|t| now - t < COMPLETED_SECS) && step > 0 {
+        weak(ui, format!("Step {} done.", step));
         ui.ctx().request_repaint();
     }
-    if a.step >= n {
+    if step >= n {
         para(ui, &l.end.unguided);
         weak(
             ui,
             "Close keeps your patch and every edit. Save it from Sounds if you like it.",
         );
     } else {
-        let s = &l.steps[a.step];
-        ui.label(egui::RichText::new(format!("Step {} of {n}", a.step + 1)).small());
+        let s = &l.steps[step];
+        ui.label(egui::RichText::new(format!("Step {} of {n}", step + 1)).small());
         para(ui, &s.text);
+        if step_done {
+            weak(ui, "Done. Next when you are ready.");
+        }
         let state = editor.state();
         let resolved = s
             .show
@@ -244,14 +253,14 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         });
     }
     ui.horizontal(|ui| {
-        let b = ui.add_enabled(a.step > 0, kb("Previous".into()).ghost());
+        let b = ui.add_enabled(step > 0, kb("Previous".into()).ghost());
         ui_state.record("lesson-prev".into(), b.rect);
         if b.clicked() {
-            step_to(editor, ui_state, a.step - 1);
+            step_to(editor, ui_state, step - 1);
         }
         let b = ui.add_enabled(
-            a.step < n,
-            kb(if a.step + 1 == n {
+            step < n,
+            kb(if step + 1 == n {
                 "Try on your own"
             } else {
                 "Next"
@@ -261,7 +270,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         );
         ui_state.record("lesson-next".into(), b.rect);
         if b.clicked() {
-            step_to(editor, ui_state, a.step + 1);
+            step_to(editor, ui_state, step + 1);
         }
     });
 }

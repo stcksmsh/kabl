@@ -237,6 +237,7 @@ fn a_step_completes_only_when_all_its_conditions_hold() {
         base: Baseline::of(&e),
         completed_at: None,
         armed: false,
+        done: vec![false; l.steps.len()],
     };
     assert!(!complete(&l, &a, &e, &ui), "no conditions: Next only");
     l.steps[0].done = vec![

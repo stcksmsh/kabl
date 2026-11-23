@@ -37,10 +37,12 @@ pub struct Active {
     pub base: Baseline,
     /// When the last step completed by its conditions (the panel says so briefly).
     pub completed_at: Option<f64>,
-    /// The step's conditions have not all held at some frame since it was entered. A step
-    /// whose conditions already hold when it starts waits for a change, so it is not passed
-    /// before the user has read it.
+    /// The step's conditions have not all held at some frame since it was entered. Only then
+    /// does meeting them advance by itself; a step that already holds is just marked done.
     pub armed: bool,
+    /// Steps completed this session, one per step. A done step asks for nothing again, so
+    /// going back to it with Previous does not mean undoing and redoing the edit.
+    pub done: Vec<bool>,
 }
 
 /// Learn tab state. View only.
@@ -117,7 +119,7 @@ pub fn holds(c: &Cond, editor: &PatchEditor, ui: &UiState, base: &Baseline) -> b
     let state = editor.state();
     match c {
         Cond::Opened(sound) => {
-            matches!(&ui.doc, Some(d) if d.origin == DocOrigin::Library(sound.clone()))
+            matches!(&ui.doc, Some(d) if matches!(&d.origin, DocOrigin::Library(s) if s == sound))
         }
         Cond::ParamMoved {
             id,
@@ -198,6 +200,7 @@ pub fn frame(editor: &PatchEditor, ui: &mut UiState, now: f64) {
                 base: Baseline::of(editor),
                 completed_at: None,
                 armed: false,
+                done: vec![false; l.steps.len()],
             });
             ui.lessons.open = true;
             ui.compare.capture(editor, "the lesson start");
@@ -218,13 +221,27 @@ pub fn frame(editor: &PatchEditor, ui: &mut UiState, now: f64) {
     if a.detached {
         return;
     }
-    let a = a.clone();
-    if !complete(&all()[a.lesson], &a, editor, ui) {
-        if let Some(a) = ui.lessons.active.as_mut() {
-            a.armed = true;
-        }
-    } else if a.armed {
-        step_to(editor, ui, a.step + 1);
+    // Borrowed, not cloned: this runs every frame and `Active` holds a whole patch.
+    let Some(a) = ui.lessons.active.as_ref() else {
+        return;
+    };
+    let step = a.step;
+    // Already done, or the end page: nothing to watch.
+    if a.done.get(step).copied().unwrap_or(true) {
+        return;
+    }
+    let (ok, armed) = (complete(&all()[a.lesson], a, editor, ui), a.armed);
+    let Some(a) = ui.lessons.active.as_mut() else {
+        return;
+    };
+    if !ok {
+        a.armed = true;
+        return;
+    }
+    a.done[step] = true;
+    // Met by what the user did here: move on. Met on arrival: show it done and let Next move on.
+    if armed {
+        step_to(editor, ui, step + 1);
         if let Some(a) = ui.lessons.active.as_mut() {
             a.completed_at = Some(now);
         }

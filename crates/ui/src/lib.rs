@@ -1318,7 +1318,7 @@ fn drawer(
     // Learn and Compare are tabs of their own: each replaces the drawer's body.
     if ui_state.lessons.open {
         egui::ScrollArea::vertical()
-            .id_salt("kabl-recipes")
+            .id_salt("kabl-lessons")
             .show_owned(ui, |ui| {
                 ui.set_max_width(DRAWER_W - 24.0);
                 lessons::panel(editor, ui_state, ui, now);

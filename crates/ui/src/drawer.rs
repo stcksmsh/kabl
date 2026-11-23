@@ -88,7 +88,7 @@ pub fn current(ui_state: &UiState) -> Tab {
 /// Shows `tab` and closes the others.
 pub fn open(ui_state: &mut UiState, tab: Tab) {
     if tab != Tab::Learn {
-        // Leaving Learn keeps the patch and its edits, and ends the running recipe.
+        // Leaving Learn keeps the patch and its edits, and ends the running lesson.
         ui_state.lessons.active = None;
     }
     ui_state.explain.close();

@@ -179,13 +179,7 @@ fn every_step_completes_only_once_its_conditions_hold() {
     }
 }
 
-/// A condition that already holds when its step starts waits for a change: the step is not
-/// passed before the user has read it.
-#[test]
-fn a_step_already_satisfied_at_its_start_waits_for_a_change() {
-    let user = tempfile::tempdir().unwrap();
-    let mut h = H::new(user.path());
-    h.start("pluck-to-pad");
+fn inspect_envelope(h: &mut H) {
     h.ui.inspect.select(
         Sel {
             id: 6,
@@ -193,26 +187,55 @@ fn a_step_already_satisfied_at_its_start_waits_for_a_change() {
         },
         h.t,
     );
+}
+
+fn step_done(h: &H) -> bool {
+    let a = h.ui.lessons.active.as_ref().unwrap();
+    a.done[a.step]
+}
+
+/// A step whose conditions already hold when it is reached counts as done at once: it stays
+/// put, shows done, and Next moves on. Nothing has to be undone and redone.
+#[test]
+fn a_step_already_satisfied_when_reached_is_done_and_next_moves_on() {
+    let user = tempfile::tempdir().unwrap();
+    let mut h = H::new(user.path());
+    h.start("pluck-to-pad");
+    h.click("lesson-next");
+    assert_eq!(h.step(), 1);
+    inspect_envelope(&mut h);
+    h.click("lesson-prev");
+    for _ in 0..5 {
+        h.frame();
+    }
+    assert_eq!(h.step(), 0, "a step met on arrival does not skip itself");
+    assert!(step_done(&h), "a step met on arrival counts as done");
+    h.click("lesson-next");
+    assert_eq!(h.step(), 1);
+}
+
+/// Going back to a step completed earlier shows it done and asks for nothing again.
+#[test]
+fn a_completed_step_stays_done_when_revisited() {
+    let user = tempfile::tempdir().unwrap();
+    let mut h = H::new(user.path());
+    h.start("pluck-to-pad");
+    inspect_envelope(&mut h);
     h.frame();
     assert_eq!(h.step(), 1);
-    // Back to step 1 while the envelope is still inspected: it stays.
+    h.ui.inspect.clear();
     h.click("lesson-prev");
     for _ in 0..5 {
         h.frame();
     }
     assert_eq!(h.step(), 0);
-    h.ui.inspect.clear();
-    h.frame();
-    assert_eq!(h.step(), 0);
-    h.ui.inspect.select(
-        Sel {
-            id: 6,
-            port: "out".into(),
-        },
-        h.t,
+    assert!(
+        step_done(&h),
+        "a completed step stays done though its condition no longer holds"
     );
-    h.frame();
+    h.click("lesson-next");
     assert_eq!(h.step(), 1);
+    assert!(!step_done(&h), "step 2 was never done");
 }
 
 /// The runner is view only: walking every lesson with its own buttons (Show, Inspect, test

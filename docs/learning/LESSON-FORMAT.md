@@ -41,7 +41,7 @@ Only `text` is required. Each optional field adds one button to the step, shown 
 | `play_note` | **Play test note** plays middle C for this many seconds at a fixed velocity. |
 | `compare` | **Open Compare**. |
 | `anchor` | A `UiState::hits` key (`knob:4.cutoff_hz`, `module:6`, `pcard:…`). While the step shows, it gets an accent ring with a slow pulse. The ring takes no input. A trailing `*` matches the first key with that prefix. |
-| `done` | Completion conditions. Once all of them hold, the step advances by itself and the panel shows "Step n done." for a moment. If they already all hold when the step starts, the step waits until they have stopped holding once and hold again, so a step is never passed before the user has read it. If `done` is empty, the step only advances on **Next**. **Previous** always works. |
+| `done` | Completion conditions. Once all of them hold, the step advances by itself and the panel shows "Step n done." for a moment. If they already all hold when the step is reached, the step counts as done at once: the panel says so and **Next** moves on, nothing has to be undone and redone. A step completed earlier in the session stays done when **Previous** goes back to it. If `done` is empty, the step only advances on **Next**. **Next** and **Previous** always work: every step can be skipped. |
 
 Targets are named by explicit module id and kind, never by name. If a target is missing or has
 another kind, the step says so and suggests Undo. It never guesses.
