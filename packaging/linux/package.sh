@@ -6,6 +6,7 @@
 #     lib/clap/kabl.clap                   CLAP plugin
 #     share/kabl/patches/...               factory sounds as .kabl files, packed from patches/
 #                                          (found relative to bin/)
+#     share/kabl/composites/<name>/vN.json factory composites, copied from composites/
 #     share/applications/kabl.desktop, share/icons/hicolor/...
 #     install.sh                           installs (and --uninstall removes) under ~/.local and ~/.clap
 #     LICENSE, COPYRIGHT, TRADEMARKS.md, THIRD-PARTY-NOTICES.md, ASSET-LICENSES.md, README.txt
@@ -35,6 +36,8 @@ cp -r packaging/linux/logo/hicolor "$OUT/$NAME/share/icons/hicolor"
 cp packaging/linux/install.sh "$OUT/$NAME/"
 cp LICENSE COPYRIGHT TRADEMARKS.md THIRD-PARTY-NOTICES.md ASSET-LICENSES.md "$OUT/$NAME/"
 target/release/kabl pack-tree patches "$OUT/$NAME/share/kabl/patches"
+# Factory composites are already single JSON files: copied as they are.
+cp -r composites "$OUT/$NAME/share/kabl/composites"
 cat > "$OUT/$NAME/README.txt" <<TXT
 kabl $VERSION (Linux, $(uname -m)), built from $(git rev-parse --short HEAD 2>/dev/null || echo unknown).
 License: GPL-3.0-or-later (LICENSE; owner and notice: COPYRIGHT; name and logo: TRADEMARKS.md;
@@ -48,12 +51,13 @@ Install:    ./install.sh                   standalone and desktop entry under ~/
 Run:        ./bin/kabl-ui                  (opens the sound browser)
             ./bin/kabl-ui --size 1280x800  (smaller window)
 Factory sounds: share/kabl/patches (read-only; Save As makes your own copy).
+Factory composites: share/kabl/composites (read-only; inserting one embeds a copy in the patch).
 Your sounds:    \$XDG_DATA_HOME/kabl/sounds, usually ~/.local/share/kabl/sounds
                 (favorites and recents: ~/.local/share/kabl/library.json).
 Logs:           ~/.local/state/kabl/logs/kabl.log (INFO and above; up to 4 MiB rotated).
                 KABL_LOG=debug ./bin/kabl-ui (or --log-level debug) adds detail;
                 KABL_LOG_DIR=<dir> puts them elsewhere. The status bar's Log button copies the path.
-Overrides:      KABL_FACTORY_DIR=<dir>, KABL_USER_DIR=<dir>.
+Overrides:      KABL_FACTORY_DIR=<dir>, KABL_FACTORY_COMPOSITES_DIR=<dir>, KABL_USER_DIR=<dir>.
 Needs: ALSA (libasound2), X11 or Wayland with OpenGL, libxkbcommon-x11.
 TXT
 tar -C "$OUT" -czf "$OUT/$NAME.tar.gz" "$NAME"
