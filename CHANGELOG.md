@@ -13,6 +13,8 @@ standalone `kabl-ui` app.
 - Composite modules, functional cables (step patterns, pass probability, A/B morph, glide, all
   locked to the patch clock) and macros that drive cable parameters.
 - The vocoder is intelligible on a real voice.
+- The VA oscillator's triangle is band-limited (polyBLAMP), so it aliases much less at high notes, also
+  with hard sync. Patches that use the triangle sound slightly cleaner.
 
 ### Code modules and the creator SDK
 - Write your own modules in Rust (or C) with `kabl-module-sdk` and `cargo kabl` (new, build,
@@ -21,6 +23,9 @@ standalone `kabl-ui` app.
 - Code runs as sandboxed WebAssembly. A fuel budget is measured against the real sample rate, shared
   per module and in total; a module that fails or overruns fades out alone instead of crashing the
   synth. Songs embed the code they use, so they open anywhere.
+- A code module that declares more ports than the engine supports (4 inputs, 8 outputs, a stereo port
+  counting as 2) is refused when it is registered, with a clear error instead of a confusing failure
+  at compile time.
 
 ### Living-rack UI (look B)
 - Rack faces with live displays (filter curves, mixer peak meters, delay flash, travelling gate
@@ -33,6 +38,7 @@ standalone `kabl-ui` app.
 
 ### Perform and Sounds
 - Perform view in look B with a teal accent.
+- In Perform, only the scene you launched shows Playing (or Queued while it waits for the bar).
 - Sounds browser with search and an audible preview at matched loudness, in the app and in the
   plugin.
 - Patches are single `.kabl` files; your own sounds live in `~/.local/share/kabl/sounds` and are
