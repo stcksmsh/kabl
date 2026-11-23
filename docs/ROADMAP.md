@@ -46,6 +46,10 @@ In practice the streams overlap. A/B and C share no files until L8. The Windows 
 
 **Objective.** Tag `v1.0.0` from a verified release candidate that Kosta has accepted.
 
+**Scope.** Release mechanics and acceptance fixes only. No new features. Code: `.github/workflows/release.yml`, `packaging/linux/package.sh`, `docs/ACCEPTANCE-V1.md`.
+
+**Deliverables.** The `v1.0.0-rc.2` tag with a green release run; a clean-profile install report; an acceptance checklist that matches 1.0; the `v1.0.0` tag and its Releases page.
+
 **State**
 - **DONE**: #196 (release 1.0.0: workspace 1.0.0, CHANGELOG, `release.yml`) merged as `89d9c1be`.
 - **DONE**: #204 (triangle polyBLAMP) merged.
@@ -124,6 +128,10 @@ The plugin shows no first-run card at all (`crates/clap/src/lib.rs:853-858`).
 
 **Objective.** One coherent learning system across eight stages, plus lesson 00. Lessons are taught through real patches and the real UI. Each lesson ends in a useful patch the user saved. Lessons are optional and revisitable and never lock anything.
 
+**Scope.** The lesson engine in `crates/ui/src/lessons/`, lesson files in `lessons/`, teaching patches in `patches/lessons/`, the Learn tab, and one automation-lane hook in `crates/clap`. No factory sound changes.
+
+**Deliverables.** The engine with the three recipes migrated (L1); lessons 1 to 8 as TOML with their teaching patches (L5 to L8); the anchor-resolution guard test; walkthrough captures and listening clips per lesson.
+
 **Architecture.** In three lines, from [design §3](pivot/firstrun-learning-design.md):
 1. A lesson is a TOML file (steps, target patch, anchors, completion predicates, listening prompts), embedded in the binary.
 2. One runner in `kabl_ui` evaluates a closed set of predicates each frame against the real `PatchState`, the op log and `UiState`. It rings anchors from the existing `UiState::hits` registry (`lib.rs:225-228`) and never edits the patch.
@@ -155,7 +163,7 @@ The plugin shows no first-run card at all (`crates/clap/src/lib.rs:853-858`).
 
 | id | slice | status | effort | depends |
 |---|---|---|---|---|
-| L1 | Lesson engine core with the recipes migrated: `crates/ui/src/lessons/{mod,run,panel}.rs`; the TOML format; the predicate enum (the recipes' predicates plus `opened`, `param_moved`, `route`, `inspecting`, `compare_restored`); `lessons/` embedded by `crates/ui/build.rs`; progress in `library::Prefs`; the Learn tab as hub; delete `recipes.rs`; port the recipe checks in `tests/signal_inspection.rs:725` | NOW. **In flight** | M: well-bounded; the new code is the runner | - |
+| L1 | Lesson engine core with the recipes migrated: `crates/ui/src/lessons/{mod,run,panel}.rs`; the TOML format; the predicate enum (the recipes' predicates plus `opened`, `param_moved`, `route`, `inspecting`, `compare_restored`); `lessons/` embedded by `crates/ui/build.rs`; progress in `library::Prefs`; the Learn tab as hub; delete `recipes.rs`; port the recipe checks in `tests/signal_inspection.rs:725` | In flight (builder running, branch `claude/lesson-engine`) | M: well-bounded; the new code is the runner | - |
 | L5 | Lessons 1, 2, 3 (content, teaching patches under `patches/lessons/` from test generators, the remaining predicates) | DEP | M | L1, L3 (L2 for lesson 1) |
 | L6 | Lessons 6 and 8; the automation-lane hook in `crates/clap` (`lib.rs:646-660`) | DEP | M | L1 |
 | L7 | Lessons 4 and 5 on primitives; bindings by `added_in_step` | DEP; OWNER D5 | M | L1, L2 |
@@ -179,6 +187,10 @@ The plugin shows no first-run card at all (`crates/clap/src/lib.rs:853-858`).
 ## Workstream C: composites across the whole corpus
 
 **Objective.** Make complex patches legible through a coherent library of reusable musical building blocks, discovered from the whole corpus, with no hand-simplification. Behaviour is preserved exactly. Any sonic change is Kosta's call.
+
+**Scope.** All 129 browser patches and the hidden demos, through their generators in `tools/examples/presets_*.rs`; the composite model and encapsulate code (`crates/core/src/composite.rs`, `crates/ui/src/composites.rs`); a factory composite bank. Learning patches stay flat. Fixtures and dev-only assets are out of scope.
+
+**Deliverables.** Corpus golden hashes (C0); the infrastructure gaps closed (CI1 to CI5); five factory composites (CB1 to CB5); migrated representative patches, then the corpus (CM1, CM2); rack and panel captures for Kosta (CP1).
 
 **Evidence base (DONE)**
 - The corpus manifest covers all 160 assets: 129 in the Sounds browser, 19 hidden engine demos, 12 `docs/` items. It classifies fixtures, promo and dev-only assets separately.
@@ -219,7 +231,7 @@ D10 panel UX is "changes requested" (`docs/panel-authoring/design.md:3`). The DS
 | id | slice | status | effort | depends |
 |---|---|---|---|---|
 | C0 | Golden render hashes for the whole Sounds corpus (129 patches), recorded on the base commit before any migration (G7). Each migration PR must then pass `cargo test -p kabl-engine --test golden_renders` unchanged | WORK: **PR #206 in review** | S | - |
-| CI1 | G4: deterministic factory definition ids (for example `kabl.space` v1) and a read-only factory `composites/` bank packed like `patches/`, for Insert. Instances embed and never auto-update | OWNER (OD-C, id scheme) | M | C0 |
+| CI1 | G4: deterministic factory definition ids (for example `kabl.space` v1) and a read-only factory `composites/` bank packed like `patches/`, for Insert. Instances embed and never auto-update | OWNER (OD-C2, id scheme) | M | C0 |
 | CI2 | G5: `encapsulate_with(definition, exposures{target,label,mapping}, panel)` so the generators in `tools/examples/presets_*.rs` emit stable logs; migration appends `SetComposite` after existing ops and keeps leaf and cable ids and order | DEP | M | CI1 |
 | CB1 | Space composite (C2) plus nested Space Return (C6); interface as in the catalogue's C2 section; standalone test plus a test inside a parent | DEP; OWNER (OD-C interface) | M | CI1, CI2 |
 | CB2 | Drum Kit (C4) | DEP; OWNER (OD-C) | M | CI1, CI2 |
@@ -253,6 +265,10 @@ D10 panel UX is "changes requested" (`docs/panel-authoring/design.md:3`). The DS
 
 **Objective.** Windows standalone and a Windows VST3 (plus a Windows CLAP) on the same engine and patch model. Accepted in Ableton Live first and REAPER second, on real Windows. Linux stays first-class: Linux CI is unchanged and Windows jobs are only added.
 
+**Scope.** Platform fixes in `crates/ui` and `crates/standalone`, the CLAP crate's Windows build, a clap-wrapper VST3 build under `packaging/windows/`, Windows CI and release jobs, and an installer. macOS and AU are out of scope.
+
+**Deliverables.** A green Windows CI job; `kabl.clap` and `kabl.vst3` that pass their validators; a Windows standalone; an Inno Setup installer and zip on the Releases page; a real-Windows acceptance report for Live and REAPER (WA).
+
 **Route.** clap-wrapper (MIT) around the existing CLAP, producing a clap-first single-file `.vst3`. Reasons:
 - kabl's host behaviour lives at raw CLAP level (`crates/clap/src/state_bridge.rs`);
 - nice-plug's own VST3 export uses the generic state loader that kabl bypasses.
@@ -269,7 +285,7 @@ Fallback to nice-plug's export only if Live fails in a way upstream will not fix
 
 | id | slice | status | effort | depends |
 |---|---|---|---|---|
-| W1 | RT handle `Send` fix; a `windows-latest` MSVC CI job (build ui, clap and standalone; `cargo test`; Linux-only tests skipped) | OWNER (OD-W9, toolchain); otherwise NOW | S | - |
+| W1 | RT handle `Send` fix; a `windows-latest` MSVC CI job (build ui, clap and standalone; `cargo test`; Linux-only tests skipped) | OWNER (OD-W9, toolchain) | S | - |
 | W2 | Platform paths in one place (`%APPDATA%`, `%LOCALAPPDATA%`), Linux paths unchanged | DEP | S | W1 |
 | W3 | File browser: profile home, drive roots, breadcrumbs | DEP | S | W2 |
 | W4 | Atomic save: retry, or `ReplaceFileW` | DEP | S | W1 |
@@ -302,6 +318,10 @@ Order: W1; W2-W4 beside W5; W6; W7 and W8; W9 and W10; WA.
 - a trailer: atmospheric, fast, sound and identity, broad palette, building to big moments, Lichen as the flagship;
 - a walkthrough: first run, find a sound, change it, understand its signal path, use composites, perform.
 
+**Scope.** Promo scripts, storyboards and renders only. Promo work never changes product code or factory sounds. Code: `tools/examples/promo_render.rs`, `docs/promo/build_animatic.py`, `docs/promo/STORYBOARD-V2.md` (all on `claude/promo-v2`); `docs/promo/lichen-plus.kabl`.
+
+**Deliverables.** A trailer render (E2) and a walkthrough recording (E3), each with its audio mix, for Kosta's approval.
+
 **Current state.** WORK: promo v2 on branch `claude/promo-v2` (#203): `STORYBOARD-V2.md`, `build_animatic.py`, `promo_render.rs`, an audio animatic, and a captions pass in flight. It is useful work, but neither approved nor final. The earlier Kosta questions (half-bar cuts, the Loading Dock pulse, a Pad flash) are still open. Promo v1 (#197) is merged and holds the lichen-plus patch and the take scripts.
 
 **Slices**
@@ -313,6 +333,11 @@ Order: W1; W2-W4 beside W5; W6; W7 and W8; W9 and W10; WA.
 | E3 | Walkthrough: record lesson 00 and lessons 1-3 through the real app, plus composites and Perform (learning report L9) | DEP | S-M | L3, L5, CM1 |
 
 **Acceptance.** Kosta approves both on real renders, not on storyboards.
+
+**Risks**
+- Misrepresenting the build: every shot must come from the shipped app and patches, with no mocked UI or features that are not merged.
+- Timing against the product: recording before composites and lessons land means recording twice. E2 and E3 wait for their dependencies.
+- Taste rounds: each round needs Kosta's listen and viewing. Expect several, and keep them on short clips rather than full cuts.
 
 ---
 
@@ -343,6 +368,7 @@ graph LR
   L1[L1 lesson engine] --> L3[L3 first run]
   L2[L2 keys + strip] --> L3
   L1 --> L5[L5 lessons 1-3]
+  L2 --> L5
   L3 --> L5
   L1 --> L6[L6 lessons 6, 8]
   L1 --> L7[L7 lessons 4, 5]
@@ -368,6 +394,7 @@ graph LR
   W6 --> W7[W7 params/MIDI]
   W6 --> W8[W8 editor DPI/focus]
   W6 --> W9[W9 installer] --> W10[W10 release job]
+  W5 --> W9
   W7 --> WA[WA real-Windows acceptance]
   W8 --> WA
   W10 --> WA
@@ -381,16 +408,18 @@ graph LR
 ## Immediately startable
 
 No open dependency and no open owner decision. Respect the limit of three cargo builds at once.
-1. **L1** lesson engine core. In flight.
-2. **L2** play without a controller. D6 only sets the default; the slice can make it a pref.
-3. **L4** macro reveal.
-4. **R1** acceptance checklist alignment. Docs only, no build.
-5. **C0** golden corpus: already PR #206, in review.
-6. **E1** promo captions pass. In flight, no cargo build.
-7. **W1**, once Kosta confirms OD-W9 (native MSVC on `windows-latest`). It needs no Windows machine.
+1. **L2** play without a controller. D6 only sets the default; the slice can make it a pref.
+2. **L4** macro reveal.
+3. **R1** acceptance checklist alignment. Docs only, no build.
 
-Startable as soon as their decision lands:
-- CI1 (OD-C, id scheme);
+Already in flight (not to be started again):
+- **L1** lesson engine core: builder running on `claude/lesson-engine`.
+- **C0** golden corpus: PR #206, in review.
+- **E1** promo captions pass on `claude/promo-v2` (#203). No cargo build.
+
+Owner-gated, startable as soon as their decision lands:
+- W1 (OD-W9, toolchain: native MSVC on `windows-latest`). It needs no Windows machine;
+- CI1 (OD-C2, id scheme; also needs C0 merged);
 - L3 (D1, D2, D3, D7; also needs L1 and L2);
 - L7 (D5).
 
@@ -508,16 +537,28 @@ Each decision lists its alternatives, its consequences and a recommendation. The
 
 ### Windows and VST3 ([feasibility](pivot/windows-vst3-feasibility.md))
 
-**OD-W1. Test machine.**
+**OD-W1. Test machine** (blocks WA)
 - Options:
   - A: a physical Windows PC for acceptance, plus a VM snapshot for clean-install tests.
-  - B: a VM only (OpenGL risk).
-  - C: Kosta runs the list by hand.
-- **Recommend A**, with remote access or Kosta running the checklist.
+  - B: a VM only.
+  - C: no machine for agents; Kosta runs the 9-point list by hand.
+- Consequences:
+  - A covers real GPU drivers, DPI and audio hardware. The VM snapshot gives repeatable clean installs.
+  - B is cheapest, but the OpenGL editor is a known risk on VMs, so editor and DPI results would not count.
+  - C puts every Windows round trip on Kosta's time.
+- **Recommend A**, with remote access for agents or Kosta running the checklist.
 
-**OD-W2. Ableton Live licence.**
-- Trial first. Buy a licence before the release gate: Lite's track limit cuts the multi-instance test. The REAPER evaluation is free.
-- **Recommend this.**
+**OD-W2. Ableton Live licence** (blocks WA)
+- Options:
+  - A: a trial during development, and a licence bought before the release gate.
+  - B: Live Lite.
+  - C: REAPER only.
+- Consequences:
+  - A: the trial is time-limited, so it has to be timed for the acceptance window.
+  - B: Lite's track limit cuts the 8+ instance test.
+  - C: Live is the primary acceptance host in the brief, and it has no CLAP support, so it fails the brief.
+- The REAPER evaluation is free either way.
+- **Recommend A.**
 
 **OD-W3. Code signing.**
 - Options:
@@ -529,24 +570,49 @@ Each decision lists its alternatives, its consequences and a recommendation. The
 - **The reports conflict here; see "Inconsistencies".**
 - **Recommend:** A, then apply to B. Fall back to D. Use C only if eligibility is confirmed.
 
-**OD-W4. Installer.**
-- **Recommend:** Inno Setup plus a zip.
-- Alternative: MSI or WiX, which is heavier and enterprise-friendly.
+**OD-W4. Installer** (blocks W9)
+- Options:
+  - A: Inno Setup plus a zip.
+  - B: MSI through WiX.
+  - C: a zip only, with manual copying.
+- Consequences:
+  - A: one script installs to Program Files and the VST3 and CLAP common folders, adds Start menu entries, and gives an uninstaller that keeps user data. It is the common choice for free plugins.
+  - B: heavier to author; mainly useful for managed enterprise deployment.
+  - C: users have to find the right folders themselves, which fails the brief's "clean install".
+- **Recommend A.**
 
-**OD-W5. Freeze the VST3 class id**
-- The id is `bda9c239b42389589c969403a7b9d23e`, derived from `dev.stcksmsh.kabl`. Once released, a changed id breaks every saved project.
-- **Recommend:** freeze it at W6.
+**OD-W5. Freeze the VST3 class id** (blocks W6 release)
+- The id is `bda9c239b42389589c969403a7b9d23e`, derived from `dev.stcksmsh.kabl` by clap-wrapper.
+- Options:
+  - A: freeze this id at W6.
+  - B: choose a new id before the first release.
+- Consequence: once a release ships, a changed id means hosts treat kabl as a different plugin and every saved project loses it. B is free only before the first Windows release.
+- **Recommend A.**
 
-**OD-W6. VST logo.**
-- Optional. Using it means following Steinberg's trademark rules.
-- **Recommend:** no logo for the first release.
+**OD-W6. VST logo**
+- Options:
+  - A: no logo.
+  - B: use the VST compatible logo, following Steinberg's trademark rules.
+- Consequence: B adds a usage-guidelines check to the release, for a small marketing gain. The VST3 SDK licence (MIT) does not require the logo.
+- **Recommend A** for the first release.
 
-**OD-W7. Ship a Windows CLAP.**
-- REAPER loads it natively, and the clap-first VST3 needs it anyway.
-- **Recommend yes.**
+**OD-W7. Ship a Windows CLAP**
+- Options:
+  - A: ship `kabl.clap` next to `kabl.vst3`.
+  - B: VST3 only.
+- Consequences:
+  - A: REAPER and Bitwig load the CLAP natively, the same format as on Linux, so Linux projects carry over most directly.
+  - B is not really possible: the clap-first `kabl.vst3` loads `kabl.clap` from the CLAP common folder, so the file ships either way and B only hides it.
+- **Recommend A.**
 
-**OD-W8. ASIO in v1.**
-- **Recommend no**: WASAPI only, ASIO as W11 on request. ASIO's SDK licence and build add cost.
+**OD-W8. ASIO in v1**
+- Options:
+  - A: WASAPI only (cpal default), with ASIO later as W11 on request.
+  - B: ASIO in the first Windows release.
+- Consequences:
+  - A: no extra SDK. In the plugin, the host owns the driver, so ASIO matters only for the standalone.
+  - B: adds the Steinberg ASIO SDK to the build and a licence review, plus a second standalone audio path to test.
+- **Recommend A.**
 
 **OD-W9. Toolchain.**
 - Options:

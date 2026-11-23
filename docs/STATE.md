@@ -15,7 +15,7 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 - Promo v2 captions pass on `claude/promo-v2` (#203, draft). Not approved; no video until E2.
 - #205, the release-mode test build fix (`assert_no_alloc` disable_release). Green and reviewed clean; awaiting Kosta's merge, then rc.2.
 - #206, golden render hashes for the 129 browser patches (C0). In review.
-- L1, the lesson engine core with the recipes migrated. Starting.
+- L1, the lesson engine core with the recipes migrated. In flight (builder running, branch `claude/lesson-engine`).
 
 ## Next
 1. After Kosta merges #205: tag `v1.0.0-rc.2` and watch the release run (R2).
