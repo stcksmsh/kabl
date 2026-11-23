@@ -483,6 +483,11 @@ pub fn duplicate(editor: &mut PatchEditor, id: CompositeId) -> Result<CompositeI
 pub fn publish(p: &PatchState, id: CompositeId, root: &Path) -> Result<std::path::PathBuf, String> {
     let mut pkg = package(p, id)?;
     let identity = pkg.patch.composites[&id].definition.id.clone();
+    if identity.starts_with(FACTORY_PREFIX) {
+        return Err(format!(
+            "{identity} is a read-only factory definition; the instance in this patch stays editable"
+        ));
+    }
     if !identity
         .bytes()
         .all(|b| b.is_ascii_alphanumeric() || b == b'-')
@@ -542,6 +547,110 @@ pub fn entries(root: &Path) -> Vec<std::path::PathBuf> {
     }
     files.sort();
     files
+}
+
+/// Factory definition ids are `kabl.<name>`. User ids never contain a dot (see `publish`), so
+/// neither kind can shadow or overwrite the other.
+pub const FACTORY_PREFIX: &str = "kabl.";
+/// One read-only factory definition, `<bank>/<name>/v<N>.json`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FactoryEntry {
+    pub path: std::path::PathBuf,
+    pub definition: Definition,
+}
+/// The factory composite bank: `KABL_FACTORY_COMPOSITES_DIR`, else
+/// `<exe>/../share/kabl/factory-composites` (the package layout), else
+/// `$XDG_DATA_DIRS/kabl/factory-composites`, else the source checkout's `composites/` (a
+/// development build). Not `share/kabl/composites`: installed under `~/.local` that is the user
+/// library.
+pub fn find_factory_bank() -> Option<std::path::PathBuf> {
+    if let Some(d) = std::env::var_os("KABL_FACTORY_COMPOSITES_DIR") {
+        return Some(d.into());
+    }
+    let mut candidates = Vec::new();
+    if let Some(bin) = std::env::current_exe()
+        .ok()
+        .and_then(|e| e.canonicalize().ok())
+        .and_then(|e| e.parent().map(Path::to_path_buf))
+    {
+        candidates.push(bin.join("../share/kabl/factory-composites"));
+    }
+    let data_dirs = std::env::var("XDG_DATA_DIRS")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "/usr/local/share:/usr/share".into());
+    candidates.extend(
+        data_dirs
+            .split(':')
+            .map(|d| Path::new(d).join("kabl/factory-composites")),
+    );
+    candidates.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composites"));
+    candidates.into_iter().find(|d| d.is_dir())
+}
+/// Every `<name>/v<N>.json` in the bank, sorted by id then version. The id and version come
+/// from the path alone, so they are the same in every load and every process. A missing bank
+/// lists nothing.
+pub fn factory_entries(bank: &Path) -> Vec<FactoryEntry> {
+    let mut out = Vec::new();
+    for dir in std::fs::read_dir(bank)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .take(128)
+    {
+        let name = dir.file_name();
+        let Some(name) = name.to_str().filter(|n| {
+            !n.is_empty()
+                && n.len() <= 64
+                && n.bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        }) else {
+            continue;
+        };
+        for file in std::fs::read_dir(dir.path())
+            .into_iter()
+            .flatten()
+            .flatten()
+            .take(128)
+        {
+            let version = file.file_name().to_str().and_then(|f| {
+                let digits = f.strip_prefix('v')?.strip_suffix(".json")?;
+                // `v01` would alias `v1`.
+                digits
+                    .parse::<u32>()
+                    .ok()
+                    .filter(|v| *v > 0 && v.to_string() == digits)
+            });
+            if let Some(version) = version {
+                out.push(FactoryEntry {
+                    path: file.path(),
+                    definition: Definition {
+                        id: format!("{FACTORY_PREFIX}{name}"),
+                        version,
+                    },
+                });
+            }
+        }
+    }
+    out.sort_by(|a, b| a.definition.cmp(&b.definition));
+    out
+}
+/// Reads a factory definition. The file's root definition must match its path, so the id an
+/// instance embeds is the one the bank lists.
+pub fn read_factory(entry: &FactoryEntry) -> Result<Package, String> {
+    let pkg = crate::panels::read_package(&entry.path)?;
+    let found = &pkg.patch.composites[&pkg.root].definition;
+    if *found != entry.definition {
+        return Err(format!(
+            "{}: root definition is {} v{}, its place in the bank says {} v{}",
+            entry.path.display(),
+            found.id,
+            found.version,
+            entry.definition.id,
+            entry.definition.version
+        ));
+    }
+    Ok(pkg)
 }
 pub fn direction(p: &PatchState, t: &PortRef) -> Option<PortDirection> {
     match t {
@@ -771,6 +880,23 @@ pub fn panel(editor: &mut PatchEditor, view: &mut crate::UiState, ctx: &egui::Co
                 view.last_message=Some(match result {Ok(id)=>format!("Imported independent instance #{id}"),Err(e)=>e});
             }
             ui.separator(); ui.label("Insert a library version as an independent embedded instance");
+            let factory = find_factory_bank().map(|bank| factory_entries(&bank)).unwrap_or_default();
+            if !factory.is_empty() {
+                ui.label("Factory (read-only)");
+                for entry in factory {
+                    let Definition { id, version } = &entry.definition;
+                    let r = ui.button(format!("{id} v{version}"));
+                    view.record(format!("composite:factory:{id}:v{version}"), r.rect);
+                    if r.clicked() {
+                        let result = read_factory(&entry).and_then(|p| insert(editor, &p));
+                        view.last_message = Some(match result {
+                            Ok(id) => format!("Inserted instance #{id}; it keeps this version even if the factory bank changes."),
+                            Err(e) => e,
+                        });
+                    }
+                }
+                ui.label("Your library");
+            }
             let root = view.library.as_ref().map(|l| l.user_root.clone()).unwrap_or_else(crate::library::default_user_root);
             for path in entries(&root) {
                 let label = path.strip_prefix(&root).unwrap_or(&path).display().to_string();
