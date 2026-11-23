@@ -2,14 +2,13 @@
 
 One sitting, about an hour, run alone: standalone (20 min), REAPER (15), bank (10), code and look (10), D01-D12 (5).
 Tick each box when the expected result happens; note anything off next to the item.
-**[PR]** marks an item that needs an unmerged change: #171 Piece presets, #172 Voice/FX presets, #187 cable palettes, #188 Perform teal, or the code-module fuel budget (branch `claude/code-module-budget`, no PR yet). Run those after the change is merged; otherwise skip and note it.
 
 ## 1. Install and first run
-- [ ] Install the release build (or `cargo build --release`) with a clean config dir and launch `kabl-ui`. The first-run overlay appears and offers a starter sound.
-- [ ] Accept the overlay. The default patch `pluck-line` loads and plays a plucked line on a key press; the overlay does not return on the next launch.
+- [ ] Install the release build (or `cargo build --release`) with a clean config dir and launch `kabl-ui`. The Sounds browser is open over the default patch (Pluck line), and a toast says to press play on any sound.
+- [ ] The Pluck line patch plays a plucked line by itself; it does not wait for a key press. Load a sound and follow the short first-run tour (Esc skips it). Relaunch: the tour does not return.
 
 ## 2. Standalone
-- [ ] Open settings (gear), pick your audio device and buffer size. Sound plays through it with no crackle.
+- [ ] Pick your audio device in the status-bar output dropdown, then click Retry audio. Sound plays through it with no crackle. (There is no buffer-size control in the UI; the buffer is set only with the `--frames` command-line flag.)
 - [ ] Plug in the MIDI controller. It is listed; keys sound; pitch bend and mod wheel move the sound; a mapped knob moves a control.
 - [ ] Rack: add a module from the browser, drag a cable between two ports, delete the cable. Edits show at once and the patch stays audible.
 - [ ] Perform view: switch to it, turn a macro, trigger a scene or cue. Sound changes smoothly, no clicks.
@@ -28,21 +27,21 @@ Tick each box when the expected result happens; note anything off next to the it
 - [ ] Run the transport and change tempo. Tempo-synced modules keep time.
 
 ## 4. Factory bank
-- [ ] **[PR #171]** Piece presets: play Lichen (flagship; sweep the Focus macro, m5) and Laundromat. Both sound finished and musical; macros move them meaningfully.
-- [ ] **[PR #171]** Spot-check two more Pieces (for example Balcony, Pawn Shop). Each plays without edits.
-- [ ] **[PR #172]** Voice: play Sock Puppet and Maw. FX: play Temple Bowl and Updraft. Each is distinct and usable, and its macros work.
-- [ ] **[PR #171, #172]** Sounds filters show Piece, Voice and FX as separate groups.
+- [ ] Piece presets: play Lichen (flagship; sweep the Focus macro, m5) and Laundromat. Both sound finished and musical; macros move them meaningfully.
+- [ ] Spot-check two more Pieces (for example Balcony, Pawn Shop). Each plays without edits.
+- [ ] Voice: play Sock Puppet and Maw. FX: play Temple Bowl and Updraft. Each is distinct and usable, and its macros work.
+- [ ] Sounds filters show Piece, Voice and FX as separate groups.
 
 ## 5. Code modules and SDK
 - [ ] Add a code module (for example `demo.bitfilter`). It loads, processes audio and shows its controls.
-- [ ] **[PR budget branch]** Add many instances. Past the fuel budget an overrun toast appears and the module goes quiet instead of glitching the engine; a crashing module shows a crash toast; the rest of the patch keeps playing.
+- [ ] Add many instances. Past the fuel budget an overrun toast appears and the module goes quiet instead of glitching the engine; a crashing module shows a crash toast; the rest of the patch keeps playing.
 - [ ] Follow the SDK quick start (`docs/sdk`): build and install a package, then load it. It appears in the browser and runs.
 
 ## 6. Look
 - [ ] Look B is the default skin: readable and consistent across Rack, Perform and Sounds.
 - [ ] Theme setting: System, Light and Dark each apply at once and survive restart.
-- [ ] **[PR #188]** Perform view uses the teal accent; the Drums lane is green.
-- [ ] **[PR #187]** Settings gear, cable palette: skin default plus 4 palettes each recolor cables at once. Note your answer: should sequencer gate faders follow the palette?
+- [ ] Perform view uses the teal accent; the Drums lane is green.
+- [ ] Settings gear, cable palette: skin default plus 4 palettes each recolor cables at once. Note your answer: should sequencer gate faders follow the palette?
 
 ## 7. Accessibility
 - [ ] With Orca or an AccessKit inspector, focus tabs, knobs, buttons and the Sounds list. Each has a spoken name and role, not "unnamed"; tab order is sensible.
@@ -53,7 +52,7 @@ Tick each box when the expected result happens; note anything off next to the it
 - [ ] D03 Diagnose by listening inside a patch: use signal inspection on a silent patch; it points at the break.
 - [ ] D04 Turn controls without rebuilding the graph: sweep knobs while playing; no dropouts or zipper noise.
 - [ ] D05 Recover audio: section 2 recovery item.
-- [ ] D06 Correct expressive MIDI and timing: bend, wheel and channels behave; timing steady at two buffer sizes.
+- [ ] D06 Correct expressive MIDI and timing: bend, wheel and channels behave; timing steady at two buffer sizes (relaunch with `--frames`, for example `--frames 128` and `--frames 512`).
 - [ ] D07 Play and reopen as a REAPER instrument: section 3 load, save and restore.
 - [ ] D08 Automate and sync in REAPER: section 3 automation and tempo items.
 - [ ] D09 Package a patch as a reusable module: group modules into a composite, duplicate, save, reload; sound is identical.
