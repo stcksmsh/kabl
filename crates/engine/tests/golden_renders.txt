@@ -1,7 +1,7 @@
 composition cfefbebe40a2a184
 crowded 3de66c9f2c7762d5
 echo bfab8bc452be8bc3
-expressive/lead 981e7880b0fbb408
+expressive/lead bbdbd4565be67cae
 expressive/split 343052644ef8868e
 init-keyboard 3519958ce979c60d
 interlocking 08621c6a015358b1
@@ -9,7 +9,7 @@ palette/bass fdacfd987e1d38cd
 palette/breath 5b446ecab6d973cb
 palette/keyboard-bass 500966c9726643c2
 palette/keys 2275ca17059ed36d
-palette/lead 981e7880b0fbb408
+palette/lead bbdbd4565be67cae
 palette/pad a5e90667b7c5f82b
 palette/perc 4eaf3e905593b158
 palette/progression d30f602d895ca2b3

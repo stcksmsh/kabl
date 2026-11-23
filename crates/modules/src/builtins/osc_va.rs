@@ -522,24 +522,27 @@ impl Module for OscVa {
                     // Phase at the edge, one sample's (1 - f) back; restart from `s0` there.
                     let at_edge = (*p - dt * (1.0 - f)).rem_euclid(1.0);
                     let jump = naive(s0, waveform, pw) - naive(at_edge, waveform, pw);
-                    let bend = kink(waveform, s0, at_edge, dt);
                     *p = s0 + dt * (1.0 - f);
-                    let base = if waveform == OscWaveform::Triangle {
-                        // Keeps the corner correction when a restart lands near a corner.
-                        sample(*p, dt, waveform, pw)
+                    if waveform == OscWaveform::Triangle {
+                        // `sample` keeps the corner correction when a restart lands near a
+                        // corner; the BLAMP term covers the slope change at the edge.
+                        sample(*p, dt, waveform, pw) - 0.5 * f * f * jump
+                            + kink(s0, at_edge, dt) * f * f * f * (1.0 / 6.0)
                     } else {
-                        naive(*p, waveform, pw) - dc(waveform, pw)
-                    };
-                    base - 0.5 * f * f * jump + bend * f * f * f * (1.0 / 6.0)
+                        // Unchanged expression, so saw and square stay bit-identical.
+                        naive(*p, waveform, pw) - 0.5 * f * f * jump - dc(waveform, pw)
+                    }
                 } else {
                     sample(*p, dt, waveform, pw)
                 };
                 if let Some(fn_) = next {
                     let at_edge = (*p + dt * fn_).rem_euclid(1.0);
                     let jump = naive(s0, waveform, pw) - naive(at_edge, waveform, pw);
-                    let g = 1.0 - fn_;
-                    y += 0.5 * g * g * jump
-                        + kink(waveform, s0, at_edge, dt) * g * g * g * (1.0 / 6.0);
+                    y += 0.5 * (1.0 - fn_) * (1.0 - fn_) * jump;
+                    if waveform == OscWaveform::Triangle {
+                        let g = 1.0 - fn_;
+                        y += kink(s0, at_edge, dt) * g * g * g * (1.0 / 6.0);
+                    }
                 }
                 *p += dt;
                 if *p >= 1.0 {
@@ -593,16 +596,12 @@ impl Module for OscVa {
 }
 
 /// The triangle's change of slope per sample when a sync edge restarts it from `at_edge` to
-/// `s0`, for the PolyBLAMP term at the edge (the same residual as `dsp::poly_blamp`). Zero
-/// for the other waveforms: the saw keeps its slope, the square has none.
+/// `s0`, for the PolyBLAMP term at the edge (the same residual as `dsp::poly_blamp`). The saw
+/// keeps its slope and the square has none, so only the triangle needs it.
 #[inline]
-fn kink(w: OscWaveform, s0: f32, at_edge: f32, dt: f32) -> f32 {
+fn kink(s0: f32, at_edge: f32, dt: f32) -> f32 {
     let slope = |p: f32| if (0.25..0.75).contains(&p) { -4.0 } else { 4.0 };
-    if w == OscWaveform::Triangle {
-        (slope(s0) - slope(at_edge)) * dt
-    } else {
-        0.0
-    }
+    (slope(s0) - slope(at_edge)) * dt
 }
 
 /// The DC the square's `sample` removes (the naive pulse's mean).
