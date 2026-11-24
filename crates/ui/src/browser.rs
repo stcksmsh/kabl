@@ -8,6 +8,7 @@
 //!   (`PatchEditor::is_dirty`) and runtime state (transport, edit banks) never count.
 //! - Browsing never makes sound: a click selects, **Open** (or a double click) loads.
 //!   Keyboard sounds sound only from **Play**; pieces open stopped and run from **Start**.
+//!   A row's ▶ (or Space) previews the sound and shows its card; leaving the browser stops it.
 //! - A failed open or save changes nothing in the editor.
 
 use crate::filebrowser::{self, Mode, Purpose};
@@ -966,7 +967,7 @@ pub fn frame_input(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &egui::
         ui_state.launches.push(Command::PreviewStop);
         ui_state.browser.preview_until = None;
     }
-    if ui_state.browser.focused && !focused {
+    if (ui_state.browser.focused && !focused) || !ui_state.browser_open {
         ui_state.browser.clips.stop();
     }
     ui_state.browser.clips.poll();
@@ -1505,7 +1506,7 @@ fn prepare_clip(ui_state: &mut UiState, id: &str) {
 }
 
 /// The selected sound's clip renders in the background; a new selection ends the preview of the
-/// old one and, with "Preview when selected" on, starts its own. Never while a clock runs.
+/// old one and starts nothing (only ▶ or Space plays).
 fn follow_selection(ui_state: &mut UiState) {
     let sel = ui_state.browser.selected.clone();
     if let Some(id) = &sel {
@@ -1514,16 +1515,8 @@ fn follow_selection(ui_state: &mut UiState) {
     if ui_state.browser.clips.seen == sel {
         return;
     }
-    ui_state.browser.clips.seen = sel.clone();
+    ui_state.browser.clips.seen = sel;
     ui_state.browser.clips.stop();
-    let on = ui_state
-        .library
-        .as_ref()
-        .is_some_and(|l| l.prefs.preview_on_select);
-    let quiet = !ui_state.host_playing && !ui_state.clock_running.values().any(|r| *r);
-    if let (true, true, Some(id)) = (on, quiet, sel) {
-        ui_state.browser.clips.play(&id);
-    }
 }
 
 /// Space plays or stops the selected sound's preview; Enter loads it.
@@ -1907,50 +1900,18 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
     );
     hit(ui_state, "search", &r);
     kit::gap(ui, st, 1);
-    // The active category as a chip (a click drops it); "Preview when selected" on the right.
-    let mut on_select = ui_state
-        .library
-        .as_ref()
-        .is_some_and(|l| l.prefs.preview_on_select);
-    let can_preview = ui_state.browser.clips.available();
+    // The active category as a chip (a click drops it).
     let cat = ui_state.browser.category.clone();
     let mut chip = None;
-    let mut sw = None;
     ui.horizontal(|ui| {
         if let Some(cat) = &cat {
             chip = Some(category_chip(ui, st, cat));
         }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.add_enabled_ui(can_preview, |ui| {
-                sw = Some(
-                    kit::toggle(ui, st, &mut on_select, "Preview when selected").tip(
-                        st,
-                        if can_preview {
-                            "Play a sound's preview as soon as you select it. Never while a \
-                         clock is running."
-                        } else {
-                            "Previews need an audio output."
-                        },
-                    ),
-                );
-            });
-        });
     });
     if let Some(r) = chip {
         hit(ui_state, "category-chip", &r);
         if r.clicked() {
             ui_state.browser.category = None;
-        }
-    }
-    if let Some(r) = sw {
-        hit(ui_state, "preview-on-select", &r);
-        if r.changed() {
-            if let Some(lib) = ui_state.library.as_mut() {
-                lib.prefs.preview_on_select = on_select;
-                if let Some(n) = lib.save_prefs() {
-                    message(ui_state, n);
-                }
-            }
         }
     }
     kit::gap(ui, st, 1);
@@ -2164,7 +2125,8 @@ fn list_column(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style, open: &mut
                             ui_state.browser.selected = Some(e.id.clone());
                             // This selection is already handled: it must not stop the play.
                             ui_state.browser.clips.seen = Some(e.id.clone());
-                            if playing {
+                            // A clip still rendering counts as playing: a second ▶ cancels it.
+                            if playing || pv.waiting {
                                 ui_state.browser.clips.stop();
                             } else if !pv.off {
                                 ui_state.browser.clips.stop();
@@ -2256,7 +2218,8 @@ fn detail_column(
                         }
                     );
                     kit::section(ui, st, kicker);
-                    kit::label_truncated(ui, st, Role::Display, Tone::Text, &e.meta.name);
+                    let r = kit::label_truncated(ui, st, Role::Display, Tone::Text, &e.meta.name);
+                    ui_state.record(format!("card:{}", e.id), r.rect);
                     if !e.meta.description.is_empty() {
                         kit::paragraph(ui, st, Role::Body, Tone::Text2, &e.meta.description);
                     }

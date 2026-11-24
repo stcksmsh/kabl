@@ -76,6 +76,9 @@ fn the_browser_has_no_player_without_output_and_says_so() {
 }
 
 #[test]
-fn preview_on_select_is_off_by_default() {
-    assert!(!library::Prefs::default().preview_on_select);
+fn a_library_json_with_the_old_preview_on_select_setting_still_loads() {
+    // "Preview when selected" was removed (a row's ▶ previews); files that saved it load.
+    let old = r#"{"favorites":["factory:palette/pad"],"preview_on_select":true}"#;
+    let p: library::Prefs = serde_json::from_str(old).unwrap();
+    assert!(p.favorites.contains("factory:palette/pad"));
 }
