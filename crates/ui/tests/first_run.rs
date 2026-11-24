@@ -29,6 +29,8 @@ impl H {
     fn launch(dir: tempfile::TempDir) -> Self {
         let mut ui = UiState::default();
         ui.library = Some(Library::open(None, dir.path().to_path_buf()));
+        // The standalone app owns the devices (`first_run::devices::take_over`); a plugin does not.
+        ui.devices = Some(Default::default());
         // The app starts with the routing drawer closed.
         ui.drawer_open = false;
         let editor = first_run::open(&mut ui);

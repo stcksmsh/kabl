@@ -162,17 +162,20 @@ pub fn card(
                                 ui_state.record("start-next".into(), b.rect);
                                 next = b.clicked();
                             }
-                            let b = ui.add(
-                                kit::Button::new(st, if running { "Stop" } else { "Play" })
-                                    .icon(if running {
-                                        kit::Ic::Stop
-                                    } else {
-                                        kit::Ic::Play
-                                    })
-                                    .enabled(!clocks.is_empty()),
-                            );
-                            ui_state.record("start-stop".into(), b.rect);
-                            stop = b.clicked();
+                            // In a plugin (`devices` is `None`) the host's transport decides.
+                            if ui_state.devices.is_some() {
+                                let b = ui.add(
+                                    kit::Button::new(st, if running { "Stop" } else { "Play" })
+                                        .icon(if running {
+                                            kit::Ic::Stop
+                                        } else {
+                                            kit::Ic::Play
+                                        })
+                                        .enabled(!clocks.is_empty()),
+                                );
+                                ui_state.record("start-stop".into(), b.rect);
+                                stop = b.clicked();
+                            }
                         });
                     });
                 });

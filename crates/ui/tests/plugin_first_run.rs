@@ -278,6 +278,22 @@ fn step_one_in_a_plugin_does_not_say_the_sound_is_playing() {
 }
 
 #[test]
+fn the_play_button_is_on_the_standalone_card_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let h = H::plugin_on(dir.path(), first_run::start_patch());
+    assert!(h.card());
+    assert!(
+        !h.ui.hits.contains_key("start-stop"),
+        "the host's transport decides in a plugin"
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    let h = H::standalone(dir.path());
+    assert!(h.card());
+    assert!(h.ui.hits.contains_key("start-stop"));
+}
+
+#[test]
 fn two_plugins_opened_together_show_the_card_once() {
     let dir = tempfile::tempdir().unwrap();
     let factory = || PatchEditor::seed_from(&kabl_standalone::default_patch());
