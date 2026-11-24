@@ -72,7 +72,7 @@ impl Tab {
 
 /// The tab showing now. The Explain view belongs to Routing (Back returns to it).
 pub fn current(ui_state: &UiState) -> Tab {
-    if ui_state.recipes.open {
+    if ui_state.lessons.open {
         Tab::Learn
     } else if ui_state.compare.open {
         Tab::Compare
@@ -88,13 +88,13 @@ pub fn current(ui_state: &UiState) -> Tab {
 /// Shows `tab` and closes the others.
 pub fn open(ui_state: &mut UiState, tab: Tab) {
     if tab != Tab::Learn {
-        // Leaving Learn keeps the patch and its edits, and ends the running recipe.
-        ui_state.recipes.active = None;
+        // Leaving Learn keeps the patch and its edits, and ends the running lesson.
+        ui_state.lessons.active = None;
     }
     ui_state.explain.close();
     ui_state.inspect.open = false;
     ui_state.compare.open = false;
-    ui_state.recipes.open = false;
+    ui_state.lessons.open = false;
     ui_state.explain.help = false;
     match tab {
         Tab::Routing => {}
@@ -106,7 +106,7 @@ pub fn open(ui_state: &mut UiState, tab: Tab) {
             ui_state.compare.open = true;
             ui_state.compare.reveal = true;
         }
-        Tab::Learn => ui_state.recipes.open = true,
+        Tab::Learn => ui_state.lessons.open = true,
         Tab::Help => ui_state.explain.help = true,
     }
 }

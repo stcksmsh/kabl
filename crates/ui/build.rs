@@ -29,4 +29,26 @@ fn main() {
     }
     println!("cargo:rustc-env=KABL_FACTORY_BUILD={}", out.display());
     println!("cargo:rerun-if-changed=../../patches");
+
+    // Every `lessons/*.toml`, embedded by name in file-name order (`lessons::all`). Parsed at run
+    // time; a bad file fails `lessons::tests`, not the build.
+    let mut files: Vec<_> = std::fs::read_dir("../../lessons")
+        .expect("the lessons/ folder")
+        .map(|e| e.unwrap().path().canonicalize().unwrap())
+        .filter(|p| p.extension().is_some_and(|x| x == "toml"))
+        .collect();
+    files.sort();
+    let list: String = files
+        .iter()
+        .map(|p| {
+            format!(
+                "({:?}, include_str!({:?})),\n",
+                p.file_name().unwrap().to_string_lossy(),
+                p.display().to_string()
+            )
+        })
+        .collect();
+    let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("lessons.rs");
+    std::fs::write(out, format!("&[\n{list}]")).unwrap();
+    println!("cargo:rerun-if-changed=../../lessons");
 }

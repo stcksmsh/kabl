@@ -10,7 +10,7 @@ use kabl_engine::probe::{LaneStats, ProbeReport, ProbeStatus, ProbeTarget, PROBE
 use kabl_ui::browser::{is_modified, Dialog, DocOrigin};
 use kabl_ui::inspect::{self, Context, Sel, Status};
 use kabl_ui::library::Library;
-use kabl_ui::{compare, recipes, show, PatchEditor, UiState};
+use kabl_ui::{compare, lessons, show, PatchEditor, UiState};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -720,18 +720,18 @@ fn escape_in_a_dialog_over_inspection_and_comparison_closes_only_the_dialog() {
 }
 
 #[test]
-fn every_recipe_target_resolves_on_its_patch() {
+fn every_lesson_target_resolves_on_its_patch() {
     let lib = Library::open(Some(factory()), tempfile::tempdir().unwrap().path().into());
-    for r in &recipes::RECIPES {
-        let state = lib.read(r.sound).unwrap().state().clone();
-        assert!((3..=5).contains(&r.steps.len()), "{}", r.key);
-        for s in r.steps {
-            if let Some(t) = &s.target {
-                assert!(recipes::resolve(&state, t).is_some(), "{}: {t:?}", r.key);
+    for l in lessons::all() {
+        let state = lib.read(&l.start.sound).unwrap().state().clone();
+        assert!((3..=5).contains(&l.steps.len()), "{}", l.id);
+        for s in &l.steps {
+            if let Some(t) = &s.show {
+                assert!(lessons::resolve(&state, t).is_some(), "{}: {t:?}", l.id);
             }
-            if let Some((id, kind, port)) = s.inspect {
-                assert_eq!(state.modules[&id].kind, kind, "{}", r.key);
-                assert!(inspect::port_type(&state, id, port).is_some());
+            if let Some(p) = &s.inspect {
+                assert_eq!(state.modules[&p.id].kind, p.kind, "{}", l.id);
+                assert!(inspect::port_type(&state, p.id, &p.port).is_some());
             }
         }
     }
@@ -742,8 +742,38 @@ fn every_recipe_target_resolves_on_its_patch() {
         .state()
         .clone();
     s.modules.get_mut(&6).unwrap().kind = "lfo".into();
-    let t = recipes::RECIPES[0].steps[1].target.unwrap();
-    assert!(recipes::resolve(&s, &t).is_none());
+    let t = lessons::all()[0].steps[1].show.clone().unwrap();
+    assert!(lessons::resolve(&s, &t).is_none());
+}
+
+/// Every step's anchor is a widget the running lesson really draws (after Show, when the step
+/// has one), so a renamed hit key fails here, not in front of a user.
+#[test]
+fn every_lesson_anchor_is_on_screen_in_its_step() {
+    for l in lessons::all() {
+        let mut h = H::new(1440.0, 900.0);
+        h.open(INIT);
+        h.frame();
+        h.click("learn-open");
+        h.click(&format!("lesson:{}", l.id));
+        assert!(h.ui.lessons.active.is_some(), "{}", l.id);
+        for (i, s) in l.steps.iter().enumerate() {
+            if s.show.is_some() {
+                h.click("lesson-show");
+                h.frame();
+            }
+            if let Some(a) = &s.anchor {
+                assert!(
+                    lessons::anchor_rect(&h.ui, a).is_some(),
+                    "lesson {} step {}: anchor {a:?} is not drawn",
+                    l.id,
+                    i + 1
+                );
+            }
+            h.click("lesson-next");
+        }
+        assert_eq!(h.ui.lessons.active.as_ref().unwrap().step, l.steps.len());
+    }
 }
 
 #[test]
@@ -757,63 +787,66 @@ fn a_recipe_starts_through_the_unsaved_question_and_exit_keeps_the_patch() {
         h.frame();
         h.frame();
         h.click("learn-open");
-        h.click("recipe:pluck-to-pad");
+        h.click("lesson:pluck-to-pad");
         assert!(matches!(h.ui.browser.dialog, Some(Dialog::Unsaved { .. })));
         h.click("dlg:cancel");
         assert_eq!(h.editor.state(), &song, "cancel: the song is untouched");
-        assert!(h.ui.recipes.active.is_none());
+        assert!(h.ui.lessons.active.is_none());
         assert!(h
             .ui
-            .recipes
+            .lessons
             .note
             .as_deref()
             .unwrap()
             .contains("did not start"));
 
-        h.click("recipe:pluck-to-pad");
+        h.click("lesson:pluck-to-pad");
         h.click("dlg:discard");
-        let a = h.ui.recipes.active.clone().expect("started");
-        assert_eq!((a.recipe, a.step, a.detached), (0, 0, false));
+        let a = h.ui.lessons.active.clone().expect("started");
+        assert_eq!((a.lesson, a.step, a.detached), (0, 0, false));
         assert_eq!(
             h.ui.doc.as_ref().unwrap().origin,
             DocOrigin::Library("factory:recipes/pluck-to-pad".into())
         );
         assert!(h.ui.compare.reference.is_some(), "starting point captured");
         // Step 1: inspect the envelope, play the fixed test note.
-        h.click("recipe-inspect");
+        h.click("lesson-inspect");
         assert_eq!(
             h.sent().flatten().map(|t| (t.module, t.kind)),
             Some((6, "env.adsr"))
         );
-        h.click("recipe-note");
+        h.click("lesson-note");
         assert!(h
             .ui
             .launches
             .iter()
             .any(|c| matches!(c, Command::Preview { count: 1, .. })));
         h.ui.launches.clear();
-        // Step 2: Show reaches the envelope's Sustain; Back returns.
-        h.click("recipe-next");
-        h.click("recipe-show");
+        // Inspecting the envelope completed step 1 by itself. Step 2: Show reaches the
+        // envelope's Sustain; Back returns.
+        assert_eq!(h.ui.lessons.active.as_ref().unwrap().step, 1);
+        h.click("lesson-show");
         assert_eq!(h.ui.inspected, Some((6, "sustain".into())));
-        h.click("recipe-back");
+        h.click("lesson-back");
         assert_ne!(h.ui.inspected, Some((6, "sustain".into())));
         // An edit, then the target deleted: a clear state, and undo brings it back.
         h.editor.set_param(6, "sustain", 0.7);
         h.editor.remove_module(6);
         h.frame();
-        assert!(!h.ui.hits.contains_key("recipe-show"));
+        assert!(!h.ui.hits.contains_key("lesson-show"));
         h.editor.undo();
         h.frame();
-        assert!(h.ui.hits.contains_key("recipe-show"));
+        assert!(h.ui.hits.contains_key("lesson-show"));
+        // The Sustain edit is back, so step 2 completed by itself.
+        assert_eq!(h.ui.lessons.active.as_ref().unwrap().step, 2);
         // Through the last step to the unguided task; close keeps the patch and edits.
-        for _ in 0..4 {
-            h.click("recipe-next");
+        for _ in 0..3 {
+            h.click("lesson-next");
         }
-        assert_eq!(h.ui.recipes.active.as_ref().unwrap().step, 5);
+        assert_eq!(h.ui.lessons.active.as_ref().unwrap().step, 5);
         let kept = h.editor.state().clone();
         h.click("routing-tab");
-        assert!(h.ui.recipes.active.is_none());
+        assert!(h.ui.lessons.active.is_none());
         assert_eq!(h.editor.state(), &kept);
         assert_eq!(kept.modules[&6].params["sustain"], 0.7);
     }
@@ -825,15 +858,15 @@ fn opening_another_sound_detaches_a_recipe() {
     h.open(INIT);
     h.frame();
     h.click("learn-open");
-    h.click("recipe:filter-movement");
-    assert!(h.ui.recipes.active.is_some());
+    h.click("lesson:filter-movement");
+    assert!(h.ui.lessons.active.is_some());
     h.open("factory:palette/pad");
-    assert!(h.ui.recipes.active.as_ref().unwrap().detached);
-    assert!(!h.ui.hits.contains_key("recipe-show"));
-    assert!(h.ui.hits.contains_key("recipe-reopen"));
-    h.click("recipe-reopen");
-    let a = h.ui.recipes.active.clone().unwrap();
-    assert!(!a.detached && a.recipe == 1);
+    assert!(h.ui.lessons.active.as_ref().unwrap().detached);
+    assert!(!h.ui.hits.contains_key("lesson-show"));
+    assert!(h.ui.hits.contains_key("lesson-reopen"));
+    h.click("lesson-reopen");
+    let a = h.ui.lessons.active.clone().unwrap();
+    assert!(!a.detached && a.lesson == 1);
 }
 
 #[test]

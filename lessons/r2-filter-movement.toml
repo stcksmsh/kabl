@@ -1,0 +1,59 @@
+# Listening recipe (docs/signal-inspection/design.md §4). Format: docs/learning/LESSON-FORMAT.md
+id = "filter-movement"
+title = "Filter movement"
+summary = "Make the brightness move by itself with one LFO route into the filter cutoff."
+start = { sound = "factory:recipes/filter-movement" }
+
+[[step]]
+text = """
+Play the 4-second test note and turn Cutoff down to about 300 Hz, then \
+back up: darker, brighter."""
+show = { control = { id = 3, kind = "filter.svf", param = "cutoff_hz" } }
+play_note = 4.0
+anchor = "knob:3.cutoff_hz"
+done = [{ param_moved = { id = 3, kind = "filter.svf", param = "cutoff_hz", by = 300.0 } }]
+
+[[step]]
+text = """
+Show the route from LFO #7 into Cutoff and turn its Bypass off: the \
+brightness now moves by itself. Source LFO #7, depth +35 %, destination \
+Filter #3 Cutoff."""
+show = { route = { from = 7, port = "out", to = 3, kind = "filter.svf", param = "cutoff_hz" } }
+play_note = 4.0
+anchor = "knob:3.cutoff_hz"
+done = [{ route = { from = 7, port = "out", to = 3, kind = "filter.svf", param = "cutoff_hz" } }]
+
+[[step]]
+text = """
+Inspect LFO #7: it swings between −1 and 1. Set Rate to about 2 Hz: the \
+movement gets faster."""
+show = { control = { id = 7, kind = "lfo", param = "rate_hz" } }
+inspect = { id = 7, kind = "lfo", port = "out" }
+play_note = 4.0
+anchor = "knob:7.rate_hz"
+done = [
+  { inspecting = { id = 7, port = "out" } },
+  { param_moved = { id = 7, kind = "lfo", param = "rate_hz", by = 0.75 } },
+]
+
+[[step]]
+text = """
+Drag the route's depth below 0: the same LFO now moves the cutoff the \
+other way. Bypass the route to hear the filter without it."""
+show = { route = { from = 7, port = "out", to = 3, kind = "filter.svf", param = "cutoff_hz" } }
+play_note = 4.0
+anchor = "knob:3.cutoff_hz"
+done = [{ route = { from = 7, port = "out", to = 3, kind = "filter.svf", param = "cutoff_hz", amount_below = 0.0 } }]
+
+[[step]]
+text = """
+Compare: Restore the reference (route bypassed, as you started), play, \
+then Back to my version (Undo)."""
+play_note = 4.0
+compare = true
+done = ["compare_restored"]
+
+[end]
+unguided = """
+On your own: add a second route from LFO #7 to Filter #3 Resonance with a \
+small depth, and decide whether you like it better."""
