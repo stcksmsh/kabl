@@ -535,11 +535,13 @@ fn all_factory_dirs() -> Vec<String> {
 fn dirs_under(base: &Path) -> Vec<String> {
     fn walk(base: &Path, dir: &Path, out: &mut Vec<String>) {
         if dir.join("checkpoint.json").is_file() {
+            // Names use `/` on every platform: the tests match them against literals such as
+            // "presets/velvet-tine".
             out.push(
                 dir.strip_prefix(base)
                     .unwrap()
                     .to_string_lossy()
-                    .into_owned(),
+                    .replace('\\', "/"),
             );
         }
         let mut subs: Vec<_> = std::fs::read_dir(dir)
