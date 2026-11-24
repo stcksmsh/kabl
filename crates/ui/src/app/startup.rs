@@ -29,6 +29,7 @@ pub(crate) fn run() -> eframe::Result<()> {
     }
     let mut ui_state = UiState::default();
     ui_state.use_user_prefs();
+    let remembered = kabl_ui::first_run::devices::take_over(&mut ui_state);
     // D6: the computer keyboard plays notes in the standalone; the key strip waits to be opened.
     ui_state.keys.computer = true;
     let library = kabl_ui::browser::open_library();
@@ -75,14 +76,32 @@ pub(crate) fn run() -> eframe::Result<()> {
         .unwrap_or([1440.0, 900.0]);
     let (notes_tx, notes_rx) = rtrb::RingBuffer::<Note>::new(1024);
     let (mut midi, cc_rx) = Midi::new(notes_tx);
-    midi.connect_default(flag("--midi").as_deref());
+    // `--midi` wins for this launch and is not remembered.
+    let midi_missing = match flag("--midi") {
+        Some(f) => {
+            midi.connect_default(Some(&f));
+            None
+        }
+        None => midi.connect_remembered(&remembered.midi),
+    };
+    if let Some(n) = midi_missing {
+        log::info!(target: "midi", "remembered input \"{n}\" not found: connecting when it appears");
+    }
+    let outputs = output_names();
+    let (device, output_missing) = remembered_output(&remembered.output, &outputs);
+    if let Some(n) = &output_missing {
+        log::warn!(target: "audio", "remembered output \"{n}\" not found: using the system default");
+        ui_state.last_message = Some(format!(
+            "Output \"{n}\" not found: playing on the system default"
+        ));
+    }
     let num = |name: &str| flag(name).and_then(|v| v.parse::<u32>().ok());
     let peaks = Arc::new(record::PeakTap::default());
     let request = AudioRequest {
         rate: num("--rate"),
         frames: num("--frames"),
         realtime: !args.iter().any(|a| a == "--no-rt"),
-        device: None,
+        device,
         input: args.iter().any(|a| a == "--input"),
     };
     let (mut audio, mut delivery) = AudioHost::start(
@@ -169,7 +188,7 @@ pub(crate) fn run() -> eframe::Result<()> {
                 log: log.as_ref().map(|l| l.view()),
                 health: Health::new(),
                 request,
-                outputs: output_names(),
+                outputs,
                 output_scanned: std::time::Instant::now(),
                 phase,
                 retry: None,

@@ -78,6 +78,10 @@ pub struct Step {
     /// "Open Compare".
     #[serde(default)]
     pub compare: bool,
+    /// The Sound-check strip on the Start card: output device, MIDI input and output meter,
+    /// remembered for the next launch. Standalone only (a plugin uses the host's devices).
+    #[serde(default)]
+    pub sound_check: bool,
     /// A `UiState::hits` key to ring while the step shows; a trailing `*` matches any rest.
     #[serde(default)]
     pub anchor: Option<String>,

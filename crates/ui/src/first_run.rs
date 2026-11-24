@@ -268,3 +268,131 @@ pub fn render(state: &kabl_core::PatchState, secs: f32, rate: f32) -> Result<Vec
     }
     Ok(out)
 }
+
+/// The audio output and MIDI input the standalone app remembers across launches (`[devices]`
+/// in `settings.toml`, `style::Prefs`), chosen in lesson 00's Sound-check strip or the status
+/// bar. A plugin uses the host's audio and MIDI and leaves them alone.
+pub mod devices {
+    use serde::{Deserialize, Serialize};
+
+    use crate::UiState;
+
+    /// One remembered choice.
+    #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum Choice {
+        /// Never chosen (or "System default" for the output): the default opens.
+        #[default]
+        Unset,
+        /// "No MIDI input", chosen on purpose: nothing opens.
+        None,
+        Named(String),
+    }
+
+    /// The remembered output device and MIDI input.
+    #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+    #[serde(default)]
+    pub struct Devices {
+        pub output: Choice,
+        pub midi: Choice,
+    }
+
+    /// What a launch opens for a remembered choice among the names available now.
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    pub enum Pick {
+        /// The default; `missing` when a remembered name was not among them.
+        Default {
+            missing: bool,
+        },
+        /// `available[i]`.
+        Listed(usize),
+        None,
+    }
+
+    /// The remembered name when it is available (exactly, else by [`base_name`], since ALSA
+    /// renumbers a replugged MIDI device), the default when it is not or nothing was chosen,
+    /// and nothing for an explicit none.
+    pub fn pick(remembered: &Choice, available: &[String]) -> Pick {
+        match remembered {
+            Choice::Unset => Pick::Default { missing: false },
+            Choice::None => Pick::None,
+            Choice::Named(n) => available
+                .iter()
+                .position(|a| a == n)
+                .or_else(|| available.iter().position(|a| base_name(a) == base_name(n)))
+                .map_or(Pick::Default { missing: true }, Pick::Listed),
+        }
+    }
+
+    /// A MIDI port name without ALSA's trailing `client:port` numbers.
+    pub fn base_name(name: &str) -> &str {
+        match name.rsplit_once(' ') {
+            Some((head, tail))
+                if tail.split(':').count() == 2
+                    && tail
+                        .split(':')
+                        .all(|p| p.chars().all(|c| c.is_ascii_digit())) =>
+            {
+                head
+            }
+            _ => name,
+        }
+    }
+
+    /// The standalone app takes over the remembered devices (after `use_user_prefs`) and gets
+    /// them, to open at launch.
+    pub fn take_over(ui: &mut UiState) -> Devices {
+        let d = ui
+            .prefs_saved
+            .as_ref()
+            .map(|p| p.devices.clone())
+            .unwrap_or_default();
+        ui.devices = Some(d.clone());
+        d
+    }
+
+    /// The user picked an output (`None`: the system default): remembered for the next launch.
+    /// Nothing happens in a plugin.
+    pub fn remember_output(ui: &mut UiState, name: Option<String>) {
+        remember(ui, |d| d.output = name.map_or(Choice::Unset, Choice::Named));
+    }
+
+    /// The user picked a MIDI input; `None` is "No MIDI input", remembered as such.
+    pub fn remember_midi(ui: &mut UiState, port: Option<String>) {
+        remember(ui, |d| d.midi = port.map_or(Choice::None, Choice::Named));
+    }
+
+    fn remember(ui: &mut UiState, f: impl FnOnce(&mut Devices)) {
+        if let Some(d) = ui.devices.as_mut() {
+            f(d);
+            ui.save_prefs();
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn pick_opens_the_remembered_one_else_the_default_and_none_stays_none() {
+            let list = ["Speakers".to_string(), "Keystep 28:0".to_string()];
+            let named = |n: &str| Choice::Named(n.into());
+            assert_eq!(pick(&named("Speakers"), &list), Pick::Listed(0));
+            // Replugged: the same device under new ALSA numbers.
+            assert_eq!(pick(&named("Keystep 24:0"), &list), Pick::Listed(1));
+            assert_eq!(
+                pick(&named("Headphones"), &list),
+                Pick::Default { missing: true }
+            );
+            assert_eq!(
+                pick(&Choice::Unset, &list),
+                Pick::Default { missing: false }
+            );
+            assert_eq!(pick(&Choice::None, &list), Pick::None);
+            assert_eq!(
+                pick(&named("Speakers"), &[]),
+                Pick::Default { missing: true }
+            );
+        }
+    }
+}

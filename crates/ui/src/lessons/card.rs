@@ -7,6 +7,7 @@ use kabl_modules::builtins::Transport;
 
 use super::all;
 use super::run::step_to;
+use crate::first_run::devices::Choice;
 use crate::kit::{self, Tone};
 use crate::style::{Role, Style};
 use crate::{PatchEditor, UiState};
@@ -116,6 +117,9 @@ pub fn card(
                             kit::label(ui, st, Role::H3, Tone::Text, t);
                         }
                         kit::paragraph(ui, st, Role::Body, Tone::Text2, &s.text);
+                        if s.sound_check && ui_state.devices.is_some() {
+                            sound_check(ui, st, ui_state);
+                        }
                         if s.show
                             .as_ref()
                             .is_some_and(|t| super::resolve(editor.state(), t).is_none())
@@ -187,4 +191,94 @@ pub fn card(
     if skip {
         ui_state.lessons.active = None;
     }
+}
+
+/// The Sound-check strip: the output device and MIDI input (applied at once and remembered,
+/// as from the status bar) and the output meter. It plays nothing itself.
+fn sound_check(ui: &mut egui::Ui, st: &Style, ui_state: &mut UiState) {
+    let remembered = ui_state.devices.clone().unwrap_or_default();
+    let strip = ui.vertical(|ui| {
+        kit::gap(ui, st, 1);
+        let row = |ui: &mut egui::Ui, name: &str, add: &mut dyn FnMut(&mut egui::Ui)| {
+            ui.horizontal(|ui| {
+                let (r, _) = ui.allocate_exact_size(vec2(56.0, 20.0), egui::Sense::hover());
+                ui.put(r, |ui: &mut egui::Ui| {
+                    kit::label(ui, st, Role::Caption, Tone::Text3, name)
+                });
+                add(ui);
+            });
+        };
+        let chosen = ui_state
+            .audio_output
+            .as_ref()
+            .map_or("System default".to_string(), |(_, n)| n.clone());
+        let mut out = None;
+        row(ui, "Output", &mut |ui| {
+            let r = kit::dropdown(ui, st, "sound-check-output", &chosen, 204.0, |ui| {
+                if kit::menu_item(ui, st, "System default", ui_state.audio_output.is_none())
+                    .clicked()
+                {
+                    out = Some(None);
+                }
+                for dev in &ui_state.audio_outputs {
+                    let on = ui_state.audio_output.as_ref() == Some(dev);
+                    if kit::menu_item(ui, st, &dev.1, on).clicked() {
+                        out = Some(Some(dev.clone()));
+                    }
+                }
+            });
+            ui_state.record("sound-check-output".into(), r.rect);
+        });
+        if let Choice::Named(n) = &remembered.output {
+            if ui_state.audio_output.as_ref().is_none_or(|(_, o)| o != n) {
+                kit::paragraph(
+                    ui,
+                    st,
+                    Role::Caption,
+                    Tone::Text3,
+                    format!("\u{201c}{n}\u{201d} not found: playing on the system default."),
+                );
+            }
+        }
+        let port = ui_state
+            .midi_input
+            .clone()
+            .unwrap_or_else(|| "No MIDI input".into());
+        let mut midi = None;
+        row(ui, "MIDI in", &mut |ui| {
+            let r = kit::dropdown(ui, st, "sound-check-midi", &port, 204.0, |ui| {
+                if kit::menu_item(ui, st, "No MIDI input", ui_state.midi_input.is_none()).clicked()
+                {
+                    midi = Some(None);
+                }
+                for p in &ui_state.midi_inputs {
+                    let on = ui_state.midi_input.as_ref() == Some(p);
+                    if kit::menu_item(ui, st, p, on).clicked() {
+                        midi = Some(Some(p.clone()));
+                    }
+                }
+            });
+            ui_state.record("sound-check-midi".into(), r.rect);
+        });
+        if let (Choice::Named(n), None) = (&remembered.midi, &ui_state.midi_input) {
+            kit::paragraph(
+                ui,
+                st,
+                Role::Caption,
+                Tone::Text3,
+                format!("\u{201c}{n}\u{201d} not found: it connects when plugged in."),
+            );
+        }
+        row(ui, "Level", &mut |ui| {
+            let r = crate::record::meter_ui(ui, st, &mut ui_state.meter);
+            ui_state.record("sound-check-meter".into(), r.rect);
+        });
+        if out.is_some() {
+            ui_state.output_select = out;
+        }
+        if midi.is_some() {
+            ui_state.midi_select = midi;
+        }
+    });
+    ui_state.record("sound-check".into(), strip.response.rect);
 }
