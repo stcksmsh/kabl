@@ -24,11 +24,25 @@ pub fn patch_dirs(root: &Path, out: &mut Vec<PathBuf>, depth: usize) {
 }
 
 /// FNV-1a over the little-endian bit patterns of the samples fed to it.
-pub struct SampleHash(u64);
+/// It also tracks finiteness, peak and energy, for the platforms where the hash itself is not
+/// comparable (see [`SampleHash::assert_clean`]).
+pub struct SampleHash {
+    hash: u64,
+    finite: bool,
+    peak: f32,
+    sum_sq: f64,
+    count: usize,
+}
 
 impl Default for SampleHash {
     fn default() -> Self {
-        Self(0xcbf2_9ce4_8422_2325)
+        Self {
+            hash: 0xcbf2_9ce4_8422_2325,
+            finite: true,
+            peak: 0.0,
+            sum_sq: 0.0,
+            count: 0,
+        }
     }
 }
 
@@ -36,13 +50,30 @@ impl SampleHash {
     pub fn feed(&mut self, samples: &[f32]) {
         for s in samples {
             for b in s.to_bits().to_le_bytes() {
-                self.0 = (self.0 ^ b as u64).wrapping_mul(0x0100_0000_01b3);
+                self.hash = (self.hash ^ b as u64).wrapping_mul(0x0100_0000_01b3);
             }
+            self.finite &= s.is_finite();
+            self.peak = self.peak.max(s.abs());
+            self.sum_sq += f64::from(*s).powi(2);
+            self.count += 1;
         }
     }
 
     pub fn hex(&self) -> String {
-        format!("{:016x}", self.0)
+        format!("{:016x}", self.hash)
+    }
+
+    /// Bit-exact hashes are a Linux reference: other platforms' libm differs in the last bit.
+    /// There the render is only checked for being finite, within full scale, and not silent.
+    pub fn assert_clean(&self, what: &str, max_peak: f32) {
+        let db = 10.0 * (self.sum_sq / self.count.max(1) as f64).log10();
+        assert!(self.finite, "{what}: non-finite samples");
+        assert!(
+            self.peak <= max_peak,
+            "{what}: over full scale, peak {}",
+            self.peak
+        );
+        assert!(db > -60.0, "{what}: near silent, {db:.1} dB");
     }
 }
 
@@ -52,8 +83,18 @@ pub fn chord_hash(
     c: &mut crate::compile::CompiledPatch,
     blocks: usize,
     release: usize,
-    mut each_block: impl FnMut(&mut crate::compile::CompiledPatch, usize),
+    each_block: impl FnMut(&mut crate::compile::CompiledPatch, usize),
 ) -> String {
+    chord_render(c, blocks, release, each_block).hex()
+}
+
+/// [`chord_hash`], keeping the whole [`SampleHash`] so a caller can check the render's level.
+pub fn chord_render(
+    c: &mut crate::compile::CompiledPatch,
+    blocks: usize,
+    release: usize,
+    mut each_block: impl FnMut(&mut crate::compile::CompiledPatch, usize),
+) -> SampleHash {
     let mut h = SampleHash::default();
     for b in 0..blocks {
         if b == 0 {
@@ -71,5 +112,5 @@ pub fn chord_hash(
         h.feed(c.left());
         h.feed(c.right());
     }
-    h.hex()
+    h
 }
