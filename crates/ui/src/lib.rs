@@ -356,6 +356,12 @@ pub struct UiState {
     /// Module in choose-primary mode and its pending face choice (committed by `Done`).
     pub choose: Option<(ModuleId, Vec<bool>)>,
     flash: Option<(ModuleId, &'static str, f64)>,
+    /// Every macro output's value as last seen and when it last changed (egui time), for the
+    /// editor `macro_seen_of`: what `explain::track_macros` reads a turned macro from.
+    macro_seen: HashMap<(ModuleId, u8), (f32, f64)>,
+    macro_seen_of: u64,
+    /// Controls a macro being turned changes: their rings pulse in the rack.
+    pub macro_pulse: Vec<(ModuleId, &'static str)>,
     /// Module to pan into view after the next layout (just expanded or revealed).
     reveal: Option<ModuleId>,
     canvas: Rect,
@@ -550,6 +556,9 @@ impl Default for UiState {
             skin_labels_on_art: None,
             choose: None,
             flash: None,
+            macro_seen: HashMap::new(),
+            macro_seen_of: 0,
+            macro_pulse: Vec::new(),
             reveal: None,
             canvas: Rect::NOTHING,
             fitted: false,
@@ -971,6 +980,29 @@ impl UiState {
     fn flash_on(&self, id: ModuleId, param: &str, now: f64) -> bool {
         matches!(self.flash, Some((fid, p, t)) if fid == id && p == param && now - t < 1.5)
     }
+
+    /// Macro output `k` of `id` moved within the last `explain::REVEAL_HOLD` seconds.
+    pub fn macro_turning(&self, id: ModuleId, k: u8, now: f64) -> bool {
+        self.macro_seen
+            .get(&(id, k))
+            .is_some_and(|&(_, at)| now - at < explain::REVEAL_HOLD)
+    }
+
+    /// The flash ring's colour, breathing, while a turned macro changes this control.
+    fn pulse_on(
+        &self,
+        id: ModuleId,
+        param: &str,
+        now: f64,
+        sel: egui::Color32,
+    ) -> Option<egui::Color32> {
+        self.macro_pulse
+            .iter()
+            .any(|&(m, p)| m == id && p == param)
+            .then(|| {
+                sel.gamma_multiply(0.65 + 0.35 * (now * std::f64::consts::TAU * 1.5).sin() as f32)
+            })
+    }
 }
 
 /// Draws the rack editor for one frame and applies user edits to `editor` directly. Call once
@@ -1127,6 +1159,7 @@ pub fn show_with(
     // MIDI CCs are applied by the control layer (`control::midi`), not here: pickup only
     // follows edits made in this frame.
     perform::sync_takeover(editor, ui_state);
+    explain::track_macros(editor, ui_state, ui.ctx());
     if !ui.input(|i| i.pointer.any_down()) {
         ui_state.drag = None;
     }
@@ -4423,6 +4456,9 @@ fn draw_control(
             if ui_state.flash_on(m.id, c.param.name, now) {
                 painter.circle_stroke(xf.p(cen), (r + 20.0) * z, Stroke::new(3.0 * z, th.sel));
             }
+            if let Some(col) = ui_state.pulse_on(m.id, c.param.name, now, th.sel) {
+                painter.circle_stroke(xf.p(cen), (r + 20.0) * z, Stroke::new(3.0 * z, col));
+            }
         }
         Geo::Select { rect } => {
             let plugs = routing::stepped_selector(
@@ -4442,6 +4478,14 @@ fn draw_control(
                     xf.r(rect).expand(5.0 * z),
                     CornerRadius::same(6),
                     Stroke::new(3.0 * z, th.sel),
+                    egui::StrokeKind::Outside,
+                );
+            }
+            if let Some(col) = ui_state.pulse_on(m.id, c.param.name, now, th.sel) {
+                painter.rect_stroke(
+                    xf.r(rect).expand(5.0 * z),
+                    CornerRadius::same(6),
+                    Stroke::new(3.0 * z, col),
                     egui::StrokeKind::Outside,
                 );
             }
@@ -5967,6 +6011,23 @@ fn draw_authored_face(
                 ),
             };
             drawn.plugs.extend(plugs);
+            let now = ui.input(|i| i.time);
+            if let Some(col) = view.pulse_on(*leaf, param.name, now, th.sel) {
+                let ring = Stroke::new(3.0 * z, col);
+                match panel_control_geo(face, p) {
+                    Geo::Knob { c: cen, r } => {
+                        painter.circle_stroke(xf.p(cen), (r + 20.0) * z, ring);
+                    }
+                    Geo::Select { rect } => {
+                        painter.rect_stroke(
+                            xf.r(rect).expand(5.0 * z),
+                            CornerRadius::same(6),
+                            ring,
+                            egui::StrokeKind::Outside,
+                        );
+                    }
+                }
+            }
             view.record(format!("composite:{id}:control:{key}"), screen);
             face_label(
                 &painter,
