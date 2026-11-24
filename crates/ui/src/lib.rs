@@ -407,6 +407,14 @@ pub struct UiState {
     pub midi_input: Option<String>,
     /// `Some(None)` = disconnect.
     pub midi_select: Option<Option<String>>,
+    /// The remembered output and MIDI input: `Some` only in the standalone app, which opens
+    /// them (`first_run::devices::take_over`). Saved with the theme.
+    pub devices: Option<first_run::devices::Devices>,
+    /// Output devices seen `(index, name)`, the chosen one (`None`: the system default), and a
+    /// switch the Sound-check strip asked for (`Some(None)`: the system default).
+    pub audio_outputs: Vec<(usize, String)>,
+    pub audio_output: Option<(usize, String)>,
+    pub output_select: Option<Option<(usize, String)>>,
     /// Final output meter (fed by `main.rs` from the audio callback).
     pub meter: record::Meter,
     /// The host feeds `meter` and `sample_rate` (standalone): the status bar shows them.
@@ -581,6 +589,10 @@ impl Default for UiState {
             midi_inputs: Vec::new(),
             midi_input: None,
             midi_select: None,
+            devices: None,
+            audio_outputs: Vec::new(),
+            audio_output: None,
+            output_select: None,
             recorder: None,
             meter: Default::default(),
             status_meter: false,
@@ -947,7 +959,7 @@ impl UiState {
 
     fn save_prefs(&mut self) {
         let Some(dir) = &self.prefs_dir else { return };
-        let p = style::Prefs {
+        let mut p = style::Prefs {
             theme: self.theme.clone(),
             dark: self.dark,
             folders: self.folders.clone(),
@@ -956,8 +968,20 @@ impl UiState {
             cable_palette: self.cable_palette,
             theme_mode: Some(self.theme_mode),
             reduce_motion: self.reduce_motion,
+            devices: match &self.devices {
+                Some(d) => d.clone(),
+                None => self
+                    .prefs_saved
+                    .as_ref()
+                    .map(|p| p.devices.clone())
+                    .unwrap_or_default(),
+            },
         };
         if self.prefs_saved.as_ref() != Some(&p) {
+            // A plugin does not own the devices: it keeps what the standalone app wrote since.
+            if self.devices.is_none() {
+                p.devices = style::Prefs::load(dir).devices;
+            }
             if let Err(e) = p.save(dir) {
                 log::warn!("could not remember the theme in {}: {e}", dir.display());
             }

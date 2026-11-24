@@ -13,6 +13,7 @@ use kabl_engine::runtime::{Feedback, ToAudio};
 use kabl_modules::builtins::{DelayLock, LfoSync};
 use kabl_standalone::{RingBuffer, DEFAULT_VOICE_COUNT};
 use kabl_ui::control::{self, Delivery};
+use kabl_ui::first_run::devices::{pick, Choice, Pick};
 use kabl_ui::record;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
@@ -83,6 +84,21 @@ pub(crate) fn output_names() -> Vec<(usize, String)> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// The output to open at launch for the remembered choice (`None`: the system default), and
+/// the remembered name when it is not among `outputs`: the default opens then, and the name
+/// stays remembered until the user picks another.
+pub(crate) fn remembered_output(
+    remembered: &Choice,
+    outputs: &[(usize, String)],
+) -> (Option<(usize, String)>, Option<String>) {
+    let names: Vec<String> = outputs.iter().map(|(_, n)| n.clone()).collect();
+    match (pick(remembered, &names), remembered) {
+        (Pick::Listed(i), _) => (Some(outputs[i].clone()), None),
+        (Pick::Default { missing: true }, Choice::Named(n)) => (None, Some(n.clone())),
+        _ => (None, None),
+    }
 }
 
 impl AudioHost {

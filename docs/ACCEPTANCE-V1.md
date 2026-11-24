@@ -6,6 +6,7 @@ Tick each box when the expected result happens; note anything off next to the it
 ## 1. Install and first run
 - [ ] Install the release build (or `cargo build --release`) with a clean config dir and launch `kabl-ui`. The Sounds browser is open over the default patch (Pluck line), and a toast says to press play on any sound.
 - [ ] The Pluck line patch plays a plucked line by itself; it does not wait for a key press. Load a sound and follow the short first-run tour (Esc skips it). Relaunch: the tour does not return.
+- [ ] In lesson 00's first step, pick your audio output and MIDI input in the Sound-check strip; the strip's meter moves with Pluck line. Quit and relaunch: both are reopened without asking. Unplug the controller and relaunch: no error, and it connects when plugged back in.
 
 ## 2. Standalone
 - [ ] Pick your audio device in the status-bar output dropdown, then click Retry audio. Sound plays through it with no crackle. (There is no buffer-size control in the UI; the buffer is set only with the `--frames` command-line flag.)

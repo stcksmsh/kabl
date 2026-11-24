@@ -10,7 +10,9 @@ start = { sound = "kabl:start" }
 title = "Hear it"
 text = """
 This is Pluck line, already playing. A clock drives the sequencer, and the \
-sound flows along the glowing cables to the output."""
+sound flows along the glowing cables to the output. Hear nothing? Pick your \
+output below. Pick your MIDI keyboard too; kabl remembers both."""
+sound_check = true
 
 [[step]]
 title = "Turn this knob"

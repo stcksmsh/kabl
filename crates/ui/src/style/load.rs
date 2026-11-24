@@ -579,6 +579,9 @@ pub struct Prefs {
     /// Setting "Reduce motion".
     #[serde(default)]
     pub reduce_motion: crate::desktop::ReduceMotion,
+    /// The standalone app's output device and MIDI input.
+    #[serde(default)]
+    pub devices: crate::first_run::devices::Devices,
 }
 
 impl Default for Prefs {
@@ -592,6 +595,7 @@ impl Default for Prefs {
             cable_palette: None,
             theme_mode: Some(Default::default()),
             reduce_motion: Default::default(),
+            devices: Default::default(),
         }
     }
 }
@@ -626,6 +630,39 @@ impl Prefs {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn remembered_devices_round_trip_and_an_old_file_loads_without_them() {
+        use crate::first_run::devices::{Choice, Devices};
+        let dir = tempfile::tempdir().unwrap();
+        let p = Prefs {
+            devices: Devices {
+                output: Choice::Named("USB Audio".into()),
+                midi: Choice::None,
+            },
+            ..Prefs::default()
+        };
+        p.save(dir.path()).unwrap();
+        assert_eq!(Prefs::load(dir.path()), p);
+        let named = Prefs {
+            devices: Devices {
+                output: Choice::Unset,
+                midi: Choice::Named("Keystep 24:0".into()),
+            },
+            ..Prefs::default()
+        };
+        named.save(dir.path()).unwrap();
+        assert_eq!(Prefs::load(dir.path()), named);
+        // A file from before the devices were remembered.
+        std::fs::write(
+            dir.path().join("settings.toml"),
+            "theme = \"look-b\"\ndark = true\n",
+        )
+        .unwrap();
+        let old = Prefs::load(dir.path());
+        assert!(old.dark);
+        assert_eq!(old.devices, Devices::default());
+    }
 
     fn themes() -> Themes {
         Themes::default()
@@ -811,6 +848,7 @@ mod tests {
             cable_palette: Some(super::super::CablePalette::Contrast),
             theme_mode: Some(crate::desktop::ThemeMode::Light),
             reduce_motion: crate::desktop::ReduceMotion::On,
+            devices: Default::default(),
         };
         p.save(d.path()).unwrap();
         assert_eq!(Prefs::load(d.path()), p);
