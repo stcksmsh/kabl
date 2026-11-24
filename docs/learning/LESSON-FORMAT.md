@@ -30,18 +30,36 @@ done = [{ route = { from = 7, port = "out", to = 3, kind = "filter.svf", param =
 unguided = "A last task with no guidance."
 ```
 
+## Lesson 00 and the Start card
+
+`card = true` (lesson field, default false) marks the first-run lesson. It runs on the Start
+card, docked at the bottom right of the page with no scrim, instead of in the Learn panel: the
+rack stays usable, and the step's `anchor` ring shows without the drawer open. The card has
+**Next**, **Skip** (Esc does the same) and **Stop**/**Play**, which stops or runs every clock in
+the patch. If no audio output runs for two seconds it adds a "no sound output" line.
+
+`start = { sound = "kabl:start" }` names the start patch (`crates/ui/src/first_run.rs`) instead
+of a library sound. Starting such a lesson from Learn opens the start patch in place of a
+sound with no unsaved changes, or asks the user to save first.
+
+On a fresh profile the standalone app opens the start patch playing in the Rack with lesson 00
+at step 1, and saves `first_run_done` at once, so an app closed mid-lesson does not start it
+again. A profile with `first_run_done` (also what the old tour set) opens on Sounds as before.
+The plugin never starts it. `lessons/00-start-here.toml` is lesson 00.
+
 ## Step fields
 
 Only `text` is required. Each optional field adds one button to the step, shown in this order.
 
 | field | button / effect |
 |---|---|
+| `title` | A short heading above the text (the Start card shows it). |
 | `show` | **Show** brings the target into view (and **Back** returns). Target is one of `{ control = { id, kind, param } }`, `{ route = { from, port, to, kind, param } }`, `{ module = { id, kind } }`. |
 | `inspect` | **Inspect #id port** selects that output in the signal inspector. |
 | `play_note` | **Play test note** plays middle C for this many seconds at a fixed velocity. |
 | `compare` | **Open Compare**. |
 | `anchor` | A `UiState::hits` key (`knob:4.cutoff_hz`, `module:6`, `pcard:…`). While the step shows, it gets an accent ring with a slow pulse. The ring takes no input. A trailing `*` matches the first key with that prefix. |
-| `done` | Completion conditions. Once all of them hold, the step advances by itself and the panel shows "Step n done." for a moment. If they already all hold when the step is reached, the step counts as done at once: the panel says so and **Next** moves on, nothing has to be undone and redone. A step completed earlier in the session stays done when **Previous** goes back to it. If `done` is empty, the step only advances on **Next**. **Next** and **Previous** always work: every step can be skipped. |
+| `done` | Completion conditions. Once all of them hold, the step advances by itself and the panel shows "Step n done." for a moment. If they already all hold when the step is reached, the step counts as done at once: the panel says so and **Next** moves on, nothing has to be undone and redone. A step completed earlier in the session stays done when **Previous** goes back to it. If `done` is empty, the step only advances on **Next**. **Next** and **Previous** always work: every step can be skipped. A later step whose conditions come to hold, compared with the patch as the lesson started, is marked done before it is reached. |
 
 Targets are named by explicit module id and kind, never by name. If a target is missing or has
 another kind, the step says so and suggests Undo. It never guesses.
@@ -58,6 +76,8 @@ undo position saved when the step was entered.
 | `{ route = { from, port, to, kind, param } }` | that modulation route exists and is not bypassed |
 | `{ route = { from, port, to, kind, param, amount_below } }` | as above, and its depth is below `amount_below` (-1 to 1) |
 | `{ inspecting = { id, port } }` | the signal inspector has that output selected |
+| `{ any_param_moved = { id, kind, params, by } }` | any one of `params` moved by at least `by` since the step started |
+| `"sounds_open"` | the Sounds browser is open |
 | `"compare_restored"` | the Compare reference was restored during this step and not undone |
 
 New conditions are new variants of `lessons::Cond`. They are not an expression language.
@@ -65,12 +85,12 @@ New conditions are new variants of `lessons::Cond`. They are not an expression l
 ## Validation
 
 Unknown fields, unknown conditions, a missing `id`/`title`/`start`/`end`, no steps, empty `text`,
-an empty `anchor`, a `play_note` out of range, a `param_moved.by` that is not above 0 and a
+an empty `anchor`, a `play_note` out of range, a `param_moved.by` or `any_param_moved.by` that is not above 0, an empty `any_param_moved.params`, and a
 `route.amount_below` that is not a number are all
 rejected. The error names the file and the reason. The unit tests parse every embedded file, so
 a bad file fails CI. `crates/ui/tests/signal_inspection.rs` also opens each lesson and checks
 that every `show` target resolves and every `anchor` is drawn. `crates/ui/tests/lessons.rs`
-walks every lesson on its real patch and checks that each step completes only once its
+walks every lesson but lesson 00 on its real patch (`crates/ui/tests/first_run.rs` walks lesson 00) and checks that each step completes only once its
 conditions hold, and that the runner adds nothing to the op log.
 
 ## Progress

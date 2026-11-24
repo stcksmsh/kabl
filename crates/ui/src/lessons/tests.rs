@@ -235,6 +235,7 @@ fn a_step_completes_only_when_all_its_conditions_hold() {
         editor: e.instance(),
         detached: false,
         base: Baseline::of(&e),
+        origin: Baseline::of(&e),
         completed_at: None,
         armed: false,
         done: vec![false; l.steps.len()],

@@ -15,15 +15,17 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 41] = [
+const SCENES: [&str; 43] = [
     "rack",
     "perform",
     "sounds",
     "sounds-preview",
-    "first-run-sounds",
-    "first-run-flows",
     "first-run",
-    "first-run-own",
+    "first-run-knob",
+    "first-run-macro",
+    "first-run-sounds",
+    "first-run-stopped",
+    "first-run-no-output",
     "drawer",
     "wavetable-editor",
     "seq-pattern-editor",
@@ -306,35 +308,43 @@ impl App {
             ui.browser.filter = kabl_ui::browser::Filter::Factory;
             ui.browser.category = Some("Groove".into());
         }
-        // The first-run scenes start on the unsaved start patch: a library origin would tell the
-        // tour that a sound was already loaded.
-        let origin = if j.scene == "first-run-sounds" {
-            kabl_ui::browser::DocOrigin::New
-        } else {
-            kabl_ui::browser::DocOrigin::Library("factory:acid-line".into())
-        };
-        let mut doc = kabl_ui::browser::Doc::new("Acid Line", origin, self.editor.state());
+        let mut doc = kabl_ui::browser::Doc::new(
+            "Acid Line",
+            kabl_ui::browser::DocOrigin::Library("factory:acid-line".into()),
+            self.editor.state(),
+        );
         doc.meta.category = "Bass".into();
         ui.doc = Some(doc);
         ui.browser_open = j.scene == "sounds" || j.scene == "sounds-preview";
-        // The first-run tour, one scene per step, over the start patch.
+        // Lesson 00 on the Start card, one scene per step, over the start patch as a fresh
+        // profile opens it; Stop pressed; and no audio output.
         if let Some(step) = match j.scene {
-            "first-run-sounds" => Some(kabl_ui::tour::Step::Sounds),
-            "first-run-flows" => Some(kabl_ui::tour::Step::Flows),
-            "first-run" => Some(kabl_ui::tour::Step::Knob),
-            "first-run-own" => Some(kabl_ui::tour::Step::Own),
+            "first-run" | "first-run-stopped" | "first-run-no-output" => Some(0),
+            "first-run-knob" => Some(1),
+            "first-run-macro" => Some(2),
+            "first-run-sounds" => Some(3),
             _ => None,
         } {
-            self.editor = kabl_ui::first_run::start_patch();
-            // The start patch's own document: its name in the header, clean.
-            ui.doc = Some(kabl_ui::browser::Doc::new(
-                kabl_ui::first_run::start_name(),
-                kabl_ui::browser::DocOrigin::New,
-                self.editor.state(),
-            ));
-            ui.first_run = Some(kabl_ui::tour::begin_at(step));
-            ui.browser_open = step == kabl_ui::tour::Step::Sounds;
-            ui.browser.selected = Some("factory:presets/acid-line".into());
+            self.editor = kabl_ui::first_run::open(&mut ui);
+            if ui.lessons.active.is_none() {
+                // The user folder already says the first run happened: start it as Learn does.
+                let i = kabl_ui::lessons::all().iter().position(|l| l.card).unwrap();
+                kabl_ui::lessons::start(&mut self.editor, &mut ui, i);
+            }
+            ui.lessons.active.as_mut().expect("lesson 00").step = step;
+            // A fresh profile shows the Rack; this capture profile has had its first run.
+            ui.browser_open = false;
+            ui.inspect.audio = j.scene != "first-run-no-output";
+            if j.scene == "first-run-no-output" {
+                ui.lessons.quiet_since = Some(f64::NEG_INFINITY);
+            }
+            if j.scene == "first-run-stopped" {
+                for (&id, m) in &self.editor.state().modules {
+                    if m.kind == "clock" {
+                        ui.clock_running.insert(id, false);
+                    }
+                }
+            }
         }
         ui.drawer_open = matches!(
             j.scene,
