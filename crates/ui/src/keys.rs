@@ -223,7 +223,7 @@ pub fn input(ui_state: &mut UiState, ctx: &egui::Context) {
     }
     let free = ui_state.keys.computer
         && ui_state.browser.dialog.is_none()
-        && !ctx.egui_wants_keyboard_input()
+        && !crate::routing::wants_text_input(ctx)
         && !egui::Popup::is_any_open(ctx);
     let keys = &mut ui_state.keys;
     ctx.input_mut(|i| {
@@ -361,7 +361,11 @@ fn strip(ui_state: &mut UiState, ui: &mut Ui, st: &Style) {
     let down = ui.input(|i| i.pointer.primary_down());
     let pos = ui.input(|i| i.pointer.interact_pos());
     // Starts with a press on the strip; a drag slides from key to key; letting go ends it.
-    let playing = down && (resp.is_pointer_button_down_on() || ui_state.keys.strip.is_some());
+    // An unfocused window has ended every note (`input`); a button still down must not start
+    // them again each frame.
+    let focused = ui.input(|i| i.focused);
+    let playing =
+        focused && down && (resp.is_pointer_button_down_on() || ui_state.keys.strip.is_some());
     let note = playing.then(|| pos.and_then(|p| hit(&keys, p))).flatten();
     if playing || ui_state.keys.strip.is_some() {
         ui_state.keys.strip_to(note);

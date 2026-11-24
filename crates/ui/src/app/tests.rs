@@ -660,3 +660,63 @@ fn computer_keys_play_a_keyboard_preset_without_midi() {
     assert_eq!(off, offs);
     assert_eq!(engine.keys().0, 0, "every key released");
 }
+
+/// A controller C4 and a computer-key C4 are two keys: the controller's note-off, Notes Off
+/// and unplug end only the controller's, and the computer key's own release ends its note.
+#[test]
+fn computer_keys_and_a_controller_never_end_each_others_notes() {
+    use kabl_engine::patch_engine::PatchEngine;
+    let dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/presets/velvet-tine");
+    let log = kabl_core::load(&dir).unwrap();
+    let collector = basedrop::Collector::new();
+    let mut engine = PatchEngine::new(
+        &collector.handle(),
+        log.state(),
+        48000.0,
+        kabl_standalone::DEFAULT_VOICE_COUNT,
+    )
+    .unwrap();
+    let mut ui = UiState::default();
+    let (notes, mut notes_rx) = rtrb::RingBuffer::<Note>::new(1024);
+    let (midi, _cc) = Midi::new(notes);
+    let c4 = KeyEvent::On {
+        note: 60,
+        velocity: 100,
+    };
+    let mut keys = |engine: &mut PatchEngine, ui: &mut UiState| {
+        midi.send_keys(ui);
+        while let Ok((_, e)) = notes_rx.pop() {
+            engine.key_at(e, 0);
+        }
+        engine.keys().0
+    };
+    let controller =
+        |engine: &mut PatchEngine, e| engine.key_at(MidiEvent::new(Source::Controller, 0, e), 0);
+    controller(&mut engine, c4);
+    ui.keys.out.push(c4);
+    assert_eq!(keys(&mut engine, &mut ui), 2, "two C4 keys held");
+    controller(&mut engine, KeyEvent::Off { note: 60 });
+    assert_eq!(
+        keys(&mut engine, &mut ui),
+        1,
+        "the computer key's C4 plays on"
+    );
+    for e in [c4, KeyEvent::NotesOff] {
+        controller(&mut engine, e);
+    }
+    assert_eq!(
+        keys(&mut engine, &mut ui),
+        1,
+        "Notes Off ends only the controller's"
+    );
+    controller(&mut engine, c4);
+    controller(&mut engine, KeyEvent::SourceLost);
+    assert_eq!(
+        keys(&mut engine, &mut ui),
+        1,
+        "unplugging ends only the controller's"
+    );
+    ui.keys.out.push(KeyEvent::Off { note: 60 });
+    assert_eq!(keys(&mut engine, &mut ui), 0);
+}

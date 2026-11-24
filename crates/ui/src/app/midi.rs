@@ -187,8 +187,10 @@ impl Midi {
         self.send(KeyEvent::AllOff);
     }
 
-    /// Notes from the computer keys and the key strip take the controller's path, channel 1,
-    /// so a keyboard patch plays them as it would a MIDI keyboard.
+    /// Notes from the computer keys and the key strip, on channel 1 so a keyboard patch plays
+    /// them as it would a MIDI keyboard. They use the host source, which the standalone has no
+    /// other use for: a controller C4 and a computer-key C4 are two keys, and the controller's
+    /// note-offs, Notes Off or unplug never end a computer-key note.
     pub(crate) fn send_keys(&self, ui_state: &mut UiState) {
         if ui_state.keys.out.is_empty() {
             return;
@@ -202,7 +204,12 @@ impl Midi {
         // What does not fit waits for the next frame, so no note-off is lost.
         let n = ui_state.keys.out.len().min(notes.slots());
         for e in ui_state.keys.out.drain(..n) {
-            notes.push(note_now(e)).expect("checked free slots");
+            notes
+                .push((
+                    std::time::Instant::now(),
+                    MidiEvent::new(Source::Host, 0, e),
+                ))
+                .expect("checked free slots");
         }
     }
 

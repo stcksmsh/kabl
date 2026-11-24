@@ -295,3 +295,70 @@ fn the_strip_opens_and_plays_under_the_rack() {
     h.frame();
     assert_eq!(h.out(), [on(60), off(60)]);
 }
+
+impl H {
+    /// Clicks a knob on the rack: it takes keyboard focus (arrows), not text.
+    fn focus_a_knob(&mut self) {
+        let knob = self
+            .ui
+            .hits
+            .keys()
+            .find(|k| k.starts_with("knob:") && k.ends_with(".cutoff_hz"))
+            .expect("the default patch shows a filter cutoff knob")
+            .clone();
+        self.click(&knob);
+        assert!(
+            self.ctx.egui_wants_keyboard_input(),
+            "the knob {knob} has focus"
+        );
+        self.out();
+    }
+}
+
+/// A focused knob takes arrows, not letters: A still plays, and never opens the add menu.
+#[test]
+fn a_focused_knob_leaves_the_keys_playing() {
+    let mut h = H::new();
+    h.focus_a_knob();
+    h.press(Key::A);
+    assert_eq!(h.out(), [on(60)]);
+    assert!(!egui::Popup::is_any_open(&h.ctx), "no add menu");
+    h.release(Key::A);
+    assert_eq!(h.out(), [off(60)]);
+}
+
+/// With computer keys off, A is the add-module shortcut again, knob focused or not.
+#[test]
+fn with_computer_keys_off_a_opens_the_add_menu() {
+    let mut h = H::new();
+    h.ui.keys.computer = false;
+    h.focus_a_knob();
+    h.press(Key::A);
+    assert!(h.out().is_empty());
+    assert!(egui::Popup::is_any_open(&h.ctx), "add menu open");
+}
+
+/// A window that loses focus with the button still down on the strip ends the note once and
+/// does not start it again every frame.
+#[test]
+fn an_unfocused_window_never_retriggers_the_strip() {
+    let mut h = H::new();
+    h.click("keys:toggle");
+    h.frame();
+    let p = h.ui.hits["keys:strip"].left_bottom() + egui::vec2(4.0, -4.0);
+    h.events.push(Event::PointerMoved(p));
+    h.frame();
+    h.events.push(Event::PointerButton {
+        pos: p,
+        button: PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.frame();
+    assert_eq!(h.out(), [on(60)]);
+    h.focused = false;
+    for _ in 0..5 {
+        h.frame();
+    }
+    assert_eq!(h.out(), [off(60)], "one note-off, no retrigger");
+}

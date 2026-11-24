@@ -1639,19 +1639,30 @@ fn add_search(
             g,
             st.roles.text3,
         );
-        let key = egui::Rect::from_center_size(
-            egui::pos2(rect.right() - st.sp(2) - 10.0, rect.center().y),
-            egui::vec2(20.0, 16.0),
-        );
-        p.rect_filled(key, 4.0, st.roles.inset);
-        let g = p.layout_no_wrap("A".into(), st.font(style::Role::Caption), st.roles.text2);
-        p.galley(key.center() - g.size() / 2.0, g, st.roles.text2);
+        // With computer keys on, A plays a note: no shortcut to show.
+        if !ui_state.keys.computer {
+            let key = egui::Rect::from_center_size(
+                egui::pos2(rect.right() - st.sp(2) - 10.0, rect.center().y),
+                egui::vec2(20.0, 16.0),
+            );
+            p.rect_filled(key, 4.0, st.roles.inset);
+            let g = p.layout_no_wrap("A".into(), st.font(style::Role::Caption), st.roles.text2);
+            p.galley(key.center() - g.size() / 2.0, g, st.roles.text2);
+        }
     }
-    let r = r.tip(st, "Add a module (A)");
+    let r = r.tip(
+        st,
+        if ui_state.keys.computer {
+            "Add a module"
+        } else {
+            "Add a module (A)"
+        },
+    );
     ui_state.record("add-menu".into(), r.rect);
     let pop = egui::Popup::default_response_id(&r);
     if std::mem::take(&mut ui_state.add_menu_req)
-        || (!routing::wants_text_input(ui.ctx())
+        || (!ui_state.keys.computer
+            && !routing::wants_text_input(ui.ctx())
             && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::A)))
     {
         egui::Popup::open_id(ui.ctx(), pop);

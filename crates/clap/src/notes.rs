@@ -6,7 +6,7 @@
 use crate::Instrument;
 use kabl_engine::keyboard::{KeyEvent, MidiEvent, Source};
 use kabl_engine::timeline::Timeline;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Events the ring holds; the strip makes a handful per frame.
 pub const CAPACITY: usize = 256;
@@ -22,6 +22,15 @@ pub fn send(tx: &mut rtrb::Producer<KeyEvent>, view: &mut kabl_ui::UiState) {
     for e in view.keys.out.drain(..n) {
         tx.push(e).expect("checked free slots");
     }
+}
+
+/// UI thread: end every note of the editor's keys now. Nothing is queued for them: the audio
+/// thread drops what is still in the ring (a note-on from a frame it never ran) and ends the
+/// strip's source, so a full ring or a stalled audio thread cannot leave a note hanging.
+pub fn reset(view: &mut kabl_ui::UiState, flag: &AtomicBool) {
+    view.keys.all_off();
+    view.keys.out.clear();
+    flag.store(true, Ordering::Release);
 }
 
 /// Audio thread, no allocation: the queued notes at the start of this block.
@@ -56,7 +65,19 @@ impl Instrument {
             self.timeline.push(
                 frames.saturating_sub(1),
                 frames,
-                MidiEvent::new(Source::Host, 0, kabl_engine::keyboard::KeyEvent::SourceLost),
+                MidiEvent::new(Source::Host, 0, KeyEvent::SourceLost),
+            );
+        }
+        if self.shared.ui_notes_reset.swap(false, Ordering::Acquire) {
+            for _ in 0..CAPACITY {
+                if self.ui_notes.pop().is_err() {
+                    break;
+                }
+            }
+            self.timeline.push(
+                0,
+                frames,
+                MidiEvent::new(Source::Controller, 0, KeyEvent::SourceLost),
             );
         }
         merge(&mut self.ui_notes, &mut self.timeline, frames);
@@ -111,5 +132,50 @@ mod tests {
         host.push((0, [0x80, 60, 0])).unwrap();
         block(&mut p);
         assert_eq!(held(&p), 0);
+    }
+
+    /// Closing the editor (or loading a sound) while the audio thread is stalled and the ring
+    /// is full of the strip's note-ons: once audio runs again, every strip note ends and none
+    /// of the stale ones start, without a reopened window; the host's key plays on.
+    #[test]
+    fn a_reset_ends_strip_notes_queued_while_audio_was_stalled() {
+        let mut p = instrument();
+        let (mut host, rx) = rtrb::RingBuffer::new(1024);
+        p.midi = rx;
+        host.push((0, [0x90, 60, 100])).unwrap();
+        let (mut l, mut r) = (vec![0.0; 256], vec![0.0; 256]);
+        let mut block = |p: &mut Instrument| {
+            assert_no_alloc(|| {
+                p.take_midi(256);
+                p.render(&mut l, &mut r);
+            });
+        };
+        let held = |p: &Instrument| p.session.as_ref().unwrap().engine.keys().0;
+        {
+            let mut c = p.shared.control.lock().unwrap();
+            let Control { view, ui_notes, .. } = &mut *c;
+            view.keys.strip_to(Some(67));
+            send(ui_notes, view);
+        }
+        block(&mut p);
+        assert_eq!(held(&p), 2, "host key and strip key both held");
+        // Audio stalls; the strip slides across keys until the ring is full.
+        {
+            let mut c = p.shared.control.lock().unwrap();
+            let Control { view, ui_notes, .. } = &mut *c;
+            for i in 0..CAPACITY {
+                view.keys.strip_to(Some(40 + (i % 40) as u8));
+                send(ui_notes, view);
+            }
+            assert_eq!(ui_notes.slots(), 0, "ring full");
+            assert!(!view.keys.out.is_empty(), "offs waiting for room");
+            reset(view, &p.shared.ui_notes_reset);
+            assert!(view.keys.out.is_empty());
+        }
+        block(&mut p);
+        assert_eq!(held(&p), 1, "only the host's key is left");
+        assert!(p.ui_notes.is_empty(), "stale strip notes dropped");
+        block(&mut p);
+        assert_eq!(held(&p), 1);
     }
 }

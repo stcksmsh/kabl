@@ -413,6 +413,10 @@ struct Shared {
     tail_samples: AtomicU64,
     host_frames: AtomicU32,
     midi_overflow: AtomicBool,
+    /// Set by the UI when the editor's notes must all end (window closed, sound loaded): the
+    /// audio thread drops what is still queued from the strip and ends its notes
+    /// (`notes::reset`), so nothing waits for a free ring or a reopened window.
+    ui_notes_reset: AtomicBool,
     event_drops: AtomicU64,
     gestures: AtomicU32,
     gesture_values: [AtomicU32; automation::SLOTS],
@@ -579,8 +583,7 @@ impl Shared {
         c.view.learn = None;
         c.view.doc = None;
         // The new session starts silent: the strip forgets what it held.
-        c.view.keys.all_off();
-        c.view.keys.out.clear();
+        notes::reset(&mut c.view, &self.ui_notes_reset);
         c.epoch = epoch;
         self.tail_samples
             .store(tail::samples(&c.patch, c.rate), Ordering::Relaxed);
@@ -621,9 +624,7 @@ impl NiceEguiApp for RackApp {
     fn editor_closed(&mut self) {
         // A note held on the strip ends with the window.
         if let Ok(mut c) = self.shared.control.lock() {
-            let Control { view, ui_notes, .. } = &mut *c;
-            view.keys.all_off();
-            notes::send(ui_notes, view);
+            notes::reset(&mut c.view, &self.shared.ui_notes_reset);
         }
         if let Some(gui) = &self.gui {
             for (i, active) in self.active_gestures.iter_mut().enumerate() {
@@ -925,6 +926,7 @@ impl Default for Instrument {
             audio_clock: AtomicU64::new(0),
             host_frames: AtomicU32::new(0),
             midi_overflow: AtomicBool::new(false),
+            ui_notes_reset: AtomicBool::new(false),
             event_drops: AtomicU64::new(0),
             gestures: AtomicU32::new(0),
             gesture_values: std::array::from_fn(|i| AtomicU32::new(initial_values[i].to_bits())),
