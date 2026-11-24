@@ -332,6 +332,14 @@ impl App {
                 kabl_ui::lessons::start(&mut self.editor, &mut ui, i);
             }
             ui.lessons.active.as_mut().expect("lesson 00").step = step;
+            // The standalone app's Sound-check strip (step 1), with devices a machine might list.
+            ui.devices = Some(Default::default());
+            ui.audio_outputs = vec![
+                (0, "Built-in Audio Analog Stereo".into()),
+                (1, "USB Audio Interface".into()),
+            ];
+            ui.midi_inputs = vec!["Keystep 37 24:0".into()];
+            ui.midi_input = Some("Keystep 37 24:0".into());
             // A fresh profile shows the Rack; this capture profile has had its first run.
             ui.browser_open = false;
             ui.inspect.audio = j.scene != "first-run-no-output";

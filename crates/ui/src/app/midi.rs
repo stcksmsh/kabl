@@ -3,6 +3,7 @@
 use super::*;
 use kabl_engine::keyboard::{KeyEvent, MidiEvent, Source};
 
+use kabl_ui::first_run::devices::{pick, Choice, Pick};
 use kabl_ui::UiState;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -263,6 +264,31 @@ impl Midi {
         Ok(())
     }
 
+    /// The remembered input when it is there. One that is not is left to the reconnect path
+    /// (`lost`), with no error; its name is returned.
+    pub(crate) fn connect_remembered(&mut self, remembered: &Choice) -> Option<String> {
+        let names = input_names();
+        let missing = match (pick(remembered, &names), remembered) {
+            (Pick::Listed(i), _) => {
+                if let Err(e) = self.connect(&names[i]) {
+                    log::warn!(target: "midi", "{e}");
+                }
+                None
+            }
+            (Pick::Default { missing: true }, Choice::Named(n)) => {
+                self.lost = Some(n.clone());
+                Some(n.clone())
+            }
+            (Pick::None, _) => None,
+            (Pick::Default { .. }, _) => {
+                self.connect_default(None);
+                return None;
+            }
+        };
+        self.ports = names;
+        missing
+    }
+
     /// The first port whose name contains `filter` (case-insensitive), else the first that isn't
     /// ALSA's own loopback.
     pub(crate) fn connect_default(&mut self, filter: Option<&str>) {
@@ -285,20 +311,7 @@ impl Midi {
     }
 }
 
-/// A MIDI port name without ALSA's trailing `client:port` numbers.
-pub(crate) fn base_name(name: &str) -> &str {
-    match name.rsplit_once(' ') {
-        Some((head, tail))
-            if tail.split(':').count() == 2
-                && tail
-                    .split(':')
-                    .all(|p| p.chars().all(|c| c.is_ascii_digit())) =>
-        {
-            head
-        }
-        _ => name,
-    }
-}
+pub(crate) use kabl_ui::first_run::devices::base_name;
 
 /// Every MIDI mapping waits for pickup again (new or reconnected hardware).
 pub(crate) fn reset_pickup(ui: &mut UiState) {

@@ -126,6 +126,15 @@ impl eframe::App for App {
         kabl_ui::show_with(editor, ui_state, ui, |ui, ui_state| {
             retry_clicked = self.toolbar(ui, st, ui_state, delivery);
         });
+        // The Sound-check strip's output choice applies at once: it is there to hear it.
+        if let Some(dev) = ui_state.output_select.take() {
+            kabl_ui::first_run::devices::remember_output(
+                ui_state,
+                dev.as_ref().map(|(_, n)| n.clone()),
+            );
+            self.request.device = dev;
+            retry_clicked |= self.retry.is_none();
+        }
         self.midi.send_keys(ui_state);
         if let Some(rec) = ui_state.recorder.as_ref() {
             // Keep the chosen folder even if the control pump takes this recorder on a
@@ -230,15 +239,16 @@ impl App {
             self.midi.lost = None;
             ui_state.midi_note = None;
             reset_pickup(ui_state);
-            let r = match pick {
-                Some(name) => self.midi.connect(&name),
+            let r = match &pick {
+                Some(name) => self.midi.connect(name),
                 None => {
                     self.midi.disconnect();
                     Ok(())
                 }
             };
-            if let Err(e) = r {
-                ui_state.last_message = Some(e);
+            match r {
+                Ok(()) => kabl_ui::first_run::devices::remember_midi(ui_state, pick),
+                Err(e) => ui_state.last_message = Some(e),
             }
         }
         if self
@@ -318,6 +328,8 @@ impl App {
         ui_state.meter.update(p, bad, dt);
         ui_state.midi_inputs = self.midi.ports.clone();
         ui_state.midi_input = self.midi.port.clone();
+        ui_state.audio_outputs.clone_from(&self.outputs);
+        ui_state.audio_output.clone_from(&self.request.device);
         if !ui_state.seq_steps.is_empty() || !ui_state.delay_status.is_empty() {
             // egui only repaints on input; the step light and readouts need frames of their own.
             ui.ctx()
@@ -430,6 +442,7 @@ impl App {
         kit::dropdown(ui, st, "audio-output", &chosen, 190.0, |ui| {
             if kit::menu_item(ui, st, "System default", self.request.device.is_none()).clicked() {
                 self.request.device = None;
+                kabl_ui::first_run::devices::remember_output(ui_state, None);
             }
             for (i, name) in &self.outputs {
                 let dev = Some((*i, name.clone()));
@@ -437,6 +450,7 @@ impl App {
                     .clicked()
                 {
                     self.request.device = dev;
+                    kabl_ui::first_run::devices::remember_output(ui_state, Some(name.clone()));
                 }
             }
         });
