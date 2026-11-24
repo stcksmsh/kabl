@@ -72,7 +72,7 @@ In practice the streams overlap. A/B and C share no files until L8. The Windows 
 
 **Risks**
 - More release-only failures. Release CI is the only place `--release` tests run. Mitigation: R2 runs the full release workflow before anything else.
-- If the acid-line decision (OD-1) is "fix before 1.0", it adds one preset PR to R5.
+- OD-1 is decided (A, 2026-11-24): the acid-line fix is one preset PR in R5.
 
 ---
 
@@ -492,7 +492,7 @@ Each decision lists its alternatives, its consequences and a recommendation. The
 
 ### Factory sounds
 
-**OD-1. Acid Line space mix values** (`patches/presets/acid-line`, source `tools/examples/presets_groove.rs:2812,2821`)
+**OD-1. Acid Line space mix values** (`patches/presets/acid-line`, source `tools/examples/presets_groove.rs:2812,2821`) - DECIDED: A, fix to 16 % and 8 %, 2026-11-24
 - The problem: delay `mix=0.16` and reverb `mix=0.08` are stored on 0-100 % params (`crates/modules/src/builtins/delay.rs:72`), so the tail is close to inaudible. Every other preset uses 5-38.
 - A related stored value: the glue compressor `makeup_db = -2`, below the declared 0-24 range.
 - Options:
