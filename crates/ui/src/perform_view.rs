@@ -648,7 +648,8 @@ fn pin_menu(
 }
 
 /// The explain button and the "…" menu of a pin, right to left. Called inside a right-to-left
-/// layout; faded by `fade`.
+/// layout; faded by `fade`. `header` draws them as full-size framed buttons in the title's ink
+/// or stronger, for tools that are always shown (the macros card header).
 #[allow(clippy::too_many_arguments)]
 fn pin_tools(
     editor: &mut PatchEditor,
@@ -661,29 +662,39 @@ fn pin_tools(
     title: &str,
     fade: f32,
     extra: Extra,
+    header: bool,
 ) {
     let key = format!("{}.{}", pin.id, pin.key);
     ui.scope(|ui| {
         ui.set_opacity(fade.max(0.001));
         ui.spacing_mut().item_spacing.x = st.sp(1);
-        let menu = kit::icon_menu(ui, st, Ic::More, |ui| {
-            pin_menu(editor, ui_state, ui, st, pin, index, count, title);
-            if let Some(extra) = extra {
-                kit::rule(ui, st);
-                extra(ui, editor, ui_state);
-            }
-        })
-        .tip(st, "Rename, move, unpin");
+        let more = if header {
+            ui.add(header_tool(st, "\u{2026}"))
+        } else {
+            kit::icon_button(ui, st, Ic::More, false, true)
+        };
+        egui::Popup::menu(&more)
+            .frame(kit::popover_frame(st))
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+            .width(260.0)
+            .show(|ui| {
+                pin_menu(editor, ui_state, ui, st, pin, index, count, title);
+                if let Some(extra) = extra {
+                    kit::rule(ui, st);
+                    extra(ui, editor, ui_state);
+                }
+            });
+        let menu = more.tip(st, "Rename, move, unpin");
         ui_state.record(format!("pmenu:{key}"), menu.rect);
         let explaining = ui_state.explain.card.as_ref() == Some(&(pin.id, pin.key.clone()))
             && ui_state.explain.is_open();
+        let explain = if header {
+            header_tool(st, "?")
+        } else {
+            kit::Button::new(st, "?").small().ghost()
+        };
         let r = ui
-            .add(
-                kit::Button::new(st, "?")
-                    .small()
-                    .ghost()
-                    .selected(explaining),
-            )
+            .add(explain.selected(explaining))
             .tip(st, "Explain: what this control really changes, and where");
         ui_state.record(format!("pexplain:{key}"), r.rect);
         if r.clicked() {
@@ -701,6 +712,13 @@ fn pin_tools(
             }
         }
     });
+}
+
+/// A full-height framed button whose label uses the primary text ink and a semibold face.
+fn header_tool<'a>(st: &'a Style, text: &str) -> kit::Button<'a> {
+    kit::Button::new(st, text)
+        .g4(st.metrics.control_h)
+        .min_width(st.metrics.control_h)
 }
 
 /// A pin's name: a label (double-click renames) or, while renaming, a text field. `font`
@@ -819,7 +837,7 @@ fn pin_head(
         }
         ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
             pin_tools(
-                editor, ui_state, ui, st, pin, index, count, &title, fade, extra,
+                editor, ui_state, ui, st, pin, index, count, &title, fade, extra, false,
             );
             ui.with_layout(Layout::left_to_right(egui::Align::Center), |ui| {
                 pin_title(editor, ui_state, ui, st, pin, &title, role, section, None);
@@ -1260,29 +1278,70 @@ fn macros_card(
         f.show(ui, |ui| {
             ui.set_width(size.x - m.x);
             ui.set_min_height(size.y - m.y);
-            let row = ui.horizontal(|ui| {
-                kit::section(ui, st, "Macros");
-            });
-            if !note.is_empty() {
-                let r = row.response.rect;
-                ui.painter().text(
-                    egui::pos2(r.left() + size.x - m.x, r.center().y),
-                    egui::Align2::RIGHT_CENTER,
-                    &note,
-                    st.font(Role::Caption),
-                    st.roles.text3,
-                );
-            }
+            let head = ui
+                .horizontal(|ui| kit::section(ui, st, "Macros").rect)
+                .inner;
             // The mockup puts the knob centres 160 below the top of its 390 px card.
             let top = ui.max_rect().top() - f.inner_margin.top as f32;
             let want = top + size.y * 160.0 / 390.0 - knob / 2.0;
             ui.add_space((want - ui.cursor().top()).max(st.sp(1)));
-            ui.horizontal_top(|ui| {
-                ui.spacing_mut().item_spacing.x = st.sp(1);
-                for &(i, pin) in pins {
-                    macro_tile(editor, ui_state, ui, st, pin, i, count, tile_w, knob);
+            let tiles = ui
+                .horizontal_top(|ui| {
+                    ui.spacing_mut().item_spacing.x = st.sp(1);
+                    pins.iter()
+                        .filter_map(|&(i, pin)| {
+                            macro_tile(editor, ui_state, ui, st, pin, tile_w, knob)
+                                .map(|r| (i, pin, r))
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .inner;
+            // Each macro's explain and menu sit in the header row, over its tile's right edge,
+            // always shown. Tiles too narrow to clear the title put them on a line under it.
+            let tool_h = st.metrics.control_h;
+            let tools_w =
+                header_tool(st, "?").width(ui) + header_tool(st, "\u{2026}").width(ui) + st.sp(1);
+            let first = tiles
+                .first()
+                .map_or(f32::INFINITY, |t| t.2.right() - tools_w);
+            let below = first < head.right() + st.sp(2);
+            let mid = if below {
+                head.bottom() + st.sp(1) + tool_h / 2.0
+            } else {
+                head.center().y
+            };
+            for &(i, pin, tile) in &tiles {
+                let title = pin_label(editor.state(), pin);
+                let rect = egui::Rect::from_min_max(
+                    egui::pos2(tile.right() - tools_w, mid - tool_h / 2.0),
+                    egui::pos2(tile.right(), mid + tool_h / 2.0),
+                );
+                let mut tools = ui.new_child(
+                    egui::UiBuilder::new()
+                        .max_rect(rect)
+                        .layout(Layout::right_to_left(egui::Align::Center)),
+                );
+                pin_tools(
+                    editor, ui_state, &mut tools, st, pin, i, count, &title, 1.0, None, true,
+                );
+            }
+            // The CC note follows the title when it clears the first macro's tools, and goes on
+            // the line under the title (free while the tools sit in the header) when it does not.
+            if !note.is_empty() {
+                let g = ui
+                    .painter()
+                    .layout_no_wrap(note, st.font(Role::Caption), st.roles.text3);
+                let mut at =
+                    egui::pos2(head.right() + st.sp(3), head.center().y - g.size().y / 2.0);
+                if !below && at.x + g.size().x + st.sp(2) > first {
+                    at = egui::pos2(head.left(), head.bottom() + st.sp(1));
                 }
-            });
+                ui_state.record(
+                    "pnote:macros".into(),
+                    egui::Rect::from_min_size(at, g.size()),
+                );
+                ui.painter().galley(at, g, st.roles.text3);
+            }
         });
     });
 }
@@ -1428,25 +1487,20 @@ fn cc_chip(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+/// One macro's knob, name, CC chip and destinations; its rect, when it has a param.
 fn macro_tile(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
     st: &Style,
     pin: &Pin,
-    index: usize,
-    count: usize,
     tile_w: f32,
     knob: f32,
-) {
+) -> Option<egui::Rect> {
     let key = format!("{}.{}", pin.id, pin.key);
-    let Some(p) = pin_param(editor.state(), pin) else {
-        return;
-    };
+    let p = pin_param(editor.state(), pin)?;
     let compact = knob < 110.0;
     let title = pin_label(editor.state(), pin);
-    let fade = tool_fade(ui, &key);
     let rect = ui
         .allocate_ui_with_layout(
             vec2(tile_w, knob + if compact { 104.0 } else { 150.0 }),
@@ -1585,28 +1639,13 @@ fn macro_tile(
                         .tip(st, &tip);
                     }
                 }
-                // Explain and the menu, at the tile's top right while the pointer is over it.
-                let tools = egui::Rect::from_min_size(
-                    egui::pos2(tile.right() - 60.0, tile.top()),
-                    vec2(60.0, 26.0),
-                );
-                ui.scope_builder(
-                    egui::UiBuilder::new()
-                        .max_rect(tools)
-                        .layout(Layout::right_to_left(egui::Align::Min)),
-                    |ui| {
-                        pin_tools(
-                            editor, ui_state, ui, st, pin, index, count, &title, fade, None,
-                        );
-                    },
-                );
             },
         )
         .response
         .rect;
-    note_hover(ui, &key, rect);
     ui_state.record(format!("pcard:{key}"), rect);
     after_card(ui, ui_state, st, pin, rect);
+    Some(rect)
 }
 
 /// CC assignment: a tag that learns on click, Clear, and the pickup state.
@@ -1914,6 +1953,7 @@ fn sequences_card(
                             &title,
                             fade,
                             Some(&mut extra),
+                            false,
                         );
                     });
                 }
