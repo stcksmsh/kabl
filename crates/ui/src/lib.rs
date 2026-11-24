@@ -5946,15 +5946,7 @@ fn draw_authored_face(
             face_label(
                 &painter,
                 Rect::from_min_size(screen.min, vec2(screen.width(), 22.0 * z)),
-                &format!(
-                    "{} {}",
-                    if dir == PortDirection::Output {
-                        "OUT"
-                    } else {
-                        "IN"
-                    },
-                    e.label
-                ),
+                &port_face_text(dir, &e.label),
                 z,
                 &th,
             );
@@ -5987,7 +5979,7 @@ fn draw_authored_face(
                 painter.rect_filled(value, 2.0, th.panel);
             }
             let plugs = match panel_control_geo(face, p) {
-                Geo::Knob { c: cen, r } => routing::param_knob(
+                Geo::Knob { c: cen, r } => routing::param_knob_named(
                     editor,
                     view,
                     &mut local,
@@ -5997,6 +5989,7 @@ fn draw_authored_face(
                     xf.p(cen),
                     r,
                     look,
+                    false,
                 ),
                 Geo::Select { rect } => routing::stepped_selector(
                     editor,
@@ -6032,11 +6025,39 @@ fn draw_authored_face(
             face_label(
                 &painter,
                 Rect::from_min_size(screen.min, vec2(screen.width(), 22.0 * z)),
-                &e.label,
+                &control_face_text(&e.label, info.kind, param),
                 z,
                 &th,
             );
         }
+    }
+}
+
+/// A port's face text: the direction cue once. A label that already opens with the direction
+/// word ("In", "Input", "out R") stands alone; a blank label leaves the bare cue.
+fn port_face_text(dir: PortDirection, label: &str) -> String {
+    let (cue, words) = if dir == PortDirection::Output {
+        ("OUT", ["out", "output"])
+    } else {
+        ("IN", ["in", "input"])
+    };
+    let label = label.trim();
+    let first = label.split_whitespace().next().unwrap_or("");
+    if label.is_empty() {
+        cue.to_string()
+    } else if words.iter().any(|w| first.eq_ignore_ascii_case(w)) {
+        label.to_string()
+    } else {
+        format!("{cue} {label}")
+    }
+}
+
+/// The one name a face control carries: the author's label, else the param's own face label.
+fn control_face_text(label: &str, kind: &str, param: &kabl_modules::ParamInfo) -> String {
+    if label.trim().is_empty() {
+        routing::face_label(kind, param)
+    } else {
+        label.to_string()
     }
 }
 fn face_label(p: &egui::Painter, r: Rect, label: &str, z: f32, th: &Theme) {
