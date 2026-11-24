@@ -129,7 +129,8 @@ fn build(s: &Spec) -> PatchEditor {
     let at = |x: f32, y: f32| Vec2 { x, y };
     // The mockup's rack. Top row: sequencer, oscillator, filter, with free room to the right of
     // the filter and below it (where the tour's card goes). Middle row: envelope, VCA, delay,
-    // reverb, output. Bottom row: the macros and the clock that makes it play by itself.
+    // reverb, output. Bottom row: the clock that makes it play by
+    // itself, and the macros under the effects they reach.
     let seq = e.add_module("seq", at(24.0, 20.0));
     let osc = e.add_module("osc.va", at(714.0, 20.0));
     let svf = e.add_module("filter.svf", at(964.0, 20.0));
@@ -138,8 +139,8 @@ fn build(s: &Spec) -> PatchEditor {
     let delay = e.add_module("delay", at(474.0, 320.0));
     let verb = e.add_module("reverb", at(714.0, 320.0));
     let out = e.add_module("out", at(954.0, 320.0));
-    let knob = e.add_module("macro", at(24.0, 620.0));
-    let clock = e.add_module("clock", at(534.0, 620.0));
+    let knob = e.add_module("macro", at(474.0, 620.0));
+    let clock = e.add_module("clock", at(24.0, 620.0));
     let m = |id, port: &str| PortRef::Module {
         id,
         port: port.to_string(),
@@ -169,14 +170,11 @@ fn build(s: &Spec) -> PatchEditor {
     e.connect(m(seq, "pitch"), m(osc, "pitch"));
     e.connect(m(seq, "gate"), m(adsr, "gate"));
     e.connect(m(osc, "out"), m(svf, "in"));
-    // Brightness (m1) and Space (m2), both resting at the middle. Each macro route gets an
-    // amount of twice the distance (in knob travel) from a lowered base to the spec's value, so
-    // at 0.5 it adds exactly that distance back and the start patch plays bit for bit as it did
-    // without the macros (`tests/first_run_macros.rs`). Brightness's cutoff route is connected before the envelope's: the engine sums
-    // routes in cable order, so base plus Brightness lands exactly on the spec's cutoff first.
+    // Brightness (m1) and Space (m2), both resting at 0 with the rack knobs at the spec's
+    // values: a macro only adds. At 0 a route adds exactly nothing, so the start patch plays bit
+    // for bit as it did without the macros (`tests/first_run_macros.rs`).
     for (key, name) in [("m1", "Brightness"), ("m2", "Space")] {
         e.set_label(knob, &format!("name.{key}"), Some(name.into()));
-        e.set_param(knob, key, 0.5);
     }
     let norm = |kind: &str, param: &str, v: f32| {
         kabl_modules::registry::info_for(kind)
@@ -184,41 +182,50 @@ fn build(s: &Spec) -> PatchEditor {
             .expect("a built-in param")
             .to_norm(v)
     };
-    // Brightness spans the cutoff from 2.5 times lower to 2.5 times higher.
-    let dark = s.cutoff_hz / 2.5;
-    e.set_param(svf, "cutoff_hz", dark);
-    let half = norm("filter.svf", "cutoff_hz", s.cutoff_hz) - norm("filter.svf", "cutoff_hz", dark);
+    // Brightness raises the cutoff to 2.5 times the spec's.
+    e.set_param(svf, "cutoff_hz", s.cutoff_hz);
     let r = e.connect_route(m(knob, "m1"), svf, "cutoff_hz");
-    e.set_route_amount(r, 2.0 * half, true);
-    // Space runs both mixes from dry to twice the spec's.
+    let up = norm("filter.svf", "cutoff_hz", s.cutoff_hz * 2.5)
+        - norm("filter.svf", "cutoff_hz", s.cutoff_hz);
+    e.set_route_amount(r, up, true);
+    // Space raises both mixes to twice the spec's.
     for (id, kind, mix) in [(delay, "delay", s.delay.2), (verb, "reverb", s.reverb.1)] {
-        e.set_param(id, "mix", 0.0);
+        e.set_param(id, "mix", mix);
         let r = e.connect_route(m(knob, "m2"), id, "mix");
-        e.set_route_amount(r, 2.0 * norm(kind, "mix", mix), true);
+        e.set_route_amount(
+            r,
+            norm(kind, "mix", (2.0 * mix).min(100.0)) - norm(kind, "mix", mix),
+            true,
+        );
     }
-    // The one obvious modulated knob: the envelope opens the cutoff on every note, as far as
-    // Brightness says (0.6 to 1.4 times the spec's depth).
+    // The one obvious modulated knob: the envelope opens the cutoff on every note, and
+    // Brightness deepens that (up to 1.4 times the spec's depth).
     let route = e.connect_route(m(adsr, "out"), svf, "cutoff_hz");
-    let shallow = s.open * 0.6;
-    e.set_route_amount(route, shallow, true);
+    e.set_route_amount(route, s.open, true);
     let depth = e
         .connect_cable_route(m(knob, "m1"), route, kabl_engine::compile::DEPTH)
         .expect("a route has a depth");
-    e.set_route_amount(depth, 2.0 * (s.open - shallow), true);
+    e.set_route_amount(depth, 0.4 * s.open, true);
     e.connect(m(svf, "lp"), m(vca, "in"));
     e.connect(m(adsr, "out"), m(vca, "cv"));
     e.connect(m(vca, "out"), m(delay, "in"));
     e.connect(m(delay, "out"), m(verb, "in"));
     e.connect(m(verb, "out"), m(out, "in"));
     // Perform, as the factory presets pin it: the transport, then the macros on CC 20 and 21.
+    // Only the two named macros sit on the module's face.
     use crate::perform::{CC_PREFIX, PIN_PREFIX, TRANSPORT};
-    e.set_presentation(&[
-        (clock, format!("{PIN_PREFIX}{TRANSPORT}"), Some(0.0)),
-        (knob, format!("{PIN_PREFIX}m1"), Some(1.0)),
-        (knob, format!("{CC_PREFIX}m1"), Some(20.0)),
-        (knob, format!("{PIN_PREFIX}m2"), Some(2.0)),
-        (knob, format!("{CC_PREFIX}m2"), Some(21.0)),
-    ]);
+    let off = (3..=kabl_modules::builtins::MACROS)
+        .map(|k| (knob, crate::rack::face_key(&format!("m{k}")), Some(0.0)));
+    e.set_presentation(
+        &off.chain([
+            (clock, format!("{PIN_PREFIX}{TRANSPORT}"), Some(0.0)),
+            (knob, format!("{PIN_PREFIX}m1"), Some(1.0)),
+            (knob, format!("{CC_PREFIX}m1"), Some(20.0)),
+            (knob, format!("{PIN_PREFIX}m2"), Some(2.0)),
+            (knob, format!("{CC_PREFIX}m2"), Some(21.0)),
+        ])
+        .collect::<Vec<_>>(),
+    );
     e
 }
 

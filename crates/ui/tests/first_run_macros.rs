@@ -117,3 +117,41 @@ fn brightness_at_either_end_plays_cleanly() {
         assert!(db > -40.0, "Brightness {v} is near silent: {db:.1} dB");
     }
 }
+
+#[test]
+fn the_macros_rest_at_zero_and_only_the_named_two_are_on_the_face() {
+    let e = first_run::start_patch();
+    let s = e.state();
+    let knob = find(s, "macro");
+    let params = &s.modules[&knob].params;
+    for m in ["m1", "m2"] {
+        assert_eq!(params.get(m).copied().unwrap_or(0.0), 0.0, "{m} rests at 0");
+    }
+    let info = kabl_modules::registry::info_for("macro").unwrap();
+    let on: Vec<&str> = kabl_ui::rack::primary_set(&s.modules[&knob], info)
+        .iter()
+        .zip(info.params)
+        .filter(|(on, _)| **on)
+        .map(|(_, p)| p.name)
+        .collect();
+    assert_eq!(on, ["m1", "m2"]);
+}
+
+#[test]
+fn brightness_and_space_at_full_play_cleanly() {
+    let mut e = first_run::start_patch();
+    let knob = find(e.state(), "macro");
+    for (name, keys) in [("Space", &["m2"][..]), ("Both", &["m1", "m2"][..])] {
+        for k in ["m1", "m2"] {
+            e.set_param(knob, k, if keys.contains(&k) { 1.0 } else { 0.0 });
+        }
+        let a = first_run::render(e.state(), SECS, RATE).unwrap();
+        assert!(a.iter().all(|s| s.is_finite()));
+        let peak = a.iter().fold(0f32, |m, s| m.max(s.abs()));
+        let rms = (a.iter().map(|s| (*s as f64).powi(2)).sum::<f64>() / a.len() as f64).sqrt();
+        let db = 20.0 * rms.log10();
+        eprintln!("{name} at 1: peak {peak:.3}, rms {db:.1} dB");
+        assert!(peak < 1.0, "{name} at 1 clips: peak {peak}");
+        assert!(db > -40.0, "{name} at 1 is near silent: {db:.1} dB");
+    }
+}
