@@ -202,3 +202,15 @@ jobs:
           name: kabl-linux-package
           path: target/dist/*.tar.gz
           if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.100.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Build ui, clap and standalone
+        run: cargo build --locked -p kabl-ui -p kabl-clap -p kabl-standalone --all-targets
+      - name: Tests
+        run: cargo test --locked -p kabl-ui -p kabl-clap -p kabl-standalone
