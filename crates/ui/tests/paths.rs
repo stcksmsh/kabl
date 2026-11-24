@@ -259,3 +259,14 @@ fn real_environment_wrappers() {
         );
     }
 }
+
+#[test]
+fn home_comes_from_userprofile_on_windows_and_home_on_unix() {
+    use kabl_ui::library::paths::home_dir_in;
+    let e = env(&[("HOME", "/home/x"), ("USERPROFILE", "C:\\Users\\x")]);
+    assert_eq!(home_dir_in(Os::Unix, &e), Some(p("/home/x")));
+    assert_eq!(home_dir_in(Os::Windows, &e), Some(p("C:\\Users\\x")));
+    let only_home = env(&[("HOME", "/home/x"), ("USERPROFILE", "")]);
+    assert_eq!(home_dir_in(Os::Windows, &only_home), None);
+    assert_eq!(home_dir_in(Os::Unix, &env(&[])), None);
+}

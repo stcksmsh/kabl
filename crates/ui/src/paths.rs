@@ -43,6 +43,23 @@ fn home(vars: Vars) -> PathBuf {
     var(vars, "HOME").unwrap_or_else(|| PathBuf::from("."))
 }
 
+/// The user's home folder: `HOME`, on Windows `USERPROFILE`. `None` when it is not set, so the
+/// caller can pick its own fallback.
+pub fn home_dir_in(os: Os, vars: Vars) -> Option<PathBuf> {
+    var(
+        vars,
+        if os == Os::Windows {
+            "USERPROFILE"
+        } else {
+            "HOME"
+        },
+    )
+}
+
+pub fn home_dir() -> Option<PathBuf> {
+    home_dir_in(HOST, &real)
+}
+
 /// `%APPDATA%`, else `%USERPROFILE%\AppData\Roaming`.
 fn roaming(vars: Vars) -> Result<PathBuf, PathsError> {
     var(vars, "APPDATA")

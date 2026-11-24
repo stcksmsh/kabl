@@ -8,6 +8,7 @@
 //! A window using it keeps its own path field as the fallback; the browser only fills it in.
 
 use crate::kit::{self, g4, Button, Ic, Tone};
+use crate::library::paths::{self, Os};
 use crate::style::{Font, Role, Style};
 use crate::UiState;
 use egui::{pos2, vec2, Align2, FontId, Rect, Response, Sense, Stroke};
@@ -162,6 +163,8 @@ pub struct FileBrowser {
     selected: Option<String>,
     /// The Recent place is shown instead of the folder.
     recent: bool,
+    /// Windows: the list of drives is shown (`dir` is empty meanwhile).
+    drives: bool,
     /// Save mode: the Name field takes focus on its first frame.
     focus_name: bool,
     /// Height of the places column and the list.
@@ -187,6 +190,7 @@ impl FileBrowser {
             error: None,
             selected: None,
             recent: false,
+            drives: false,
             focus_name: mode == Mode::Save,
             list_h: 300.0,
             bleed: 0.0,
@@ -212,6 +216,37 @@ impl FileBrowser {
         });
         self.dir = dir;
         self.recent = false;
+        self.drives = false;
+        self.rx = Some(rx);
+        self.listing = None;
+        self.confirm = None;
+        self.error = None;
+        self.selected = None;
+        self.filter.clear();
+    }
+
+    /// Windows: shows the drives that answer, in place of a folder. The probing runs on a
+    /// thread, because a drive with no media or a dead network share can take seconds.
+    fn show_drives(&mut self) {
+        if !self.dir.as_os_str().is_empty() {
+            self.back.push(std::mem::take(&mut self.dir));
+        }
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let rows = drives_in(&|d| Path::new(d).exists())
+                .into_iter()
+                .map(|d| Entry {
+                    name: d.clone(),
+                    dir: true,
+                    patch: false,
+                    modified: None,
+                    full: Some(PathBuf::from(d)),
+                })
+                .collect();
+            let _ = tx.send(Ok((rows, false)));
+        });
+        self.recent = false;
+        self.drives = true;
         self.rx = Some(rx);
         self.listing = None;
         self.confirm = None;
@@ -245,6 +280,7 @@ impl FileBrowser {
         self.rx = None;
         self.listing = Some(Ok((rows, false)));
         self.recent = true;
+        self.drives = false;
         self.confirm = None;
         self.error = None;
         self.selected = None;
@@ -280,6 +316,9 @@ impl FileBrowser {
     /// `folder/name` for Save: the name with the first wanted extension added when it has none.
     fn target(&self) -> Result<PathBuf, String> {
         let name = self.name.trim();
+        if self.drives {
+            return Err("Open a drive first".into());
+        }
         if name.is_empty() {
             return Err("Type a name first".into());
         }
@@ -313,7 +352,9 @@ impl FileBrowser {
         let prefix = self.prefix;
         let key = |k: &str| format!("{prefix}:{k}");
         let (mut go, mut back, mut pick, mut close) = (None::<PathBuf>, false, None, false);
+        let mut to_drives = false;
         let home = home();
+        let up = if self.drives { Up::None } else { up(&self.dir) };
         ui.horizontal(|ui| {
             ui.set_height(32.0);
             let mut ibtn = |ui: &mut egui::Ui, k: &str, ic: Ic, on: bool| {
@@ -322,8 +363,12 @@ impl FileBrowser {
                 r.clicked()
             };
             back = ibtn(ui, "back", Ic::Back, !self.back.is_empty());
-            if ibtn(ui, "up", Ic::Up, self.dir.parent().is_some()) {
-                go = self.dir.parent().map(Path::to_path_buf);
+            if ibtn(ui, "up", Ic::Up, up != Up::None) {
+                match up.clone() {
+                    Up::To(p) => go = Some(p),
+                    Up::Drives => to_drives = true,
+                    Up::None => {}
+                }
             }
             if ibtn(ui, "home", Ic::Home, home.is_some()) {
                 go = home.clone();
@@ -332,9 +377,9 @@ impl FileBrowser {
             // Inside another panel there is no footer: a close button ends the row.
             let inline = self.bleed == 0.0;
             let crumbs_w = (ui.available_width() - if inline { 252.0 } else { 212.0 }).max(60.0);
-            if self.recent {
-                // Recent is a list, not a folder: one crumb, nothing to click.
-                let text = egui::RichText::new("Recent")
+            if self.recent || self.drives {
+                // Recent and the drives are lists, not folders: one crumb, nothing to click.
+                let text = egui::RichText::new(if self.recent { "Recent" } else { "This PC" })
                     .font(semibold(st, 13.0))
                     .color(st.roles.text);
                 ui.add(egui::Label::new(text));
@@ -446,10 +491,8 @@ impl FileBrowser {
                         format!("This folder has no folders or {}.", self.spec.what),
                     )
                 };
-                let acts: Vec<g4::EmptyAction> = self
-                    .dir
-                    .parent()
-                    .map(|_| g4::EmptyAction {
+                let acts: Vec<g4::EmptyAction> = (up != Up::None)
+                    .then_some(g4::EmptyAction {
                         label: "Go up",
                         primary: false,
                         icon: Ic::Up,
@@ -460,7 +503,11 @@ impl FileBrowser {
                 if let Some(r) = rs.first() {
                     ui_state.record(key("go-up"), r.rect);
                     if r.clicked() {
-                        go = self.dir.parent().map(Path::to_path_buf);
+                        match up.clone() {
+                            Up::To(p) => go = Some(p),
+                            Up::Drives => to_drives = true,
+                            Up::None => {}
+                        }
                     }
                 }
             }
@@ -515,7 +562,9 @@ impl FileBrowser {
                                     Some(e.full.clone().unwrap_or_else(|| self.dir.join(&e.name)));
                             } else if resp.clicked() {
                                 if e.dir && !e.patch {
-                                    go = Some(self.dir.join(&e.name));
+                                    go = Some(
+                                        e.full.clone().unwrap_or_else(|| self.dir.join(&e.name)),
+                                    );
                                 } else if self.mode == Mode::Save {
                                     self.name.clone_from(&e.name);
                                     self.confirm = None;
@@ -556,6 +605,9 @@ impl FileBrowser {
                 self.show_dir(d);
             }
             Event::None
+        } else if to_drives {
+            self.show_drives();
+            Event::None
         } else if let Some(dir) = go {
             self.go(dir);
             Event::None
@@ -595,7 +647,15 @@ impl FileBrowser {
             Mode::Folder => {
                 let enter = ui.input(|i| i.key_pressed(egui::Key::Enter))
                     && ui.memory(|m| m.focused().is_none());
-                if button(ui, "choose", "Choose this folder", true, 116.0, true) || enter {
+                if button(
+                    ui,
+                    "choose",
+                    "Choose this folder",
+                    true,
+                    116.0,
+                    !self.drives,
+                ) || enter && !self.drives
+                {
                     event = Event::Pick(self.dir.clone());
                 }
             }
@@ -767,19 +827,15 @@ fn breadcrumb(
     home: Option<&Path>,
     width: f32,
 ) -> Option<PathBuf> {
-    let (mut at, rest, mut crumbs) = match home.and_then(|h| Some((h, dir.strip_prefix(h).ok()?))) {
-        Some((h, rest)) => (
-            h.to_path_buf(),
-            rest,
-            vec![("Home".to_string(), h.to_path_buf())],
-        ),
-        None => (PathBuf::new(), dir, Vec::new()),
+    let crumbs = if paths::HOST == Os::Windows {
+        let s = |p: &Path| p.to_string_lossy().into_owned();
+        crumbs_in(Os::Windows, &s(dir), home.map(s).as_deref())
+            .into_iter()
+            .map(|(l, p)| (l, PathBuf::from(p)))
+            .collect()
+    } else {
+        unix_crumbs(dir, home)
     };
-    for c in rest.components() {
-        at.push(c);
-        let s = c.as_os_str().to_string_lossy().into_owned();
-        crumbs.push((if s.is_empty() { "/".into() } else { s }, at.clone()));
-    }
     let r = &st.roles;
     let last = crumbs.len().saturating_sub(1);
     let galleys: Vec<_> = crumbs
@@ -838,6 +894,186 @@ fn breadcrumb(
         }
     }
     clicked
+}
+
+/// The crumbs on Unix, built from the path itself so names that are not UTF-8 survive.
+fn unix_crumbs(dir: &Path, home: Option<&Path>) -> Vec<(String, PathBuf)> {
+    let (mut at, rest, mut crumbs) = match home.and_then(|h| Some((h, dir.strip_prefix(h).ok()?))) {
+        Some((h, rest)) => (
+            h.to_path_buf(),
+            rest,
+            vec![("Home".to_string(), h.to_path_buf())],
+        ),
+        None => (PathBuf::new(), dir, Vec::new()),
+    };
+    for c in rest.components() {
+        at.push(c);
+        let s = c.as_os_str().to_string_lossy().into_owned();
+        crumbs.push((if s.is_empty() { "/".into() } else { s }, at.clone()));
+    }
+    crumbs
+}
+
+/// Where "up" goes from a folder.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Up {
+    To(PathBuf),
+    /// Windows: from a drive's root to the list of drives.
+    Drives,
+    None,
+}
+
+fn up(dir: &Path) -> Up {
+    if paths::HOST == Os::Windows {
+        up_in(Os::Windows, &dir.to_string_lossy())
+    } else {
+        dir.parent().map_or(Up::None, |p| Up::To(p.to_path_buf()))
+    }
+}
+
+fn sep(os: Os) -> char {
+    if os == Os::Windows {
+        '\\'
+    } else {
+        '/'
+    }
+}
+
+/// A typed path with the separators of `os`: on Windows `C:/Users/x` is `C:\Users\x`.
+pub fn normalize_in(os: Os, s: &str) -> String {
+    if os == Os::Windows {
+        s.replace('/', "\\")
+    } else {
+        s.to_string()
+    }
+}
+
+/// Splits a path into its root (`/`, `C:\`, `\\server\share\`, or empty for a relative path)
+/// and its names.
+fn split_in(os: Os, s: &str) -> (String, Vec<String>) {
+    let s = normalize_in(os, s);
+    let names = |t: &str| {
+        t.split(sep(os))
+            .filter(|n| !n.is_empty())
+            .map(String::from)
+            .collect::<Vec<_>>()
+    };
+    if os == Os::Unix {
+        let root = if s.starts_with('/') { "/" } else { "" };
+        return (root.into(), names(&s));
+    }
+    if let Some(unc) = s.strip_prefix("\\\\") {
+        let mut n = names(unc);
+        let root = n
+            .drain(..n.len().min(2))
+            .fold(String::from("\\\\"), |r, p| r + &p + "\\");
+        return (root, n);
+    }
+    let b = s.as_bytes();
+    if b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':' {
+        return (format!("{}:\\", &s[..1]), names(&s[2..]));
+    }
+    (
+        if s.starts_with('\\') {
+            "\\".into()
+        } else {
+            String::new()
+        },
+        names(&s),
+    )
+}
+
+fn join_in(os: Os, root: &str, names: &[String]) -> String {
+    let mut s = root.to_string();
+    for (i, n) in names.iter().enumerate() {
+        if i > 0 || !(s.is_empty() || s.ends_with(sep(os))) {
+            s.push(sep(os));
+        }
+        s.push_str(n);
+    }
+    s
+}
+
+fn same(os: Os, a: &str, b: &str) -> bool {
+    if os == Os::Windows {
+        a.eq_ignore_ascii_case(b)
+    } else {
+        a == b
+    }
+}
+
+/// The breadcrumb of `dir` as (label, folder) pairs, outermost first: a root crumb (`/`, `C:\`,
+/// or a UNC share) or, when `dir` is inside `home`, `Home` standing for the home folder.
+pub fn crumbs_in(os: Os, dir: &str, home: Option<&str>) -> Vec<(String, String)> {
+    let (mut root, mut names) = split_in(os, dir);
+    let mut crumbs = Vec::new();
+    let mut skip = 0;
+    if let Some(h) = home.filter(|h| !h.is_empty()) {
+        let (hroot, hnames) = split_in(os, h);
+        if same(os, &root, &hroot)
+            && hnames.len() <= names.len()
+            && hnames.iter().zip(&names).all(|(a, b)| same(os, a, b))
+        {
+            crumbs.push(("Home".to_string(), join_in(os, &hroot, &hnames)));
+            skip = hnames.len();
+            // The crumbs below Home are spelled like home, whatever case was typed.
+            names.splice(..skip, hnames);
+            root = hroot;
+        }
+    }
+    if crumbs.is_empty() && !root.is_empty() {
+        let label = if root.starts_with("\\\\") {
+            root.trim_end_matches('\\').to_string()
+        } else {
+            root.clone()
+        };
+        crumbs.push((label, root.clone()));
+    }
+    for i in skip..names.len() {
+        crumbs.push((names[i].clone(), join_in(os, &root, &names[..=i])));
+    }
+    crumbs
+}
+
+/// Where "up" goes from `dir`: the folder above, the list of drives from a drive's root, nowhere
+/// from `/` or a UNC share's root.
+pub fn up_in(os: Os, dir: &str) -> Up {
+    let (root, names) = split_in(os, dir);
+    if !names.is_empty() {
+        let above = join_in(os, &root, &names[..names.len() - 1]);
+        return if above.is_empty() {
+            Up::None
+        } else {
+            Up::To(PathBuf::from(above))
+        };
+    }
+    if os == Os::Windows && root.as_bytes().get(1) == Some(&b':') {
+        Up::Drives
+    } else {
+        Up::None
+    }
+}
+
+/// The Windows drive roots `A:\` to `Z:\` for which `exists` says yes.
+pub fn drives_in(exists: &dyn Fn(&str) -> bool) -> Vec<String> {
+    ('A'..='Z')
+        .map(|c| format!("{c}:\\"))
+        .filter(|d| exists(d))
+        .collect()
+}
+
+/// The root of the system: `/`, on Windows the system drive (`C:\` when `SystemDrive` is unset).
+pub fn root_in(os: Os, vars: paths::Vars) -> PathBuf {
+    match os {
+        Os::Unix => PathBuf::from("/"),
+        Os::Windows => {
+            let drive = vars("SystemDrive")
+                .and_then(|d| d.into_string().ok())
+                .filter(|d| d.len() == 2 && d.ends_with(':'))
+                .unwrap_or_else(|| "C:".into());
+            PathBuf::from(format!("{drive}\\"))
+        }
+    }
 }
 
 fn regular(st: &Style, size: f32) -> FontId {
@@ -918,7 +1154,7 @@ fn row(ui: &mut egui::Ui, st: &Style, e: &Entry, selected: bool, date_x: f32) ->
 }
 
 fn home() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from)
+    paths::home_dir()
 }
 
 /// Folders first, then the wanted files, each by name without regard to case; hidden names left
@@ -987,13 +1223,14 @@ pub fn start_dir(ui_state: &UiState, place: Place, hint: &str) -> PathBuf {
         .filter(|d| d.is_dir())
         .cloned()
         .or_else(|| {
-            let h = Path::new(hint.trim());
+            let hint = normalize_in(paths::HOST, hint.trim());
+            let h = Path::new(&hint);
             let dir = if h.is_dir() { Some(h) } else { h.parent() };
             dir.filter(|d| !d.as_os_str().is_empty() && d.is_dir())
                 .map(Path::to_path_buf)
         })
         .or_else(home)
-        .unwrap_or_else(|| PathBuf::from("/"))
+        .unwrap_or_else(|| root_in(paths::HOST, &|k| std::env::var_os(k)))
 }
 
 /// A browser asked for by a window that has no room of its own for it.

@@ -477,3 +477,141 @@ fn saving_a_patch_names_a_kabl_file() {
         Some(dir.path().join("mine.kabl"))
     );
 }
+
+mod path_styles {
+    use kabl_ui::filebrowser::{crumbs_in, drives_in, normalize_in, root_in, up_in, Up};
+    use kabl_ui::library::paths::{home_dir_in, Os};
+    use std::path::PathBuf;
+
+    fn c(os: Os, dir: &str, home: Option<&str>) -> Vec<(String, String)> {
+        crumbs_in(os, dir, home)
+    }
+
+    fn pairs(v: &[(&str, &str)]) -> Vec<(String, String)> {
+        v.iter()
+            .map(|(a, b)| (a.to_string(), b.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn windows_crumbs_split_drive_and_names() {
+        assert_eq!(
+            c(Os::Windows, "C:\\Users\\x\\Documents", None),
+            pairs(&[
+                ("C:\\", "C:\\"),
+                ("Users", "C:\\Users"),
+                ("x", "C:\\Users\\x"),
+                ("Documents", "C:\\Users\\x\\Documents"),
+            ])
+        );
+        assert_eq!(c(Os::Windows, "D:\\", None), pairs(&[("D:\\", "D:\\")]));
+    }
+
+    #[test]
+    fn windows_home_crumb_ignores_case() {
+        assert_eq!(
+            c(Os::Windows, "c:\\users\\X\\Documents", Some("C:\\Users\\x")),
+            pairs(&[
+                ("Home", "C:\\Users\\x"),
+                ("Documents", "C:\\Users\\x\\Documents")
+            ])
+        );
+        // Another drive: not inside home.
+        assert_eq!(c(Os::Windows, "D:\\", Some("C:\\Users\\x")).len(), 1);
+    }
+
+    #[test]
+    fn windows_unc_share_is_the_root_crumb() {
+        assert_eq!(
+            c(Os::Windows, "\\\\srv\\share\\a\\b", None),
+            pairs(&[
+                ("\\\\srv\\share", "\\\\srv\\share\\"),
+                ("a", "\\\\srv\\share\\a"),
+                ("b", "\\\\srv\\share\\a\\b"),
+            ])
+        );
+        // A bare server and a bare root do not panic.
+        assert_eq!(
+            c(Os::Windows, "\\\\srv", None),
+            pairs(&[("\\\\srv", "\\\\srv\\")])
+        );
+        assert_eq!(c(Os::Windows, "\\\\", None).len(), 1);
+        assert_eq!(c(Os::Windows, "", None), vec![]);
+    }
+
+    #[test]
+    fn mixed_separators_are_normalised() {
+        assert_eq!(
+            normalize_in(Os::Windows, "C:/Users/x\\y"),
+            "C:\\Users\\x\\y"
+        );
+        assert_eq!(normalize_in(Os::Unix, "/a/b"), "/a/b");
+        assert_eq!(
+            c(Os::Windows, "C:/Users/x", None),
+            c(Os::Windows, "C:\\Users\\x", None)
+        );
+    }
+
+    #[test]
+    fn unix_crumbs_are_unchanged() {
+        assert_eq!(
+            c(Os::Unix, "/home/x/Music", None),
+            pairs(&[
+                ("/", "/"),
+                ("home", "/home"),
+                ("x", "/home/x"),
+                ("Music", "/home/x/Music")
+            ])
+        );
+        assert_eq!(
+            c(Os::Unix, "/home/x/Music", Some("/home/x")),
+            pairs(&[("Home", "/home/x"), ("Music", "/home/x/Music")])
+        );
+        assert_eq!(c(Os::Unix, "/", None), pairs(&[("/", "/")]));
+        // Case matters on Unix.
+        assert_eq!(c(Os::Unix, "/Home/x", Some("/home/x")).len(), 3);
+    }
+
+    #[test]
+    fn up_goes_to_the_drive_list_from_a_drive_root() {
+        let to = |s: &str| Up::To(PathBuf::from(s));
+        assert_eq!(up_in(Os::Windows, "C:\\"), Up::Drives);
+        assert_eq!(up_in(Os::Windows, "C:\\Users"), to("C:\\"));
+        assert_eq!(up_in(Os::Windows, "C:/Users/x"), to("C:\\Users"));
+        assert_eq!(
+            up_in(Os::Windows, "\\\\srv\\share\\a"),
+            to("\\\\srv\\share\\")
+        );
+        assert_eq!(up_in(Os::Windows, "\\\\srv\\share\\"), Up::None);
+        assert_eq!(up_in(Os::Unix, "/"), Up::None);
+        assert_eq!(up_in(Os::Unix, "/home"), to("/"));
+        assert_eq!(up_in(Os::Unix, "/home/x"), to("/home"));
+    }
+
+    #[test]
+    fn drives_are_the_letters_that_answer() {
+        let has = |d: &str| d == "C:\\" || d == "D:\\";
+        assert_eq!(drives_in(&has), vec!["C:\\", "D:\\"]);
+        assert!(drives_in(&|_| false).is_empty());
+    }
+
+    #[test]
+    fn windows_uses_userprofile_for_home_and_the_system_drive_for_root() {
+        let env = |k: &str| match k {
+            "USERPROFILE" => Some("C:\\Users\\x".into()),
+            "HOME" => Some("/ignored".into()),
+            "SystemDrive" => Some("D:".into()),
+            _ => None,
+        };
+        let home = home_dir_in(Os::Windows, &env).unwrap();
+        assert_eq!(home, PathBuf::from("C:\\Users\\x"));
+        let home = home.to_string_lossy().into_owned();
+        assert_eq!(
+            c(Os::Windows, "C:\\Users\\x\\Documents", Some(&home))[0].0,
+            "Home"
+        );
+        assert_eq!(root_in(Os::Windows, &env), PathBuf::from("D:\\"));
+        assert_eq!(root_in(Os::Windows, &|_| None), PathBuf::from("C:\\"));
+        assert_eq!(root_in(Os::Unix, &env), PathBuf::from("/"));
+    }
+}
