@@ -1,0 +1,382 @@
+{
+  "schema": 1,
+  "root": 1,
+  "patch": {
+    "composites": {
+      "1": {
+        "name": "Space",
+        "help": "Open internals to inspect the real modules and routes. Editing affects this instance only.",
+        "definition": {
+          "id": "kabl.space",
+          "version": 1
+        },
+        "parent": null,
+        "members": [
+          1,
+          2,
+          3
+        ],
+        "pos": {
+          "x": 24.0,
+          "y": 20.0
+        },
+        "ports": {
+          "1": {
+            "label": "In",
+            "target": {
+              "Module": {
+                "id": 1,
+                "port": "in"
+              }
+            }
+          },
+          "2": {
+            "label": "Clock",
+            "target": {
+              "Module": {
+                "id": 2,
+                "port": "clock"
+              }
+            }
+          },
+          "3": {
+            "label": "Out",
+            "target": {
+              "Module": {
+                "id": 3,
+                "port": "out"
+              }
+            }
+          },
+          "4": {
+            "label": "Echo mod",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "mix"
+              }
+            }
+          },
+          "5": {
+            "label": "Room mod",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "mix"
+              }
+            }
+          },
+          "6": {
+            "label": "Decay mod",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "decay_s"
+              }
+            }
+          },
+          "7": {
+            "label": "Feedback mod",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "feedback"
+              }
+            }
+          }
+        },
+        "controls": {
+          "8": {
+            "label": "Echo",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "mix"
+              }
+            }
+          },
+          "9": {
+            "label": "Time",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "time_ms"
+              }
+            }
+          },
+          "10": {
+            "label": "Sync",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "sync"
+              }
+            }
+          },
+          "11": {
+            "label": "Feedback",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "feedback"
+              }
+            }
+          },
+          "12": {
+            "label": "Tone",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "tone_hz"
+              }
+            }
+          },
+          "13": {
+            "label": "Room",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "mix"
+              }
+            }
+          },
+          "14": {
+            "label": "Decay",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "decay_s"
+              }
+            }
+          },
+          "15": {
+            "label": "Damp",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "damp_hz"
+              }
+            }
+          },
+          "16": {
+            "label": "Width",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "width"
+              }
+            }
+          },
+          "17": {
+            "label": "Predelay",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "predelay_ms"
+              }
+            }
+          }
+        },
+        "next_interface": 18,
+        "panel": {
+          "width": 720.0,
+          "placements": {
+            "1": {
+              "kind": "jack",
+              "x": 448.0,
+              "y": 64.0,
+              "width": 128.0,
+              "height": 58.0
+            },
+            "2": {
+              "kind": "jack",
+              "x": 448.0,
+              "y": 124.0,
+              "width": 128.0,
+              "height": 58.0
+            },
+            "3": {
+              "kind": "jack",
+              "x": 584.0,
+              "y": 64.0,
+              "width": 128.0,
+              "height": 58.0
+            },
+            "4": {
+              "kind": "jack",
+              "x": 448.0,
+              "y": 184.0,
+              "width": 128.0,
+              "height": 58.0
+            },
+            "5": {
+              "kind": "jack",
+              "x": 448.0,
+              "y": 244.0,
+              "width": 128.0,
+              "height": 58.0
+            },
+            "6": {
+              "kind": "jack",
+              "x": 584.0,
+              "y": 184.0,
+              "width": 128.0,
+              "height": 58.0
+            },
+            "7": {
+              "kind": "jack",
+              "x": 584.0,
+              "y": 124.0,
+              "width": 128.0,
+              "height": 58.0
+            },
+            "8": {
+              "kind": "knob",
+              "x": 8.0,
+              "y": 64.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "9": {
+              "kind": "knob",
+              "x": 86.0,
+              "y": 64.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "10": {
+              "kind": "selector",
+              "x": 164.0,
+              "y": 64.0,
+              "width": 110.0,
+              "height": 110.0
+            },
+            "11": {
+              "kind": "knob",
+              "x": 282.0,
+              "y": 64.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "12": {
+              "kind": "knob",
+              "x": 360.0,
+              "y": 64.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "13": {
+              "kind": "knob",
+              "x": 8.0,
+              "y": 180.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "14": {
+              "kind": "knob",
+              "x": 86.0,
+              "y": 180.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "15": {
+              "kind": "knob",
+              "x": 164.0,
+              "y": 180.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "16": {
+              "kind": "knob",
+              "x": 242.0,
+              "y": 180.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "17": {
+              "kind": "knob",
+              "x": 320.0,
+              "y": 180.0,
+              "width": 70.0,
+              "height": 110.0
+            }
+          },
+          "light": null,
+          "dark": null
+        }
+      }
+    },
+    "modules": {
+      "1": {
+        "kind": "split",
+        "pos": {
+          "x": 24.0,
+          "y": 20.0
+        },
+        "params": {}
+      },
+      "2": {
+        "kind": "delay",
+        "pos": {
+          "x": 214.0,
+          "y": 20.0
+        },
+        "params": {
+          "feedback": 40.0,
+          "mix": 12.0,
+          "sync": 0.0,
+          "time_ms": 310.0,
+          "tone_hz": 3500.0
+        }
+      },
+      "3": {
+        "kind": "reverb",
+        "pos": {
+          "x": 404.0,
+          "y": 20.0
+        },
+        "params": {
+          "damp_hz": 3500.0,
+          "decay_s": 1.4,
+          "mix": 10.0,
+          "predelay_ms": 0.0,
+          "width": 60.0
+        }
+      }
+    },
+    "cables": {
+      "1": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "left"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 2,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "2": {
+        "from": {
+          "Module": {
+            "id": 2,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 3,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      }
+    }
+  }
+}
