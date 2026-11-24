@@ -107,29 +107,36 @@ fn a_full_ring_is_reported_and_the_take_marked_incomplete() {
 
 #[test]
 fn write_failures_are_visible() {
-    let (mut rec, mut tap) = pair(SR);
-    // A folder that can't be created.
+    let dir = tempfile::tempdir().unwrap();
+    let (mut rec, _tap) = pair(SR);
+    // A folder that can't be created: its would-be parent is a regular file.
+    let file = dir.path().join("f");
+    std::fs::write(&file, b"x").unwrap();
     let err = rec
-        .start_at("/proc/kabl-no/take.wav".into())
+        .start_at(file.join("sub").join("take.wav"))
         .expect_err("unwritable");
     assert!(err.contains("can't record"), "{err}");
     assert!(matches!(rec.last, Some(Outcome::Failed(_))));
-    // A device that accepts the open but fails every write.
-    // (As root, /dev is writable and the never-overwrite rule records to a new regular file
-    // beside it instead; that proves nothing here, so it is removed and skipped.)
-    if let Ok(path) = rec.start_at("/dev/full".into()) {
-        if path != std::path::Path::new("/dev/full") {
-            rec.stop();
-            let _ = std::fs::remove_file(&path);
-            return;
+    #[cfg(unix)]
+    {
+        let (mut rec, mut tap) = pair(SR);
+        // A device that accepts the open but fails every write.
+        // (As root, /dev is writable and the never-overwrite rule records to a new regular file
+        // beside it instead; that proves nothing here, so it is removed and skipped.)
+        if let Ok(path) = rec.start_at("/dev/full".into()) {
+            if path != std::path::Path::new("/dev/full") {
+                rec.stop();
+                let _ = std::fs::remove_file(&path);
+                return;
+            }
+            let mut n = 0;
+            for _ in 0..100 {
+                callback(&mut tap, &mut n, 256);
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            let outcome = rec.stop().unwrap();
+            assert!(matches!(outcome, Outcome::Failed(_)), "{outcome:?}");
         }
-        let mut n = 0;
-        for _ in 0..100 {
-            callback(&mut tap, &mut n, 256);
-            std::thread::sleep(Duration::from_millis(2));
-        }
-        let outcome = rec.stop().unwrap();
-        assert!(matches!(outcome, Outcome::Failed(_)), "{outcome:?}");
     }
 }
 
