@@ -22,7 +22,7 @@ palette/perc fd202e44adebdbbc
 palette/progression 9b9e8f453febdb14
 palette/strings 73e964a779d0b169
 performance ba5d1c0036ec1887
-presets/acid-line 388dd2025176e732
+presets/acid-line 2880473d8f9f0ac2
 presets/acid-rain bf7f260af375e24d
 presets/afterglow 63c0e5f973dd2401
 presets/automaton 26aaf8ebaca89e04
