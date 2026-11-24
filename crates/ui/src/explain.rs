@@ -18,7 +18,7 @@
 use std::collections::{BTreeSet, VecDeque};
 
 use egui::{Color32, RichText, Vec2 as EguiVec2};
-use kabl_core::{CableId, ModuleId, PatchState, PortRef};
+use kabl_core::{CableId, CompositeId, ModuleId, PatchState, PortRef};
 use kabl_modules::{registry, ParamInfo, PortDirection};
 
 use crate::perform::{self, BANKS, CUE_PADS, PIN_PREFIX, TRANSPORT};
@@ -602,6 +602,180 @@ fn dest_detail(state: &PatchState, d: &Dest) -> String {
         }
         Reach::Unknown(_) => String::new(),
     }
+}
+
+/// How long a macro's reveal stays up after the macro last moved, in seconds.
+pub const REVEAL_HOLD: f64 = 1.2;
+
+/// One thing a macro being turned changes, in words: `Ladder #7 Cutoff +40 %`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RevealLine {
+    pub text: String,
+    /// The route's signed depth; 0 for a signal jack.
+    pub depth: f32,
+    pub bypass: bool,
+    /// The control whose ring pulses in the rack: a parameter route that is not bypassed.
+    pub pulse: Option<(ModuleId, &'static str)>,
+}
+
+/// What output `port` of macro module `from` changes, deepest route first: the rows of
+/// `destinations` with module numbers and signed depths. A target inside a closed composite
+/// is named by the composite's exposed control when there is one, else by the composite with
+/// the hidden module in brackets.
+pub fn reveal(state: &PatchState, view: &UiState, from: ModuleId, port: &str) -> Vec<RevealLine> {
+    let (rows, _) = destinations(state, from, port);
+    let mut out: Vec<RevealLine> = rows
+        .iter()
+        .map(|d| {
+            let (what, param, depth, bypass) = match &d.reach {
+                Reach::Param {
+                    param,
+                    amount,
+                    bypass,
+                } => (
+                    routing::target_label(param),
+                    Some(param.name),
+                    *amount,
+                    *bypass,
+                ),
+                Reach::Jack(port) => (format!("{port} input"), None, 0.0, false),
+                Reach::Unknown(name) => (name.clone(), None, 0.0, false),
+            };
+            let plain = format!("{} #{} {what}", kind_short(state, d.to), d.to);
+            let mut text = match hidden_in(state, view, d.to) {
+                Some(c) => {
+                    let comp = &state.composites[&c];
+                    let exposed = param.and_then(|p| {
+                        let t = PortRef::Param {
+                            id: d.to,
+                            param: p.into(),
+                        };
+                        comp.controls.values().find(|e| e.target == t)
+                    });
+                    match exposed {
+                        Some(e) => format!("{} {}", comp.name, e.label),
+                        None => format!("{} ({plain})", comp.name),
+                    }
+                }
+                None => plain,
+            };
+            if param.is_some() {
+                text.push_str(&format!(" {:+.0} %", depth * 100.0));
+            }
+            if let Some(v) = d.via {
+                text.push_str(&format!(" via {} #{v}", kind_short(state, v)));
+            }
+            if bypass {
+                text.push_str(" (bypassed)");
+            }
+            RevealLine {
+                text,
+                depth,
+                bypass,
+                pulse: param.filter(|_| !bypass).map(|p| (d.to, p)),
+            }
+        })
+        .collect();
+    out.sort_by(|a, b| b.depth.abs().total_cmp(&a.depth.abs()));
+    out
+}
+
+/// Most destinations a macro card lists while the macro is turned.
+pub const REVEAL_SHOWN: usize = 4;
+
+/// The rows a macro card shows while the macro is turned, each with whether it is dimmed
+/// (bypassed): the first `REVEAL_SHOWN` lines, then `+k more`.
+pub fn reveal_rows(lines: &[RevealLine]) -> Vec<(String, bool)> {
+    let mut rows: Vec<(String, bool)> = lines
+        .iter()
+        .take(REVEAL_SHOWN)
+        .map(|l| (l.text.clone(), l.bypass))
+        .collect();
+    if lines.len() > REVEAL_SHOWN {
+        rows.push((format!("+{} more", lines.len() - REVEAL_SHOWN), true));
+    }
+    rows
+}
+
+fn kind_short(state: &PatchState, id: ModuleId) -> &'static str {
+    short(state.modules.get(&id).map_or("", |m| m.kind.as_str()))
+}
+
+/// The outermost composite that hides module `id` in the rack as `view` shows it: one the
+/// module is inside that is neither open nor entered.
+fn hidden_in(state: &PatchState, view: &UiState, id: ModuleId) -> Option<CompositeId> {
+    let entered = |c: CompositeId| {
+        view.composites.open.contains(&c)
+            || view
+                .scope
+                .is_some_and(|s| kabl_core::composite::descendants(state, c).contains(&s))
+    };
+    let mut at = state
+        .composites
+        .iter()
+        .find(|(_, c)| c.members.contains(&id))
+        .map(|(&c, _)| c);
+    let mut hidden = None;
+    // Bounded like `descendants`: composites nest at most a few levels.
+    for _ in 0..8 {
+        let Some(c) = at else { break };
+        if !entered(c) {
+            hidden = Some(c);
+        }
+        at = state.composites.get(&c).and_then(|c| c.parent);
+    }
+    hidden
+}
+
+/// Tracks every macro knob's stored value and when it last changed: a hand or controller
+/// moved it (drag, wheel, keys, MIDI CC, undo). A cue's morph is left out on purpose: it never
+/// touches the stored knob, so neither the morph nor its end (the live value falling back to
+/// the knob) reveals. While any knob is moving, the rack pulses the controls those macros
+/// change. Idle frames compare values and allocate nothing.
+pub(crate) fn track_macros(editor: &PatchEditor, ui_state: &mut UiState, ctx: &egui::Context) {
+    let now = ctx.input(|i| i.time);
+    if ui_state.macro_seen_of != editor.instance() {
+        ui_state.macro_seen_of = editor.instance();
+        ui_state.macro_seen.clear();
+    }
+    let state = editor.state();
+    let mut turning = false;
+    for (&id, m) in &state.modules {
+        if m.kind != "macro" {
+            continue;
+        }
+        for k in 0..kabl_modules::builtins::MACRO_INFO.params.len() as u8 {
+            let p = &kabl_modules::builtins::MACRO_INFO.params[k as usize];
+            let v = routing::base_value(state, id, p);
+            let seen = ui_state
+                .macro_seen
+                .entry((id, k))
+                // First sight is not a movement: a sound just opened reveals nothing.
+                .or_insert((v, f64::NEG_INFINITY));
+            if seen.0 != v {
+                *seen = (v, now);
+            }
+            turning |= now - seen.1 < REVEAL_HOLD;
+        }
+    }
+    if !turning {
+        ui_state.macro_pulse.clear();
+        return;
+    }
+    let mut pulse = Vec::new();
+    for (&(id, k), &(_, at)) in &ui_state.macro_seen {
+        if now - at < REVEAL_HOLD && state.modules.contains_key(&id) {
+            let port = kabl_modules::builtins::MACRO_INFO.params[k as usize].name;
+            pulse.extend(
+                reveal(state, ui_state, id, port)
+                    .into_iter()
+                    .filter_map(|l| l.pulse),
+            );
+        }
+    }
+    ui_state.macro_pulse = pulse;
+    // The pulse animates and the reveal settles after the hold.
+    ctx.request_repaint_after(std::time::Duration::from_millis(33));
 }
 
 /// The drawer section. Drawn above the module and routing sections while open.

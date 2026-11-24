@@ -1308,6 +1308,40 @@ fn dest_line(ui: &mut egui::Ui, st: &Style, tone: Tone, text: String) -> egui::R
     )
 }
 
+/// What a macro being turned changes, one destination per line with its module number and
+/// signed depth, on a popover over the card from `top` (centre x) down. An overlay, so the
+/// card's layout never jumps when it opens or settles.
+fn reveal_overlay(
+    ui: &egui::Ui,
+    st: &Style,
+    key: &str,
+    top: egui::Pos2,
+    tile_w: f32,
+    lines: &[crate::explain::RevealLine],
+) -> egui::Rect {
+    let w = tile_w.max(190.0);
+    egui::Area::new(egui::Id::new(("kabl-macro-reveal", key)))
+        .order(egui::Order::Foreground)
+        .fixed_pos(egui::pos2(top.x - w / 2.0, top.y))
+        .interactable(false)
+        .show(ui.ctx(), |ui| {
+            let f = kit::popover_frame(st);
+            let m = f.inner_margin.sum().x;
+            f.show(ui, |ui| {
+                ui.set_width(w - m);
+                ui.spacing_mut().item_spacing.y = 2.0;
+                if lines.is_empty() {
+                    dest_line(ui, st, Tone::Text3, "moves nothing yet".into());
+                }
+                for (text, dim) in crate::explain::reveal_rows(lines) {
+                    dest_line(ui, st, if dim { Tone::Text3 } else { Tone::Text2 }, text);
+                }
+            });
+        })
+        .response
+        .rect
+}
+
 /// The CC chip of a macro: the mapping (or "Learn") on a pill; click to learn another control.
 /// The pickup state is in its tooltip, Clear in its menu.
 fn cc_chip(
@@ -1517,6 +1551,14 @@ fn macro_tile(
                     moves.join("\n")
                 };
                 ui.add_space(st.sp(1));
+                // While the macro is turned, what it changes covers these lines (see
+                // `reveal_overlay`); the compact lines keep their space so the card stays put.
+                if ui_state.macro_turning(pin.id, k, now) {
+                    let lines = crate::explain::reveal(editor.state(), ui_state, pin.id, p.name);
+                    let at = egui::pos2(tile.center().x, ui.cursor().top());
+                    let r = reveal_overlay(ui, st, &key, at, tile_w, &lines);
+                    ui_state.record(format!("preveal:{key}"), r);
+                }
                 if moves.is_empty() {
                     kit::label(ui, st, Role::Caption, tone, "moves nothing yet").tip(st, &tip);
                 } else if compact {
