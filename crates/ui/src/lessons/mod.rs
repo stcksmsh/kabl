@@ -8,6 +8,7 @@
 //! presses. Nothing is locked. Progress is kept in `library.json` (`library::Prefs::lessons`),
 //! shared by the standalone app and the plugin.
 
+mod card;
 mod panel;
 pub mod patches;
 mod run;
@@ -18,8 +19,13 @@ use std::sync::OnceLock;
 use kabl_core::ModuleId;
 use serde::{Deserialize, Serialize};
 
+pub use card::card;
 pub use panel::{anchor_rect, mark, panel};
-pub use run::{frame, holds, resolve, start, Active, Baseline, Learn};
+pub use run::{first_run, frame, holds, resolve, start, Active, Baseline, Learn};
+
+/// `start.sound` of a lesson over the built-in start patch (`first_run::start_patch`), which is
+/// not a library sound.
+pub const START_PATCH: &str = "kabl:start";
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -29,6 +35,9 @@ pub struct Lesson {
     pub title: String,
     /// One line under the title on the Learn card.
     pub summary: String,
+    /// Shown on the Start card over the rack (lesson 00, the first run) as well as in Learn.
+    #[serde(default)]
+    pub card: bool,
     pub start: Start,
     #[serde(rename = "step")]
     pub steps: Vec<Step>,
@@ -39,7 +48,7 @@ pub struct Lesson {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Start {
-    /// A library id (`factory:…`).
+    /// A library id (`factory:…`), or [`START_PATCH`].
     pub sound: String,
 }
 
@@ -53,6 +62,9 @@ pub struct End {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Step {
+    /// A short heading (the Start card shows it above `text`).
+    #[serde(default)]
+    pub title: Option<String>,
     pub text: String,
     /// "Show" brings this into view (`explain::go`).
     #[serde(default)]
@@ -121,6 +133,15 @@ pub enum Cond {
         param: String,
         by: f32,
     },
+    /// Any one of these parameters of one module moved by at least `by` since the step started.
+    AnyParamMoved {
+        id: ModuleId,
+        kind: String,
+        params: Vec<String>,
+        by: f32,
+    },
+    /// The Sounds view is open.
+    SoundsOpen,
     /// A modulation route from `from`'s `port` into `to`'s `param` exists and is not bypassed,
     /// with its depth below `amount_below` when that is given.
     Route {
@@ -176,6 +197,13 @@ pub fn parse(name: &str, text: &str) -> Result<Lesson, String> {
             match c {
                 Cond::ParamMoved { by, .. } if !(by.is_finite() && *by > 0.0) => {
                     return bad(&format!("step {n}: `param_moved.by` must be above 0"));
+                }
+                Cond::AnyParamMoved { by, params, .. }
+                    if !(by.is_finite() && *by > 0.0) || params.is_empty() =>
+                {
+                    return bad(&format!(
+                        "step {n}: `any_param_moved` needs `params` and a `by` above 0"
+                    ));
                 }
                 Cond::Route {
                     amount_below: Some(a),

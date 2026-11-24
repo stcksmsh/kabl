@@ -148,13 +148,23 @@ fn satisfy(h: &mut H, c: &Cond, step: usize) {
         Cond::CompareRestored => {
             compare::restore(&mut h.editor, &mut h.ui);
         }
+        Cond::AnyParamMoved { id, params, by, .. } => {
+            let p = &params[0];
+            let start = value(h, *id, p);
+            h.editor.set_param(*id, p, start + by * 0.4);
+            h.frame();
+            assert_eq!(h.step(), step, "{c:?}: completed on less than `by`");
+            h.editor.set_param(*id, p, start + by);
+        }
+        Cond::SoundsOpen => h.ui.browser_open = true,
         Cond::Opened(_) => unreachable!("no shipped lesson opens a second sound mid-way"),
     }
 }
 
 #[test]
 fn every_step_completes_only_once_its_conditions_hold() {
-    for l in lessons::all() {
+    // The Start card's lesson opens with a listen-only step; tests/first_run.rs walks it.
+    for l in lessons::all().iter().filter(|l| !l.card) {
         let user = tempfile::tempdir().unwrap();
         let mut h = H::new(user.path());
         h.start(&l.id);
@@ -297,7 +307,13 @@ fn progress_survives_library_json_and_a_reopened_lesson_resumes() {
     let mut h = H::new(user.path());
     h.start("filter-movement");
     assert_eq!(h.step(), 2);
-    for _ in 2..lessons::all()[1].steps.len() {
+    let n = lessons::all()
+        .iter()
+        .find(|l| l.id == "filter-movement")
+        .unwrap()
+        .steps
+        .len();
+    for _ in 2..n {
         h.click("lesson-next");
     }
     let saved = Library::open(None, user.path().into()).prefs.lessons["filter-movement"];

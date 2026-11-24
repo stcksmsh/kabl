@@ -44,13 +44,21 @@ pub(crate) fn run() -> eframe::Result<()> {
     for note in &library.notes {
         log::warn!(target: "library", "{note}");
     }
-    let Some(editor) = open_document(flag("--patch"), &library, &mut ui_state) else {
-        if let Some(l) = log.as_mut() {
-            l.shutdown();
-        }
-        std::process::exit(1);
+    let named = match flag("--patch") {
+        Some(dir) => match open_document(dir, &library, &mut ui_state) {
+            Some(e) => Some(e),
+            None => {
+                if let Some(l) = log.as_mut() {
+                    l.shutdown();
+                }
+                std::process::exit(1);
+            }
+        },
+        None => None,
     };
     ui_state.library = Some(library);
+    // No patch named: the start patch (with lesson 00 over it on a fresh profile).
+    let editor = named.unwrap_or_else(|| kabl_ui::first_run::open(&mut ui_state));
     ui_state.browser.async_io = true;
     ui_state.browser.io_delay_ms = std::env::var("KABL_BROWSER_IO_DELAY_MS")
         .ok()
@@ -182,70 +190,53 @@ pub(crate) fn run() -> eframe::Result<()> {
     result
 }
 
-/// The first document: the `--patch` file (keeping its library identity when it is a library
-/// sound), else the first-run start patch with the browser open. `None` when the file fails to
-/// load (logged).
+/// The `--patch` file (keeping its library identity when it is a library sound). `None` when it
+/// fails to load (logged).
 fn open_document(
-    patch: Option<String>,
+    dir: String,
     library: &kabl_ui::library::Library,
     ui_state: &mut UiState,
 ) -> Option<PatchEditor> {
-    match patch {
-        Some(dir) => match kabl_core::format::load_kabl_full(std::path::Path::new(&dir)) {
-            Ok((log, _, code)) => {
-                // Named on the command line, so its embedded code is registered without the
-                // trust notice the browser shows.
-                for w in kabl_standalone::code_load::register_for_cli(&code, log.state()) {
-                    log::warn!(target: "app", "{w}");
+    match kabl_core::format::load_kabl_full(std::path::Path::new(&dir)) {
+        Ok((log, _, code)) => {
+            // Named on the command line, so its embedded code is registered without the
+            // trust notice the browser shows.
+            for w in kabl_standalone::code_load::register_for_cli(&code, log.state()) {
+                log::warn!(target: "app", "{w}");
+            }
+            let editor = PatchEditor::from_log(log);
+            // A library sound opened by path keeps its library identity (factory
+            // protection, name); anything else is a plain folder.
+            let canonical = std::path::Path::new(&dir).canonicalize().ok();
+            let doc = match library
+                .entries
+                .iter()
+                .find(|e| e.dir.canonicalize().ok() == canonical)
+            {
+                Some(e) => kabl_ui::browser::Doc {
+                    name: e.meta.name.clone(),
+                    origin: kabl_ui::browser::DocOrigin::Library(e.id.clone()),
+                    meta: e.meta.clone(),
+                    saved: editor.state().clone(),
+                },
+                None => {
+                    let name = std::path::Path::new(&dir)
+                        .file_name()
+                        .map_or(dir.clone(), |n| n.to_string_lossy().to_string());
+                    kabl_ui::browser::Doc::new(
+                        &name,
+                        kabl_ui::browser::DocOrigin::Folder(dir.clone()),
+                        editor.state(),
+                    )
                 }
-                let editor = PatchEditor::from_log(log);
-                // A library sound opened by path keeps its library identity (factory
-                // protection, name); anything else is a plain folder.
-                let canonical = std::path::Path::new(&dir).canonicalize().ok();
-                let doc = match library
-                    .entries
-                    .iter()
-                    .find(|e| e.dir.canonicalize().ok() == canonical)
-                {
-                    Some(e) => kabl_ui::browser::Doc {
-                        name: e.meta.name.clone(),
-                        origin: kabl_ui::browser::DocOrigin::Library(e.id.clone()),
-                        meta: e.meta.clone(),
-                        saved: editor.state().clone(),
-                    },
-                    None => {
-                        let name = std::path::Path::new(&dir)
-                            .file_name()
-                            .map_or(dir.clone(), |n| n.to_string_lossy().to_string());
-                        kabl_ui::browser::Doc::new(
-                            &name,
-                            kabl_ui::browser::DocOrigin::Folder(dir.clone()),
-                            editor.state(),
-                        )
-                    }
-                };
-                ui_state.browser.folder = dir;
-                ui_state.doc = Some(doc);
-                Some(editor)
-            }
-            Err(err) => {
-                log::error!(target: "doc", "failed to load patch from {dir}: {err:?}");
-                None
-            }
-        },
-        None => {
-            // No patch named: start with the browser open on the plain start patch.
-            ui_state.browser_open = true;
-            // The first-run start patch (see `first_run`), and the tour over it until dismissed.
-            ui_state.first_run = kabl_ui::tour::begin(library.prefs.first_run_done);
-            let start = kabl_ui::first_run::start_patch();
-            // Its own name in the header, and clean: nothing edited yet.
-            ui_state.doc = Some(kabl_ui::browser::Doc::new(
-                kabl_ui::first_run::start_name(),
-                kabl_ui::browser::DocOrigin::New,
-                start.state(),
-            ));
-            Some(start)
+            };
+            ui_state.browser.folder = dir;
+            ui_state.doc = Some(doc);
+            Some(editor)
+        }
+        Err(err) => {
+            log::error!(target: "doc", "failed to load patch from {dir}: {err:?}");
+            None
         }
     }
 }
