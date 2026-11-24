@@ -1,6 +1,10 @@
 //! A log sink that never accepts a byte (a fifo nobody reads: opening it blocks the writer
 //! thread forever) must not block or crash the callers: the queue fills, lines are dropped
 //! and counted, and shutdown gives up after `FLUSH_WAIT`.
+//!
+//! Unix only: a fifo is how the sink is made to stall. On Windows `mkfifo` (from Git's
+//! tools) makes a plain file that accepts every byte, so nothing stalls.
+#![cfg(unix)]
 
 use std::time::{Duration, Instant};
 
