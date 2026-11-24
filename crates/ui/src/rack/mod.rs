@@ -80,6 +80,9 @@ pub fn knob_text_dy(r: f32, z: f32, text_h: f32) -> f32 {
 /// Nut radius of a drawn jack (PLAN section 4); `JACK_R` is its larger hit radius.
 pub const JACK_NUT: f32 = 11.0;
 
+/// Narrowest jack pitch on a macro module: more than two pick radii (`JACK_R * 1.4`).
+const MACRO_PITCH: f32 = 38.0;
+
 /// Screen px from a jack centre up to its label centre, for text `text_h` px high at zoom `z`:
 /// 22 design px scaled, never closer than 1.5 px above the nut.
 pub fn jack_text_dy(z: f32, text_h: f32) -> f32 {
@@ -291,6 +294,16 @@ impl Placed {
             .fold(76.0, f32::min)
     }
 
+    /// Width a label centred over jack `j` can use: the distance to the nearest jack in the
+    /// same row, at most a knob pitch.
+    pub fn jack_room(&self, j: &Jack) -> f32 {
+        self.jacks
+            .iter()
+            .filter(|o| o.c != j.c && (o.c.y - j.c.y).abs() < 1.0)
+            .map(|o| (o.c.x - j.c.x).abs())
+            .fold(76.0, f32::min)
+    }
+
     pub fn jack(&self, port: &str, dir: PortDirection) -> Option<&Jack> {
         self.jacks
             .iter()
@@ -431,7 +444,16 @@ pub fn layout(state: &PatchState, v: &View) -> Layout {
             .iter()
             .map(|p| visible_page(info, p.name, bank, page))
             .collect();
-        let mut pl = place_local(id, info, &primary, &shown, expanded, choosing, skin);
+        let wired: Vec<&str> = state
+            .cables
+            .values()
+            .filter_map(|c| match &c.from {
+                kabl_core::PortRef::Module { id: from, port } if *from == id => Some(port.as_str()),
+                _ => None,
+            })
+            .collect();
+        let mut pl = place_local(info, &primary, &shown, &wired, expanded, choosing, skin);
+        pl.id = id;
         let order = control_order(m, info);
         // Reassign existing same-kind face slots; no parameter identity or jack position changes.
         for stepped in [false, true] {
@@ -504,12 +526,13 @@ fn options(info: &ModuleInfo, p: &ParamInfo) -> (usize, usize) {
     (n, longest)
 }
 
-/// One module's geometry at the origin.
+/// One module's geometry at the origin, with id 0 (the caller sets it). `wired` names the
+/// output ports that carry a cable.
 fn place_local(
-    id: ModuleId,
     info: &'static ModuleInfo,
     primary: &[bool],
     shown: &[bool],
+    wired: &[&str],
     expanded: bool,
     choosing: bool,
     skin: Option<&'static ModuleSkin>,
@@ -529,7 +552,36 @@ fn place_local(
     let (header_sels, face_sels): (Vec<usize>, Vec<usize>) = (0..info.params.len())
         .filter(|&i| shown[i] && primary[i] && !knob(&info.params[i]))
         .partition(|&i| in_header(info.kind, info.params[i].name));
-    let base_w = info.width_units as f32 * UNIT;
+    let macros = info.kind == "macro";
+    let ins: Vec<&'static PortInfo> = info
+        .ports
+        .iter()
+        .filter(|p| p.direction == PortDirection::Input)
+        .collect();
+    // A macro draws the outputs of the slots on its face, and every output that has a cable
+    // (its ports and params share the names m1..m8), so no cable loses its anchor.
+    let outs: Vec<&'static PortInfo> = info
+        .ports
+        .iter()
+        .filter(|p| p.direction == PortDirection::Output)
+        .filter(|p| {
+            !macros
+                || wired.contains(&p.name)
+                || info
+                    .params
+                    .iter()
+                    .position(|q| q.name == p.name)
+                    .is_some_and(|i| primary[i])
+        })
+        .collect();
+    // A macro module is as wide as the jacks it draws need, down to the narrowest panel. Their
+    // pitch stays wide enough that two jacks' pick circles (JACK_R * 1.4) never overlap.
+    let base_w = if macros {
+        let need = 2.0 * SIDE + outs.len() as f32 * MACRO_PITCH;
+        (need / UNIT).ceil().max(6.0) * UNIT
+    } else {
+        info.width_units as f32 * UNIT
+    };
     let fw = match skin {
         Some(s) => ((s.panel_size.0 / UNIT).round() * UNIT).max(base_w),
         None if face_knobs.len() >= 3 && !matches!(info.kind, "osc.fm6" | "seq") => {
@@ -542,16 +594,6 @@ fn place_local(
     let mut decor = Decor::None;
     let mut off_face: Vec<usize> = (0..info.params.len())
         .filter(|&i| shown[i] && !primary[i])
-        .collect();
-    let ins: Vec<&'static PortInfo> = info
-        .ports
-        .iter()
-        .filter(|p| p.direction == PortDirection::Input)
-        .collect();
-    let outs: Vec<&'static PortInfo> = info
-        .ports
-        .iter()
-        .filter(|p| p.direction == PortDirection::Output)
         .collect();
 
     if let Some(skin) = skin {
@@ -606,7 +648,9 @@ fn place_local(
         let pitch = if wide {
             56.0
         } else {
-            72.0f32.min((fw - 2.0 * SIDE) / ins.len().max(outs.len()).max(3) as f32)
+            // A macro's few outputs take the full pitch, so their names fit.
+            let cols = ins.len().max(outs.len()).max(if macros { 1 } else { 3 });
+            72.0f32.min((fw - 2.0 * SIDE) / cols as f32)
         };
         let col_x = |k: usize| SIDE + pitch / 2.0 + k as f32 * pitch;
         if matches!(info.kind, "split" | "join") {
@@ -911,7 +955,7 @@ fn place_local(
     let face = Rect::from_min_size(Pos2::ZERO, vec2(fw, PANEL_H));
     let push_w = adv.map_or(0.0, |a| a.width());
     Placed {
-        id,
+        id: 0,
         info,
         rect: Rect::from_min_size(Pos2::ZERO, vec2(fw + push_w, PANEL_H)),
         face,
@@ -1281,12 +1325,12 @@ mod tests {
         };
         let info = registry::info_for("osc.va").unwrap();
         let p = place_local(
-            1,
             info,
             &[
                 true, true, false, false, false, false, false, false, false, false,
             ],
             &[true; 10],
+            &[],
             false,
             false,
             Some(&SKIN),
@@ -1309,12 +1353,12 @@ mod tests {
         }
         // Off the face: the waveform goes to the advanced area like any module's.
         let p = place_local(
-            1,
             info,
             &[
                 true, false, false, false, false, false, false, false, false, false,
             ],
             &[true; 10],
+            &[],
             true,
             false,
             Some(&SKIN),
@@ -1322,5 +1366,109 @@ mod tests {
         assert!(p.adv.is_some_and(|a| p
             .ctl("waveform")
             .is_some_and(|c| a.contains_rect(c.geo.bounds()))));
+    }
+
+    /// A macro module with slots `on` (1-based) on its face, and a cable from each of `wired`.
+    fn macros(on: &[usize], wired: &[&str]) -> Placed {
+        let mut e = crate::PatchEditor::new();
+        let id = e.add_module(
+            "macro",
+            Vec2 {
+                x: RACK_X,
+                y: row_y(0),
+            },
+        );
+        let face: Vec<_> = (1..=8)
+            .map(|k| {
+                (
+                    id,
+                    face_key(&format!("m{k}")),
+                    Some(f32::from(on.contains(&k))),
+                )
+            })
+            .collect();
+        e.set_presentation(&face);
+        // An input takes one cable, so each wired output gets its own VCA.
+        for (k, port) in wired.iter().enumerate() {
+            let vca = e.add_module(
+                "vca",
+                Vec2 {
+                    x: RACK_X + k as f32 * 4.0 * UNIT,
+                    y: row_y(1),
+                },
+            );
+            e.connect(
+                kabl_core::PortRef::Module {
+                    id,
+                    port: port.to_string(),
+                },
+                kabl_core::PortRef::Module {
+                    id: vca,
+                    port: "cv".into(),
+                },
+            );
+        }
+        layout(e.state(), &View::default()).get(id).unwrap().clone()
+    }
+
+    fn outs(p: &Placed) -> Vec<&str> {
+        p.jacks
+            .iter()
+            .filter(|j| j.port.direction == PortDirection::Output)
+            .map(|j| j.port.name)
+            .collect()
+    }
+
+    #[test]
+    fn macro_face_draws_only_its_slots_outputs_and_narrows() {
+        let two = macros(&[1, 2], &[]);
+        let all = macros(&[1, 2, 3, 4, 5, 6, 7, 8], &[]);
+        assert_eq!(outs(&two), ["m1", "m2"]);
+        assert_eq!(outs(&all).len(), 8);
+        assert!(two.face.width() < all.face.width());
+        assert_eq!(
+            all.face.width(),
+            480.0,
+            "a full macro module keeps its width"
+        );
+        assert_eq!(two.face.width() % UNIT, 0.0, "on the panel grid");
+        let none = macros(&[], &[]);
+        assert!(outs(&none).is_empty());
+        assert_eq!(none.face.width(), 6.0 * UNIT);
+    }
+
+    #[test]
+    fn macro_cable_on_a_hidden_slot_keeps_its_jack() {
+        let p = macros(&[1, 2], &["m5"]);
+        assert_eq!(outs(&p), ["m1", "m2", "m5"]);
+        assert!(p
+            .face
+            .contains(p.jack("m5", PortDirection::Output).unwrap().c));
+    }
+
+    #[test]
+    fn many_cables_on_hidden_slots_widen_the_macro_so_jacks_stay_apart() {
+        let wired = ["m2", "m3", "m4", "m5", "m6", "m7", "m8"];
+        let p = macros(&[1], &wired);
+        assert_eq!(outs(&p).len(), 8);
+        let o: Vec<&Jack> = p
+            .jacks
+            .iter()
+            .filter(|j| j.port.direction == PortDirection::Output)
+            .collect();
+        for (i, a) in o.iter().enumerate() {
+            assert!(p.face.contains(a.c), "{} off the face", a.port.name);
+            for b in &o[i + 1..] {
+                // Two pick circles (lib.rs picks within JACK_R * 1.4) must not touch.
+                assert!(
+                    (a.c - b.c).length() > 2.0 * JACK_R * 1.4,
+                    "{} and {} overlap: {:?} {:?}",
+                    a.port.name,
+                    b.port.name,
+                    a.c,
+                    b.c
+                );
+            }
+        }
     }
 }

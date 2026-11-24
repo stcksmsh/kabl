@@ -1,12 +1,22 @@
 //! Eight named, pinned macros on the Perform page (`patches/macros-eight`) fit one row inside
 //! the plugin editor's default 1180 by 680 window and the standalone minimum, without overlap.
+//! Each macro's explain and menu sit in the card's header, above the knobs.
 
 use egui::{Pos2, RawInput, Rect};
 use kabl_ui::{show, PatchEditor, UiState};
+use std::collections::BTreeMap;
 
-fn tiles(w: f32, h: f32) -> Vec<Rect> {
+fn eight() -> PatchEditor {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/macros-eight");
-    let mut editor = PatchEditor::from_log(kabl_core::load(&dir).expect("patch"));
+    PatchEditor::from_log(kabl_core::load(&dir).expect("patch"))
+}
+
+/// The Perform page drawn at `w` by `h`: the macro module's id and every recorded hit rect.
+fn perform(
+    mut editor: PatchEditor,
+    w: f32,
+    h: f32,
+) -> (kabl_core::ModuleId, BTreeMap<String, Rect>) {
     let id = editor
         .state()
         .modules
@@ -33,9 +43,14 @@ fn tiles(w: f32, h: f32) -> Vec<Rect> {
         show(&mut editor, &mut ui, &mut root);
         let _ = ctx.end_pass();
     }
+    (id, ui.hits)
+}
+
+fn tiles(w: f32, h: f32) -> Vec<Rect> {
+    let (id, hits) = perform(eight(), w, h);
     (1..=8)
         .map(|k| {
-            *ui.hits
+            *hits
                 .get(&format!("pslider:{id}.m{k}"))
                 .unwrap_or_else(|| panic!("no tile for m{k}"))
         })
@@ -63,6 +78,61 @@ fn eight_macros_share_one_row_and_stay_inside_the_window() {
             assert!(
                 (pair[0].center().y - pair[1].center().y).abs() < 1.0,
                 "one row at {w}"
+            );
+        }
+    }
+}
+
+#[test]
+fn macro_tools_sit_in_the_header_above_the_knobs() {
+    for (patch, n) in [
+        (eight as fn() -> PatchEditor, 8),
+        (kabl_ui::first_run::start_patch, 2),
+    ] {
+        for (w, h) in [(1180.0, 680.0), (1280.0, 800.0), (1440.0, 900.0)] {
+            let (id, hits) = perform(patch(), w, h);
+            let knob_top = (1..=n)
+                .map(|k| hits[&format!("pslider:{id}.m{k}")].top())
+                .fold(f32::INFINITY, f32::min);
+            let mut tools: Vec<Rect> = Vec::new();
+            for k in 1..=n {
+                for what in ["pexplain", "pmenu"] {
+                    let r = hits
+                        .get(&format!("{what}:{id}.m{k}"))
+                        .unwrap_or_else(|| panic!("no {what} for m{k} at {w}"));
+                    assert!(
+                        r.bottom() <= knob_top,
+                        "{what} m{k} at {w}: {r:?} not above the knobs"
+                    );
+                    // A full-size button (the theme's control height), not the small one.
+                    assert!(r.height() >= 28.0, "{what} m{k} at {w}: hit target {r:?}");
+                    for o in &tools {
+                        assert!(!r.intersects(*o), "{what} m{k} at {w} overlaps {o:?}");
+                    }
+                    tools.push(*r);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn the_cc_note_stays_visible_and_clear_of_the_tools() {
+    for (w, h) in [(1180.0, 680.0), (1280.0, 800.0), (1440.0, 900.0)] {
+        let (id, hits) = perform(eight(), w, h);
+        let note = hits
+            .get("pnote:macros")
+            .unwrap_or_else(|| panic!("no CC note at {w}"));
+        assert!(note.width() > 0.0, "empty CC note at {w}");
+        for (k, r) in &hits {
+            let ours = (1..=8).any(|m| {
+                ["pexplain", "pmenu", "pslider"]
+                    .iter()
+                    .any(|what| *k == format!("{what}:{id}.m{m}"))
+            });
+            assert!(
+                !ours || !note.intersects(*r),
+                "CC note {note:?} at {w} overlaps {k} {r:?}"
             );
         }
     }
