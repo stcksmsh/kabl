@@ -183,10 +183,13 @@ fn every_start_patch_sounds_right_untouched() {
         ] {
             assert!(kinds.contains(&k), "{}: no {k}", c.id);
         }
-        // One obvious modulated knob: the envelope into the filter cutoff.
-        let into_cutoff = state.cables.values().filter(
-            |cb| matches!(&cb.to, kabl_core::PortRef::Param { param, .. } if param == "cutoff_hz"),
-        );
+        // One obvious modulated knob: the envelope into the filter cutoff (Brightness, a
+        // macro, reaches it too).
+        let into_cutoff = state.cables.values().filter(|cb| {
+            matches!(&cb.to, kabl_core::PortRef::Param { param, .. } if param == "cutoff_hz")
+                && matches!(&cb.from, kabl_core::PortRef::Module { id, .. }
+                    if state.modules[id].kind == "env.adsr")
+        });
         assert_eq!(into_cutoff.count(), 1, "{}", c.id);
         // Gain staging, no limiter: headroom and a sensible level, and it never goes silent.
         let a = first_run::render(state, 8.0, 48000.0).unwrap();
