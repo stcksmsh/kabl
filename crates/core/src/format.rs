@@ -424,6 +424,8 @@ pub fn save_kabl_full(
         let mut f = fs::File::create(&tmp)?;
         write_kabl_full(io::BufWriter::new(&mut f), log, meta, code)?;
         f.sync_all()?;
+        // Closed before the replace so Windows never sees the replacement open for write.
+        drop(f);
         crate::fsutil::replace_file(&tmp, path)?;
         // So the rename survives a power loss.
         #[cfg(unix)]

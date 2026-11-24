@@ -28,12 +28,25 @@ pub fn retry_delay(error: &io::Error, attempt: usize) -> Option<Duration> {
     BACKOFF_MS.get(attempt).map(|&ms| Duration::from_millis(ms))
 }
 
-/// Moves `from` over `to` (same directory, hence same volume). On failure `from` is removed and
-/// `to` is untouched; a target that stayed busy for the whole budget says so in the error.
+/// Moves the temporary file `from` over `to` (same directory, hence same volume). On failure
+/// `from` is removed and `to` is untouched. A target still busy after the whole retry budget
+/// says so in the error.
 pub fn replace_file(from: &Path, to: &Path) -> io::Result<()> {
+    replace_checked(from, to, true)
+}
+
+/// [`replace_file`] for a `from` that is real data, such as a log being rotated: it is left in
+/// place when the move fails.
+pub fn move_file(from: &Path, to: &Path) -> io::Result<()> {
+    replace_checked(from, to, false)
+}
+
+fn replace_checked(from: &Path, to: &Path, remove_from: bool) -> io::Result<()> {
     // Windows reports a read-only target as "access denied", the same code as a busy one.
     if cfg!(windows) && std::fs::metadata(to).is_ok_and(|m| m.permissions().readonly()) {
-        let _ = std::fs::remove_file(from);
+        if remove_from {
+            let _ = std::fs::remove_file(from);
+        }
         return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             format!("{} is read-only", to.display()),
@@ -43,6 +56,7 @@ pub fn replace_file(from: &Path, to: &Path) -> io::Result<()> {
         from,
         to,
         cfg!(windows),
+        remove_from,
         || os_replace(from, to),
         std::thread::sleep,
     )
@@ -54,6 +68,7 @@ fn replace_with(
     from: &Path,
     to: &Path,
     retry: bool,
+    remove_from: bool,
     mut replace: impl FnMut() -> io::Result<()>,
     mut sleep: impl FnMut(Duration),
 ) -> io::Result<()> {
@@ -71,14 +86,18 @@ fn replace_with(
             None => break e,
         }
     };
-    let _ = std::fs::remove_file(from);
+    if remove_from {
+        let _ = std::fs::remove_file(from);
+    }
     if attempt > 0 {
+        let why = if error.raw_os_error() == Some(32) {
+            "is in use by another program"
+        } else {
+            "access was denied (the file may be in use or protected)"
+        };
         return Err(io::Error::new(
             error.kind(),
-            format!(
-                "{} is in use by another program and could not be replaced: {error}",
-                to.display()
-            ),
+            format!("{} {why} and could not be replaced: {error}", to.display()),
         ));
     }
     Err(error)
@@ -150,6 +169,7 @@ mod tests {
             &from,
             &to,
             true,
+            true,
             || {
                 calls.set(calls.get() + 1);
                 if calls.get() <= 3 {
@@ -176,6 +196,7 @@ mod tests {
             &from,
             &to,
             true,
+            true,
             || Err(busy()),
             |d| total.set(total.get() + d),
         )
@@ -194,6 +215,7 @@ mod tests {
         let e = replace_with(
             &from,
             &to,
+            true,
             true,
             || {
                 calls.set(calls.get() + 1);
@@ -215,6 +237,7 @@ mod tests {
             p,
             p,
             false,
+            true,
             || {
                 calls.set(calls.get() + 1);
                 Err(busy())
@@ -223,6 +246,19 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(calls.get(), 1);
+    }
+
+    #[test]
+    fn move_file_keeps_the_source_on_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let (from, to) = (dir.path().join("a.log"), dir.path().join("b.log"));
+        std::fs::write(&from, "log").unwrap();
+        std::fs::create_dir(&to).unwrap();
+        std::fs::write(to.join("x"), "").unwrap();
+        move_file(&from, &to).unwrap_err();
+        assert_eq!(std::fs::read_to_string(&from).unwrap(), "log");
+        replace_file(&from, &to).unwrap_err();
+        assert!(!from.exists());
     }
 
     #[test]

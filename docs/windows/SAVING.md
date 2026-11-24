@@ -14,7 +14,9 @@ place in the kabl, kabl-ui and kabl-standalone sources that calls `fs::rename` f
   total, on the thread that saves (UI or worker, never audio). Any other error is returned at once.
 - A read-only target is reported as an error without retrying.
 - When the budget runs out, or on any final error, the temporary file is removed, the old target
-  is untouched, and the error names the file and says it is in use by another program.
+  is untouched. After retries the error names the file and says it is in use by another program
+  (sharing violation) or that access was denied (error 5). Log rotation uses `move_file`, which
+  keeps the source file on failure.
 
 ## Sites that do not use the helper
 
@@ -25,6 +27,7 @@ place in the kabl, kabl-ui and kabl-standalone sources that calls `fs::rename` f
 ## Needs a real Windows check
 
 Save a sound and a patch while the target is open in another program: a text editor with the
-file locked, an antivirus scan of the folder, a cloud-sync client, a second kabl window. Expect the
+file locked, an antivirus scan of the folder, a cloud-sync client, a second kabl window. A plain overwrite-save (target exists, `ReplaceFileW`) has not been run on Windows at all yet: check it
+first, with no other program involved. Expect the
 save to succeed after a short pause, or to fail within about a second with the "in use" message
 and no `.tmp` or `.new` file left behind. The Linux tests only simulate the sharing violations.
