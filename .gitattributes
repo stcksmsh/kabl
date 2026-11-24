@@ -1,0 +1,6 @@
+* text=auto eol=lf
+
+# Committed with CRLF; keep byte-identical.
+docs/composites/evidence/owner-recalled.rpp -text
+docs/pivot/corpus-manifest.csv -text
+docs/reaper-clap-prototype/evidence/proof.rpp -text
