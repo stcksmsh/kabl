@@ -12,6 +12,10 @@ text = """
 This is Pluck line, already playing. A clock drives the sequencer, and the \
 sound flows along the glowing cables to the output. Hear nothing? Pick your \
 output below. Pick your MIDI keyboard too; kabl remembers both."""
+plugin_text = """
+This is the sound on this track. Your host decides when it plays: press play \
+there, or play notes into the track. The sound flows along the glowing cables \
+to the output."""
 sound_check = true
 
 [[step]]
