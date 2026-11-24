@@ -479,7 +479,9 @@ fn saving_a_patch_names_a_kabl_file() {
 }
 
 mod path_styles {
-    use kabl_ui::filebrowser::{crumbs_in, drives_in, normalize_in, root_in, up_in, Up};
+    use kabl_ui::filebrowser::{
+        crumbs_in, drives_from_mask, normalize_in, root_in, up_in, FileBrowser, Mode, Up, PATCHES,
+    };
     use kabl_ui::library::paths::{home_dir_in, Os};
     use std::path::PathBuf;
 
@@ -589,12 +591,55 @@ mod path_styles {
     }
 
     #[test]
-    fn drives_are_the_letters_that_answer() {
-        let has = |d: &str| d == "C:\\" || d == "D:\\";
-        assert_eq!(drives_in(&has), vec!["C:\\", "D:\\"]);
-        assert!(drives_in(&|_| false).is_empty());
+    fn drives_are_the_bits_of_the_logical_drive_mask() {
+        assert_eq!(drives_from_mask(0b1100), vec!["C:\\", "D:\\"]);
+        assert_eq!(drives_from_mask(1 << 25), vec!["Z:\\"]);
+        assert!(drives_from_mask(0).is_empty());
     }
 
+    #[test]
+    fn verbatim_paths_are_read_as_the_plain_ones() {
+        assert_eq!(
+            c(Os::Windows, "\\\\?\\C:\\Users\\x", None),
+            c(Os::Windows, "C:\\Users\\x", None)
+        );
+        assert_eq!(
+            c(Os::Windows, "\\\\?\\UNC\\srv\\share\\a", None),
+            c(Os::Windows, "\\\\srv\\share\\a", None)
+        );
+        assert_eq!(up_in(Os::Windows, "\\\\?\\C:\\"), Up::Drives);
+    }
+
+    fn browser(dir: &str) -> FileBrowser {
+        FileBrowser::new("t", Mode::Save, PATCHES, PathBuf::from(dir), "a".into())
+    }
+
+    fn two() -> Vec<String> {
+        drives_from_mask(0b1100)
+    }
+
+    #[test]
+    fn back_returns_through_the_drive_list() {
+        let mut b = browser("C:\\");
+        b.go_up(Os::Windows, two());
+        assert!(b.at_drives());
+        b.go(PathBuf::from("D:\\"));
+        assert!(!b.at_drives());
+        assert_eq!(b.dir, PathBuf::from("D:\\"));
+        b.back_one(two());
+        assert!(b.at_drives());
+        b.back_one(two());
+        assert!(!b.at_drives());
+        assert_eq!(b.dir, PathBuf::from("C:\\"));
+    }
+
+    #[test]
+    fn save_has_no_target_in_the_drive_list() {
+        let mut b = browser("C:\\");
+        assert!(b.target().is_ok());
+        b.go_up(Os::Windows, two());
+        assert!(b.target().is_err());
+    }
     #[test]
     fn windows_uses_userprofile_for_home_and_the_system_drive_for_root() {
         let env = |k: &str| match k {

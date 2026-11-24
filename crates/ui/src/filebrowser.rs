@@ -200,11 +200,38 @@ impl FileBrowser {
     }
 
     /// Shows `dir`; the folder left is kept for Back.
-    fn go(&mut self, dir: PathBuf) {
-        if !self.dir.as_os_str().is_empty() && self.dir != dir {
+    pub fn go(&mut self, dir: PathBuf) {
+        // An empty entry in the Back list stands for the drive list.
+        if self.drives {
+            self.back.push(PathBuf::new());
+        } else if !self.dir.as_os_str().is_empty() && self.dir != dir {
             self.back.push(std::mem::take(&mut self.dir));
         }
         self.show_dir(dir);
+    }
+
+    /// Up from the folder shown, as `os` understands paths; `drives` is the drive list a drive
+    /// root leads to.
+    pub fn go_up(&mut self, os: Os, drives: Vec<String>) {
+        match up_in(os, &self.dir.to_string_lossy()) {
+            Up::To(p) => self.go(p),
+            Up::Drives => self.show_drives(drives),
+            Up::None => {}
+        }
+    }
+
+    /// Back: the folder (or the drive list) left last.
+    pub fn back_one(&mut self, drives: Vec<String>) {
+        match self.back.pop() {
+            Some(d) if d.as_os_str().is_empty() => self.enter_drives(drives),
+            Some(d) => self.show_dir(d),
+            None => {}
+        }
+    }
+
+    /// Whether the drive list is shown.
+    pub fn at_drives(&self) -> bool {
+        self.drives
     }
 
     /// Shows `dir`, listed on a thread of its own.
@@ -225,30 +252,30 @@ impl FileBrowser {
         self.filter.clear();
     }
 
-    /// Windows: shows the drives that answer, in place of a folder. The probing runs on a
-    /// thread, because a drive with no media or a dead network share can take seconds.
-    fn show_drives(&mut self) {
-        if !self.dir.as_os_str().is_empty() {
-            self.back.push(std::mem::take(&mut self.dir));
+    /// Windows: shows the drives, in place of a folder; the folder left is kept for Back.
+    fn show_drives(&mut self, drives: Vec<String>) {
+        if !self.drives && !self.dir.as_os_str().is_empty() {
+            self.back.push(self.dir.clone());
         }
-        let (tx, rx) = mpsc::channel();
-        std::thread::spawn(move || {
-            let rows = drives_in(&|d| Path::new(d).exists())
-                .into_iter()
-                .map(|d| Entry {
-                    name: d.clone(),
-                    dir: true,
-                    patch: false,
-                    modified: None,
-                    full: Some(PathBuf::from(d)),
-                })
-                .collect();
-            let _ = tx.send(Ok((rows, false)));
-        });
+        self.enter_drives(drives);
+    }
+
+    fn enter_drives(&mut self, drives: Vec<String>) {
+        let rows = drives
+            .into_iter()
+            .map(|d| Entry {
+                name: d.clone(),
+                dir: true,
+                patch: false,
+                modified: None,
+                full: Some(PathBuf::from(d)),
+            })
+            .collect();
+        self.dir = PathBuf::new();
+        self.rx = None;
+        self.listing = Some(Ok((rows, false)));
         self.recent = false;
         self.drives = true;
-        self.rx = Some(rx);
-        self.listing = None;
         self.confirm = None;
         self.error = None;
         self.selected = None;
@@ -314,7 +341,7 @@ impl FileBrowser {
     }
 
     /// `folder/name` for Save: the name with the first wanted extension added when it has none.
-    fn target(&self) -> Result<PathBuf, String> {
+    pub fn target(&self) -> Result<PathBuf, String> {
         let name = self.name.trim();
         if self.drives {
             return Err("Open a drive first".into());
@@ -601,12 +628,10 @@ impl FileBrowser {
             }
         }
         if back {
-            if let Some(d) = self.back.pop() {
-                self.show_dir(d);
-            }
+            self.back_one(real_drives());
             Event::None
         } else if to_drives {
-            self.show_drives();
+            self.show_drives(real_drives());
             Event::None
         } else if let Some(dir) = go {
             self.go(dir);
@@ -660,7 +685,7 @@ impl FileBrowser {
                 }
             }
             Mode::Save => {
-                let mut submit = button(ui, "save", "Save", true, 116.0, true);
+                let mut submit = button(ui, "save", "Save", true, 116.0, !self.drives);
                 if button(ui, "browse-close", "Cancel", false, 100.0, true) {
                     return Event::Close;
                 }
@@ -678,7 +703,9 @@ impl FileBrowser {
                     if std::mem::take(&mut self.focus_name) {
                         r.request_focus();
                     }
-                    submit |= r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                    submit |= r.lost_focus()
+                        && !self.drives
+                        && ui.input(|i| i.key_pressed(egui::Key::Enter));
                     if let Some(s) = suffix {
                         // Dim, inside the field's right edge.
                         ui.painter().text(
@@ -951,7 +978,16 @@ pub fn normalize_in(os: Os, s: &str) -> String {
 /// Splits a path into its root (`/`, `C:\`, `\\server\share\`, or empty for a relative path)
 /// and its names.
 fn split_in(os: Os, s: &str) -> (String, Vec<String>) {
-    let s = normalize_in(os, s);
+    let mut s = normalize_in(os, s);
+    // Verbatim paths (`\\?\C:\x`, `\\?\UNC\srv\share`) name the same places as the plain ones.
+    if os == Os::Windows {
+        if let Some(v) = s.strip_prefix("\\\\?\\") {
+            s = match v.get(..4).filter(|p| p.eq_ignore_ascii_case("UNC\\")) {
+                Some(_) => format!("\\\\{}", &v[4..]),
+                None => v.to_string(),
+            };
+        }
+    }
     let names = |t: &str| {
         t.split(sep(os))
             .filter(|n| !n.is_empty())
@@ -1054,12 +1090,32 @@ pub fn up_in(os: Os, dir: &str) -> Up {
     }
 }
 
-/// The Windows drive roots `A:\` to `Z:\` for which `exists` says yes.
-pub fn drives_in(exists: &dyn Fn(&str) -> bool) -> Vec<String> {
+/// The drive roots (`A:\` to `Z:\`) of the bits set in `mask`, as `GetLogicalDrives` gives them
+/// (bit 0 is A).
+pub fn drives_from_mask(mask: u32) -> Vec<String> {
     ('A'..='Z')
-        .map(|c| format!("{c}:\\"))
-        .filter(|d| exists(d))
+        .enumerate()
+        .filter(|(i, _)| mask >> i & 1 == 1)
+        .map(|(_, c)| format!("{c}:\\"))
         .collect()
+}
+
+/// The drives of this machine. Asking the system for the letters touches no media, so an empty
+/// card reader or optical drive does not raise "There is no disk in the drive" and a dead network
+/// drive does not stall: a drive that cannot be read shows its error when it is opened.
+#[cfg(windows)]
+fn real_drives() -> Vec<String> {
+    extern "system" {
+        fn GetLogicalDrives() -> u32;
+    }
+    // SAFETY: `GetLogicalDrives` (kernel32, always linked by std on Windows) takes no arguments
+    // and returns a bit mask by value; it reads no memory of ours and has no preconditions.
+    drives_from_mask(unsafe { GetLogicalDrives() })
+}
+
+#[cfg(not(windows))]
+fn real_drives() -> Vec<String> {
+    Vec::new()
 }
 
 /// The root of the system: `/`, on Windows the system drive (`C:\` when `SystemDrive` is unset).
