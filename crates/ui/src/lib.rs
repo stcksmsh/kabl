@@ -4783,7 +4783,7 @@ fn drop_cable(
                 },
             })
         });
-        let new = editor.replug(old, to.clone());
+        let new = composites::replug(editor, &ui_state.composites.open, old, to.clone());
         if let (Some(cable), Some(PortRef::Param { id, param })) = (new, to) {
             let routes = routing::routes_into(editor.state(), id, &param);
             routing::inspect(ui_state, &routes, id, &param);

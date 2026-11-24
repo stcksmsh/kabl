@@ -242,8 +242,7 @@ fn removing_one_target_keeps_the_rest_and_the_last_drops_the_port() {
 
 #[test]
 fn undoing_an_edit_in_a_patch_without_composites_is_exact() {
-    // The trial-state clone in `changed_composite_ops` is skipped when there is nothing to
-    // compare; the inverse of a plain edit is still exact.
+    // The inverse of a plain edit is exact in a patch without composites.
     let mut log = base();
     let before = log.state().clone();
     log.append(Op::RemoveModule { id: OSC_A }, 0, Source::User);

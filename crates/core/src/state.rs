@@ -195,6 +195,8 @@ impl PatchState {
         if self.composites.is_empty() {
             return Vec::new();
         }
+        #[cfg(test)]
+        TRIALS.with(|n| n.set(n.get() + 1));
         // Tables and labels never affect composites; leave them out of the trial copy.
         let mut after = PatchState {
             composites: self.composites.clone(),
@@ -433,4 +435,68 @@ fn cable_restore_ops(id: CableId, c: &CableState) -> Vec<Op> {
         });
     }
     ops
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Trial states `changed_composite_ops` built on this thread.
+    static TRIALS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Composite, Definition};
+
+    fn trials_for(p: &PatchState, op: &Op) -> usize {
+        let before = TRIALS.with(|n| n.get());
+        p.inverse_for(op);
+        TRIALS.with(|n| n.get()) - before
+    }
+
+    #[test]
+    fn the_composite_trial_state_is_built_only_when_there_are_composites() {
+        let mut p = PatchState::new();
+        for id in [1, 2] {
+            p.apply(&Op::AddModule {
+                id,
+                kind: "osc.va".into(),
+                pos: Vec2::default(),
+            });
+        }
+        let jack = |id, port: &str| PortRef::Module {
+            id,
+            port: port.into(),
+        };
+        p.apply(&Op::Connect {
+            id: 1,
+            from: jack(1, "out"),
+            to: jack(2, "pitch"),
+        });
+        let edits = [Op::RemoveModule { id: 1 }, Op::Disconnect { id: 1 }];
+        for op in &edits {
+            assert_eq!(trials_for(&p, op), 0, "{op:?}");
+        }
+        p.apply(&Op::SetComposite {
+            id: 1,
+            value: Some(Composite {
+                name: "Pair".into(),
+                help: String::new(),
+                definition: Definition {
+                    id: "pair".into(),
+                    version: 1,
+                },
+                parent: None,
+                members: [2].into(),
+                pos: Vec2::default(),
+                ports: BTreeMap::new(),
+                controls: BTreeMap::new(),
+                next_interface: 1,
+                panel: None,
+            }),
+        });
+        for op in &edits {
+            assert_eq!(trials_for(&p, op), 1, "{op:?}");
+        }
+    }
 }

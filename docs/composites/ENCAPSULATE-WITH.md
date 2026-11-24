@@ -60,7 +60,9 @@ oscillators, its gate into two envelopes. That is one public input, so it is one
 
 - Interactive encapsulation groups the crossing cables by their outside source: every inside
   input fed from one outside output becomes one port, labelled after its first target in cable
-  order. Each inside output that leaves the group is still its own port.
+  order. Each inside output that leaves the group is still its own port. A port holds at most
+  33 targets (`also` up to `MAX_ALSO`, 32); a source feeding more inside inputs spreads over
+  further ports of 33.
 - Curated encapsulation takes the grouping from the caller: list every fed target in one
   exposure. A crossing whose inside end is in no exposure is still refused as uncovered, so a
   port that names only one of two fed oscillators fails with the other cable named.
@@ -69,8 +71,11 @@ oscillators, its gate into two envelopes. That is one public input, so it is one
 - The flat graph is unchanged: wrapping adds no thru module and touches no cable, so the
   render is bit-identical.
 - A cable patched onto a closed face's port is patched to every target in one undo step,
-  replacing what each input jack held; removing it removes all of them. With the composite
-  open the leaves are patched one by one as usual.
+  replacing what each input jack held and the same source's route into each parameter, so
+  repeated drops do not stack. Removing it removes one cable from that source per target,
+  never a second, duplicate route. Dragging its plug to another jack moves all of them, and
+  dropping it on bare rack pulls all of them. With the composite open the leaves are patched
+  one by one as usual, and outside a face "Remove cable" removes only the chosen cable.
 - A target leaves a port when it stops being valid: its module is removed, or a cable whose
   parameter it binds is disconnected or moves out. The remaining targets keep the port; the
   last one leaving drops the port and its panel placement. Undo restores the port exactly.

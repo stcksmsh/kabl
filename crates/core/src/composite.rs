@@ -128,6 +128,9 @@ pub fn binds_cable_param(c: &Composite) -> bool {
         .any(|t| matches!(t, PortRef::CableParam { .. }))
 }
 
+/// The most further targets (`Exposure::also`) one port may hold.
+pub const MAX_ALSO: usize = 32;
+
 /// Whether a port of the composite feeds several targets, which only schema v9 readers accept.
 pub fn fans_in(c: &Composite) -> bool {
     c.ports.values().any(|e| !e.also.is_empty())
@@ -206,7 +209,7 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
                 || key >= c.next_interface
                 || e.label.is_empty()
                 || e.label.len() > 128
-                || e.also.len() > 32
+                || e.also.len() > MAX_ALSO
                 || !e.targets().all(|t| {
                     let fresh = !targets.contains(&t);
                     targets.push(t);

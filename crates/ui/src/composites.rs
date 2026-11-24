@@ -227,8 +227,11 @@ pub fn encapsulate(
             None => groups.push((source, vec![inside])),
         }
     }
+    // A source feeding more inputs than one port holds spreads over several ports.
     for (_, targets) in groups {
-        expose(&mut c, targets, None, false)?;
+        for chunk in targets.chunks(kabl_core::composite::MAX_ALSO + 1) {
+            expose(&mut c, chunk.to_vec(), None, false)?;
+        }
     }
     // Preserve pinned public controls as aliases of the original parameters.
     for pin in crate::perform::pins(&p)
@@ -954,9 +957,56 @@ pub fn face_targets(
         .map_or_else(|| vec![target.clone()], |e| e.targets().cloned().collect())
 }
 
+/// Ops that patch `from` into each of `targets`, with ids from `first`. A jack input holds one
+/// cable and a port holds one route per source into each parameter, so what a new cable would
+/// duplicate is removed first, except the cables in `gone`, which go anyway.
+fn connect_ops(
+    p: &PatchState,
+    from: &PortRef,
+    targets: Vec<PortRef>,
+    first: CableId,
+    gone: &[CableId],
+) -> Vec<Op> {
+    let mut ops = Vec::new();
+    for (next, to) in (first..).zip(targets) {
+        let module = matches!(to, PortRef::Module { .. });
+        ops.extend(
+            p.cables
+                .iter()
+                .filter(|(id, c)| !gone.contains(id) && c.to == to && (module || c.from == *from))
+                .map(|(&id, _)| Op::Disconnect { id }),
+        );
+        ops.push(Op::Connect {
+            id: next,
+            from: from.clone(),
+            to,
+        });
+    }
+    ops
+}
+
+/// The cables a face port's wiring holds alongside `cable`: for each other target of the port,
+/// the first cable from the same source. Empty when `cable` does not enter a closed face.
+fn siblings(p: &PatchState, open: &BTreeSet<CompositeId>, cable: CableId) -> Vec<CableId> {
+    let Some(c) = p.cables.get(&cable) else {
+        return Vec::new();
+    };
+    face_targets(p, open, &c.to)
+        .iter()
+        .filter(|t| **t != c.to)
+        .filter_map(|t| {
+            p.cables
+                .iter()
+                .find(|(_, o)| o.from == c.from && o.to == *t)
+                .map(|(&id, _)| id)
+        })
+        .collect()
+}
+
 /// Connects `from` to every target of the face port behind `to` as one undo step. A jack input
-/// holds one cable, so a cable already in one is replaced, as `PatchEditor::connect` does.
-/// Returns the cable into the first target.
+/// holds one cable, so a cable already in one is replaced, as `PatchEditor::connect` does; a
+/// route from the same source into a parameter target is replaced too, so repeated drops do not
+/// stack. Returns the cable into the first target.
 pub fn connect(
     editor: &mut PatchEditor,
     open: &BTreeSet<CompositeId>,
@@ -968,47 +1018,55 @@ pub fn connect(
         return editor.connect(from, to);
     }
     let first = editor.reserved_ids().1;
-    let mut ops = Vec::new();
-    for (next, to) in (first..).zip(targets) {
-        if matches!(to, PortRef::Module { .. }) {
-            ops.extend(
-                editor
-                    .state()
-                    .cables
-                    .iter()
-                    .filter(|(_, c)| c.to == to)
-                    .map(|(&id, _)| Op::Disconnect { id }),
-            );
-        }
-        ops.push(Op::Connect {
-            id: next,
-            from: from.clone(),
-            to,
-        });
-    }
+    let ops = connect_ops(editor.state(), &from, targets, first, &[]);
     editor.restore_to(ops);
     first
 }
 
-/// Removes `cable` and, when it enters a composite face, the cables from the same source into
-/// the other targets of that face port: one undo step.
+/// Removes `cable` and, when it enters a closed composite face, the port's cable from the same
+/// source into each other target: one undo step. Anywhere else only `cable` goes.
 pub fn disconnect(editor: &mut PatchEditor, open: &BTreeSet<CompositeId>, cable: CableId) {
-    let Some(c) = editor.state().cables.get(&cable) else {
-        return;
-    };
-    let targets = face_targets(editor.state(), open, &c.to);
-    let ops: Vec<Op> = editor
-        .state()
-        .cables
-        .iter()
-        .filter(|(&id, o)| id == cable || (o.from == c.from && targets.contains(&o.to)))
-        .map(|(&id, _)| Op::Disconnect { id })
-        .collect();
-    if ops.len() == 1 {
+    let more = siblings(editor.state(), open, cable);
+    if more.is_empty() {
         editor.disconnect(cable);
     } else {
+        let ops = std::iter::once(cable)
+            .chain(more)
+            .map(|id| Op::Disconnect { id })
+            .collect();
         editor.edit(ops);
     }
+}
+
+/// Moves the plug of `old` to `to` (or pulls it when `None`). A plug on a closed face port
+/// carries the port's other cables with it, and a drop on one patches every target, as one undo
+/// step. Returns the cable into the first target.
+pub fn replug(
+    editor: &mut PatchEditor,
+    open: &BTreeSet<CompositeId>,
+    old: CableId,
+    to: Option<PortRef>,
+) -> Option<CableId> {
+    let p = editor.state();
+    let c = p.cables.get(&old)?;
+    if to.as_ref() == Some(&c.to) {
+        return Some(old);
+    }
+    let more = siblings(p, open, old);
+    let targets = to.as_ref().map(|t| face_targets(p, open, t));
+    if more.is_empty() && targets.as_ref().is_none_or(|t| t.len() == 1) {
+        return editor.replug(old, to);
+    }
+    let from = c.from.clone();
+    let gone: Vec<CableId> = std::iter::once(old).chain(more).collect();
+    let mut ops: Vec<Op> = gone.iter().map(|&id| Op::Disconnect { id }).collect();
+    let first = editor.reserved_ids().1;
+    if let Some(targets) = targets {
+        ops.extend(connect_ops(editor.state(), &from, targets, first, &gone));
+    }
+    let made = ops.iter().any(|o| matches!(o, Op::Connect { .. }));
+    editor.restore_to(ops);
+    made.then_some(first)
 }
 
 /// Cards participate in rack packing without moving saved leaf modules.

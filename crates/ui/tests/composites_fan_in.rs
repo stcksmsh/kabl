@@ -381,3 +381,128 @@ fn a_cable_dragged_onto_a_closed_face_port_wires_every_target() {
     want.sort_by_key(|t| format!("{t:?}"));
     assert_eq!(fed, want);
 }
+
+/// The cables from `from` into `to`, in id order.
+fn cables(p: &PatchState, from: &PortRef, to: &PortRef) -> Vec<CableId> {
+    p.cables
+        .iter()
+        .filter(|(_, c)| c.from == *from && c.to == *to)
+        .map(|(&id, _)| id)
+        .collect()
+}
+
+#[test]
+fn removing_a_cable_leaves_a_duplicate_route_alone() {
+    // Outside any face, only the chosen cable goes.
+    let mut v = voice();
+    let macros = v.editor.add_module("macro", Vec2 { x: 24.0, y: 600.0 });
+    let m1 = jack(macros, "m1");
+    let res = param(FILTER, "resonance");
+    let r1 = v.editor.connect_route(m1.clone(), FILTER, "resonance");
+    let r2 = v.editor.connect_route(m1.clone(), FILTER, "resonance");
+    composites::disconnect(&mut v.editor, &BTreeSet::new(), r1);
+    assert_eq!(cables(v.editor.state(), &m1, &res), vec![r2]);
+
+    // On a closed face port, one cable per target goes: never the duplicate route.
+    let r3 = v.editor.connect_route(m1.clone(), FILTER, "resonance");
+    let into_mixer = v.editor.connect(m1.clone(), jack(v.mixer, "in3"));
+    let id = v.wrap();
+    let port = vec![res.clone(), jack(v.mixer, "in3")];
+    assert!(targets(v.editor.state(), id).contains(&port));
+    let closed = BTreeSet::new();
+    composites::disconnect(&mut v.editor, &closed, into_mixer);
+    assert_eq!(cables(v.editor.state(), &m1, &res), vec![r3]);
+    assert!(cables(v.editor.state(), &m1, &port[1]).is_empty());
+    assert!(v.editor.undo());
+    composites::disconnect(&mut v.editor, &closed, r3);
+    assert_eq!(cables(v.editor.state(), &m1, &res), vec![r2]);
+    assert!(cables(v.editor.state(), &m1, &port[1]).is_empty());
+}
+
+#[test]
+fn dropping_a_source_twice_on_a_face_port_does_not_stack_routes() {
+    let mut v = voice();
+    let macros = v.editor.add_module("macro", Vec2 { x: 24.0, y: 600.0 });
+    let m1 = jack(macros, "m1");
+    v.editor.connect(m1.clone(), jack(v.mixer, "in3"));
+    v.editor.connect_route(m1.clone(), FILTER, "resonance");
+    let id = v.wrap();
+    let res = param(FILTER, "resonance");
+    assert!(targets(v.editor.state(), id).contains(&vec![jack(v.mixer, "in3"), res.clone()]));
+    let lfo = v.editor.add_module("macro", Vec2 { x: 24.0, y: 800.0 });
+    let m2 = jack(lfo, "m1");
+    let closed = BTreeSet::new();
+    for _ in 0..2 {
+        composites::connect(&mut v.editor, &closed, m2.clone(), res.clone());
+    }
+    let p = v.editor.state();
+    assert_eq!(cables(p, &m2, &res).len(), 1);
+    assert_eq!(cables(p, &m2, &jack(v.mixer, "in3")).len(), 1);
+    assert_eq!(
+        cables(p, &m1, &res).len(),
+        1,
+        "another source's route stays"
+    );
+}
+
+#[test]
+fn replugging_moves_every_cable_of_a_face_port() {
+    let mut v = voice();
+    let id = v.wrap();
+    let outside = v.editor.add_module("osc.va", Vec2 { x: 24.0, y: 800.0 });
+    let lfo = v.editor.add_module("macro", Vec2 { x: 24.0, y: 600.0 });
+    let m1 = jack(lfo, "m1");
+    let closed = BTreeSet::new();
+
+    // Onto a face port: the plug patches every target.
+    let plain = v.editor.connect(m1.clone(), jack(outside, "pitch"));
+    composites::replug(&mut v.editor, &closed, plain, Some(jack(OSC, "pitch"))).unwrap();
+    let p = v.editor.state();
+    assert!(cables(p, &m1, &jack(outside, "pitch")).is_empty());
+    for t in v.pitch() {
+        assert_eq!(cables(p, &m1, &t).len(), 1, "{t:?}");
+    }
+
+    // Off a face port: all of the port's cables move to the new jack in one step.
+    let before = v.editor.state().clone();
+    let held = cables(v.editor.state(), &m1, &jack(OSC, "pitch"))[0];
+    let moved =
+        composites::replug(&mut v.editor, &closed, held, Some(jack(outside, "pitch"))).unwrap();
+    let p = v.editor.state();
+    assert!(v.pitch().iter().all(|t| cables(p, &m1, t).is_empty()));
+    assert_eq!(cables(p, &m1, &jack(outside, "pitch")), vec![moved]);
+    assert_eq!(targets(p, id), targets(&before, id));
+    assert!(v.editor.undo());
+    assert_eq!(v.editor.state(), &before);
+
+    // Pulled out onto bare rack: all of them go.
+    assert_eq!(composites::replug(&mut v.editor, &closed, held, None), None);
+    assert!(v
+        .pitch()
+        .iter()
+        .all(|t| cables(v.editor.state(), &m1, t).is_empty()));
+}
+
+#[test]
+fn a_source_feeding_more_inputs_than_one_port_holds_spreads_over_ports() {
+    let mut e = PatchEditor::seed_from(&kabl_standalone::default_patch());
+    let n = kabl_core::composite::MAX_ALSO + 8;
+    let mixers: BTreeSet<ModuleId> = (0..n)
+        .map(|i| {
+            let m = e.add_module(
+                "mixer",
+                Vec2 {
+                    x: 24.0 * i as f32,
+                    y: 900.0,
+                },
+            );
+            e.connect(jack(MIDI, "pitch"), jack(m, "in1"));
+            m
+        })
+        .collect();
+    let id = composites::encapsulate(&mut e, mixers, BTreeSet::new(), "Bank").unwrap();
+    let p = e.state();
+    let sizes: Vec<usize> = targets(p, id).iter().map(Vec::len).collect();
+    assert_eq!(sizes, vec![kabl_core::composite::MAX_ALSO + 1, 7]);
+    kabl_core::composite::validate(p).unwrap();
+}
