@@ -1,5 +1,7 @@
 //! A full disk (the log file is /dev/full: every write fails with ENOSPC) is counted as a
 //! failure with its reason; logging keeps going without panicking.
+//! Unix only: it needs `/dev/full` and a Unix symlink.
+#![cfg(unix)]
 
 use std::sync::atomic::Ordering;
 use std::time::Duration;

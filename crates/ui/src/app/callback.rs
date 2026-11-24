@@ -60,7 +60,8 @@ pub(crate) struct OutputCallback {
     pub(crate) sample_rate: f32,
     pub(crate) channels: usize,
     pub(crate) rt_tried: bool,
-    /// Held while the stream lives: real-time priority ends when it drops.
+    /// Kept while the stream lives. Dropping it does not demote the thread (the handle has
+    /// no `Drop`); real-time priority ends when cpal's audio thread exits with the stream.
     /// Not on Windows: there the handle wraps a raw MMCSS `HANDLE`, so it is not `Send`
     /// and cannot live in the cpal callback.
     #[cfg(not(windows))]
