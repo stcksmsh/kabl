@@ -26,7 +26,7 @@ const BLOCKS: usize = 6000;
 /// Some corpus patches run past full scale (expressive/lead peaks near 1.06), so the non-Linux
 /// check only guards against a blow-up.
 #[cfg(not(target_os = "linux"))]
-const CORPUS_MAX_PEAK: f32 = 4.0;
+const CORPUS_MAX_PEAK: f32 = 2.0;
 /// Patches with at least one cue launch; guards against `cues()` silently returning nothing.
 const CUE_PATCHES: usize = 4;
 
