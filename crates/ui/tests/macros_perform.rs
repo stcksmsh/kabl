@@ -104,13 +104,36 @@ fn macro_tools_sit_in_the_header_above_the_knobs() {
                         r.bottom() <= knob_top,
                         "{what} m{k} at {w}: {r:?} not above the knobs"
                     );
-                    assert!(r.height() >= 20.0, "{what} m{k} at {w}: hit target {r:?}");
+                    // A full-size button (the theme's control height), not the small one.
+                    assert!(r.height() >= 28.0, "{what} m{k} at {w}: hit target {r:?}");
                     for o in &tools {
                         assert!(!r.intersects(*o), "{what} m{k} at {w} overlaps {o:?}");
                     }
                     tools.push(*r);
                 }
             }
+        }
+    }
+}
+
+#[test]
+fn the_cc_note_stays_visible_and_clear_of_the_tools() {
+    for (w, h) in [(1180.0, 680.0), (1280.0, 800.0), (1440.0, 900.0)] {
+        let (id, hits) = perform(eight(), w, h);
+        let note = hits
+            .get("pnote:macros")
+            .unwrap_or_else(|| panic!("no CC note at {w}"));
+        assert!(note.width() > 0.0, "empty CC note at {w}");
+        for (k, r) in &hits {
+            let ours = (1..=8).any(|m| {
+                ["pexplain", "pmenu", "pslider"]
+                    .iter()
+                    .any(|what| *k == format!("{what}:{id}.m{m}"))
+            });
+            assert!(
+                !ours || !note.intersects(*r),
+                "CC note {note:?} at {w} overlaps {k} {r:?}"
+            );
         }
     }
 }

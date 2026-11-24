@@ -208,6 +208,10 @@ impl App {
             Ok(d) => PatchEditor::from_log(
                 kabl_core::load(std::path::Path::new(&d)).expect("capture patch"),
             ),
+            // KABL_CAPTURE_START=1 captures the first-run start patch in every scene.
+            Err(_) if std::env::var("KABL_CAPTURE_START").is_ok() => {
+                kabl_ui::first_run::start_patch()
+            }
             // Perform needs pins, cues and macros: the cue-macros sound, with its sequencers'
             // banks pinned too.
             Err(_) if j.scene == "perform" && std::env::var("KABL_CAPTURE_FEW").is_err() => {
