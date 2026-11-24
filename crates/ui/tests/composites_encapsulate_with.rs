@@ -84,6 +84,7 @@ fn definition() -> Definition {
 fn exposure(label: &str, target: PortRef) -> Exposure {
     Exposure {
         label: label.into(),
+        also: vec![],
         target,
     }
 }
@@ -302,15 +303,21 @@ fn edges_fail_with_a_named_error() {
         "{err}"
     );
 
-    // G3: one outside source feeding two inside targets.
+    // G3: one outside source feeding two inside targets needs both in its port (fan-in).
     let mut e = PatchEditor::from_log(f.log.clone());
     let fan = e.connect_route(jack(f.macros, "m1"), f.delay, "mix");
     let mut log = e.log().clone();
     let err = refused(&mut log, &ports(&f), &controls(&f));
     assert!(
-        err.contains(&format!("{fan} carry m1 · #{}", f.macros)) && err.contains("several targets"),
+        err.contains(&format!(
+            "No curated port covers cable {fan} (#{}.mix inside, #{}.m1 outside)",
+            f.delay, f.macros
+        )),
         "{err}"
     );
+    let mut fanned = ports(&f);
+    fanned[2].also.push(param(f.delay, "mix"));
+    wrap(&mut log, &f, &fanned, &controls(&f)).unwrap();
 
     // A crossing no curated port covers: every one is named, with both ends.
     let mut log = f.log.clone();

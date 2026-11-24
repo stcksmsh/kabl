@@ -61,6 +61,7 @@ fn base() -> PatchLog {
 fn wrap(log: &mut PatchLog, members: &[u64], control: bool) {
     let e = Exposure {
         label: "Env Amount".into(),
+        also: vec![],
         target: amount(),
     };
     let (mut ports, mut controls) = (BTreeMap::new(), BTreeMap::new());

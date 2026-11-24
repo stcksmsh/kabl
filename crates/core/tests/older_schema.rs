@@ -46,8 +46,8 @@ fn a_newer_schema_is_still_unknown() {
     ));
 }
 
-/// v9 only adds cable-parameter bindings on composites; a file without one is still written as
-/// v8 and every v8 file still loads.
+/// v9 only adds cable-parameter bindings and fan-in ports on composites; a file without either is
+/// still written as v8 and every v8 file still loads.
 #[test]
 fn a_patch_without_cable_param_bindings_keeps_the_previous_schema() {
     use kabl_core::{Op, Source, Vec2};

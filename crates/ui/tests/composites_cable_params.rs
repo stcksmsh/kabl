@@ -34,6 +34,7 @@ fn amount(cable: CableId) -> PortRef {
 fn exposure(label: &str, target: PortRef) -> Exposure {
     Exposure {
         label: label.into(),
+        also: vec![],
         target,
     }
 }

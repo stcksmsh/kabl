@@ -1,8 +1,8 @@
 //! Instance editing and immutable portable definitions, entirely on the control/UI side.
 use crate::PatchEditor;
 use kabl_core::{
-    Composite, CompositeId, Definition, Exposure, ModuleId, Op, PatchLog, PatchState, PortRef,
-    Source,
+    CableId, Composite, CompositeId, Definition, Exposure, ModuleId, Op, PatchLog, PatchState,
+    PortRef, Source,
 };
 use kabl_modules::{registry, PortDirection};
 use serde::{Deserialize, Serialize};
@@ -138,21 +138,42 @@ fn definition(id: u64) -> Definition {
         version: 0,
     }
 }
-fn expose(c: &mut Composite, target: PortRef, label: String, control: bool) -> Result<(), String> {
+/// Adds one exposure feeding `targets`, less those an existing one already feeds; nothing when
+/// none is left. `label` defaults to the first target's binding label.
+fn expose(
+    c: &mut Composite,
+    targets: Vec<PortRef>,
+    label: Option<String>,
+    control: bool,
+) -> Result<(), String> {
     let map = if control {
         &mut c.controls
     } else {
         &mut c.ports
     };
-    if map.values().any(|e| e.target == target) {
+    let mut fresh: Vec<PortRef> = Vec::new();
+    for t in targets {
+        if !fresh.contains(&t) && !map.values().any(|e| e.targets().any(|x| *x == t)) {
+            fresh.push(t);
+        }
+    }
+    if fresh.is_empty() {
         return Ok(());
     }
+    let target = fresh.remove(0);
     let id = c.next_interface;
     c.next_interface = id
         .checked_add(1)
         .filter(|n| *n < u64::MAX)
         .ok_or("Interface identity exhausted")?;
-    map.insert(id, Exposure { label, target });
+    map.insert(
+        id,
+        Exposure {
+            label: label.unwrap_or_else(|| binding_label(&target)),
+            target,
+            also: fresh,
+        },
+    );
     Ok(())
 }
 pub fn encapsulate(
@@ -193,8 +214,21 @@ pub fn encapsulate(
         .map(|m| m.pos)
         .ok_or("Missing selected module")?;
     let mut c=Composite{name:name.trim().into(),help:"Open internals to inspect the real modules and routes. Editing affects this instance only.".into(),definition:definition(id),parent:None,members,pos,ports:BTreeMap::new(),controls:BTreeMap::new(),next_interface:1,panel:None};
-    for (_, target) in crossings(&p, &all) {
-        expose(&mut c, target.clone(), binding_label(&target), false)?;
+    // One port per outside source (fan-in), and one per inside output, in cable order.
+    let mut groups: Vec<(Option<PortRef>, Vec<PortRef>)> = Vec::new();
+    for (cid, inside) in crossings(&p, &all) {
+        let from = &p.cables[&cid].from;
+        let source = (*from != inside).then(|| from.clone());
+        match groups
+            .iter_mut()
+            .find(|(s, _)| source.is_some() && *s == source)
+        {
+            Some((_, targets)) => targets.push(inside),
+            None => groups.push((source, vec![inside])),
+        }
+    }
+    for (_, targets) in groups {
+        expose(&mut c, targets, None, false)?;
     }
     // Preserve pinned public controls as aliases of the original parameters.
     for pin in crate::perform::pins(&p)
@@ -206,11 +240,11 @@ pub fn encapsulate(
         {
             expose(
                 &mut c,
-                PortRef::Param {
+                vec![PortRef::Param {
                     id: pin.id,
                     param: pin.key.clone(),
-                },
-                crate::perform::pin_label(&p, &pin),
+                }],
+                Some(crate::perform::pin_label(&p, &pin)),
                 true,
             )?;
         }
@@ -244,11 +278,12 @@ fn crossings(p: &PatchState, inside: &BTreeSet<ModuleId>) -> Vec<(kabl_core::Cab
 ///
 /// `ports` then `controls` become interface keys `1..=n` in the order given (so a `panel` can
 /// place them). Nothing is exposed that the caller did not list. Refused, with nothing
-/// appended: a target outside `members`, a control that is not a parameter, a repeated label
-/// or target, a boundary crossing no port covers, a pinned parameter no control covers, and a
-/// crossing a composite cannot express yet (one outside source feeding several inside
-/// targets). A cable parameter belongs to the module its cable ends on; it can be a port but
-/// not yet a control, because composite faces only draw knobs for module parameters.
+/// appended: a target outside `members`, a control that is not a parameter or has several
+/// targets, a repeated label or target, a boundary crossing no port covers and a pinned
+/// parameter no control covers. A port lists every input one outside source feeds in its
+/// `target` and `also` (fan-in). A cable parameter belongs to the module its cable ends on; it
+/// can be a port but not yet a control, because composite faces only draw knobs for module
+/// parameters.
 pub fn encapsulate_with(
     log: &mut PatchLog,
     name: &str,
@@ -274,14 +309,17 @@ pub fn encapsulate_with(
     for (list, control) in [(ports, false), (controls, true)] {
         let mut targets = Vec::new();
         for e in list {
-            if !kabl_core::composite::owner(p, &e.target).is_some_and(|m| members.contains(&m)) {
+            if let Some(t) = e
+                .targets()
+                .find(|t| !kabl_core::composite::owner(p, t).is_some_and(|m| members.contains(&m)))
+            {
                 return Err(format!(
                     "Exposure \"{}\": target {} is not inside the wrapped modules",
                     e.label,
-                    end(&e.target)
+                    end(t)
                 ));
             }
-            if control && !matches!(e.target, PortRef::Param { .. }) {
+            if control && (!matches!(e.target, PortRef::Param { .. }) || !e.also.is_empty()) {
                 return Err(format!(
                     "Control \"{}\": {} is not a parameter",
                     e.label,
@@ -291,39 +329,22 @@ pub fn encapsulate_with(
             if !labels.insert(e.label.as_str()) {
                 return Err(format!("Two exposures are labelled \"{}\"", e.label));
             }
-            if targets.contains(&&e.target) {
-                return Err(format!(
-                    "Exposure \"{}\": {} is exposed twice",
-                    e.label,
-                    end(&e.target)
-                ));
+            for t in e.targets() {
+                if targets.contains(&t) {
+                    return Err(format!(
+                        "Exposure \"{}\": {} is exposed twice",
+                        e.label,
+                        end(t)
+                    ));
+                }
+                targets.push(t);
             }
-            targets.push(&e.target);
         }
     }
     let crossing = crossings(p, &members);
-    // A curated port is one target; a source feeding two inside targets needs fan-in (G3).
-    let mut fed: Vec<(&PortRef, kabl_core::CableId, &PortRef)> = Vec::new();
-    for (cid, target) in &crossing {
-        let cable = &p.cables[cid];
-        if cable.to != *target {
-            continue;
-        }
-        if let Some((_, first, _)) = fed
-            .iter()
-            .find(|(f, _, t)| **f == cable.from && *t != target)
-        {
-            return Err(format!(
-                "Cables {first} and {cid} carry {} into two targets inside the group; one \
-                 public input cannot feed several targets yet",
-                binding_label(&cable.from)
-            ));
-        }
-        fed.push((&cable.from, *cid, target));
-    }
     let uncovered: Vec<String> = crossing
         .iter()
-        .filter(|(_, inside)| !ports.iter().any(|e| e.target == *inside))
+        .filter(|(_, inside)| !ports.iter().any(|e| e.targets().any(|t| t == inside)))
         .map(|(cid, inside)| {
             let cable = &p.cables[cid];
             let outside = if cable.from == *inside {
@@ -377,7 +398,12 @@ pub fn encapsulate_with(
     };
     for (list, control) in [(ports, false), (controls, true)] {
         for e in list {
-            expose(&mut c, e.target.clone(), e.label.clone(), control)?;
+            expose(
+                &mut c,
+                e.targets().cloned().collect(),
+                Some(e.label.clone()),
+                control,
+            )?;
         }
     }
     let mut candidate = p.clone();
@@ -419,7 +445,7 @@ pub fn add_exposure(
         .get(&id)
         .cloned()
         .ok_or("Missing composite")?;
-    expose(&mut c, target.clone(), binding_label(&target), control)?;
+    expose(&mut c, vec![target], None, control)?;
     set(editor, id, c)
 }
 pub fn remove_exposure(
@@ -444,7 +470,7 @@ pub fn remove_exposure(
             let owned = kabl_core::composite::leaves(editor.state(), id);
             let state = editor.state();
             if state.cables.iter().any(|(cid, c)| {
-                (c.from == e.target || c.to == e.target)
+                e.targets().any(|t| c.from == *t || c.to == *t)
                     && c.from.module_id().is_some_and(|m| owned.contains(&m))
                         != state.end_module(*cid).is_some_and(|m| owned.contains(&m))
             }) {
@@ -496,18 +522,16 @@ fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
     }
     let ids: BTreeSet<kabl_core::CableId> = snapshot.cables.keys().copied().collect();
     for c in snapshot.composites.values_mut() {
-        let gone: Vec<u64> = c
-            .ports
-            .iter()
-            .chain(&c.controls)
-            .filter(|(_, e)| {
-                matches!(&e.target, PortRef::CableParam { cable, .. } if !ids.contains(cable))
-            })
-            .map(|(&key, _)| key)
-            .collect();
+        let mut gone = Vec::new();
+        for (&key, e) in c.ports.iter_mut() {
+            if !e.retain_targets(
+                |t| !matches!(t, PortRef::CableParam { cable, .. } if !ids.contains(cable)),
+            ) {
+                gone.push(key);
+            }
+        }
         for key in gone {
             c.ports.remove(&key);
-            c.controls.remove(&key);
             if let Some(panel) = &mut c.panel {
                 panel.placements.remove(&key);
             }
@@ -520,7 +544,7 @@ fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
     let schema = if snapshot
         .composites
         .values()
-        .any(kabl_core::composite::binds_cable_param)
+        .any(|c| kabl_core::composite::binds_cable_param(c) || kabl_core::composite::fans_in(c))
     {
         2
     } else {
@@ -586,7 +610,7 @@ fn insert_inner(
             .composites
             .values()
             .flat_map(|c| c.ports.values().chain(c.controls.values()))
-            .map(|e| &e.target),
+            .flat_map(Exposure::targets),
     );
     for t in targets {
         if let PortRef::CableParam { cable, .. } = t {
@@ -702,6 +726,7 @@ fn insert_inner(
         for e in c.controls.values_mut().chain(c.ports.values_mut()) {
             let autogenerated = e.label == binding_label(&e.target);
             e.target = remap(&e.target);
+            e.also = e.also.iter().map(remap).collect();
             if autogenerated {
                 e.label = binding_label(&e.target);
             }
@@ -895,6 +920,94 @@ pub fn direction(p: &PatchState, t: &PortRef) -> Option<PortDirection> {
             .iter()
             .find(|p| p.name == port)
             .map(|p| p.direction),
+    }
+}
+
+/// Whether composite `id` is drawn as a face: closed, with every enclosing composite open.
+fn face_shown(p: &PatchState, open: &BTreeSet<CompositeId>, id: CompositeId) -> bool {
+    let mut at = Some(id);
+    for depth in 0..=8 {
+        let Some(c) = at.and_then(|id| p.composites.get(&id)) else {
+            return depth > 0;
+        };
+        let id = at.unwrap();
+        if open.contains(&id) == (depth == 0) {
+            return false;
+        }
+        at = c.parent;
+    }
+    false
+}
+
+/// What a cable into `target` patches when `target` is reached through a composite face: every
+/// target of the public port behind it. Elsewhere, `target` alone.
+pub fn face_targets(
+    p: &PatchState,
+    open: &BTreeSet<CompositeId>,
+    target: &PortRef,
+) -> Vec<PortRef> {
+    p.composites
+        .iter()
+        .filter(|(&id, _)| face_shown(p, open, id))
+        .flat_map(|(_, c)| c.ports.values())
+        .find(|e| e.targets().any(|t| t == target))
+        .map_or_else(|| vec![target.clone()], |e| e.targets().cloned().collect())
+}
+
+/// Connects `from` to every target of the face port behind `to` as one undo step. A jack input
+/// holds one cable, so a cable already in one is replaced, as `PatchEditor::connect` does.
+/// Returns the cable into the first target.
+pub fn connect(
+    editor: &mut PatchEditor,
+    open: &BTreeSet<CompositeId>,
+    from: PortRef,
+    to: PortRef,
+) -> CableId {
+    let targets = face_targets(editor.state(), open, &to);
+    if targets.len() == 1 {
+        return editor.connect(from, to);
+    }
+    let first = editor.reserved_ids().1;
+    let mut ops = Vec::new();
+    for (next, to) in (first..).zip(targets) {
+        if matches!(to, PortRef::Module { .. }) {
+            ops.extend(
+                editor
+                    .state()
+                    .cables
+                    .iter()
+                    .filter(|(_, c)| c.to == to)
+                    .map(|(&id, _)| Op::Disconnect { id }),
+            );
+        }
+        ops.push(Op::Connect {
+            id: next,
+            from: from.clone(),
+            to,
+        });
+    }
+    editor.restore_to(ops);
+    first
+}
+
+/// Removes `cable` and, when it enters a composite face, the cables from the same source into
+/// the other targets of that face port: one undo step.
+pub fn disconnect(editor: &mut PatchEditor, open: &BTreeSet<CompositeId>, cable: CableId) {
+    let Some(c) = editor.state().cables.get(&cable) else {
+        return;
+    };
+    let targets = face_targets(editor.state(), open, &c.to);
+    let ops: Vec<Op> = editor
+        .state()
+        .cables
+        .iter()
+        .filter(|(&id, o)| id == cable || (o.from == c.from && targets.contains(&o.to)))
+        .map(|(&id, _)| Op::Disconnect { id })
+        .collect();
+    if ops.len() == 1 {
+        editor.disconnect(cable);
+    } else {
+        editor.edit(ops);
     }
 }
 

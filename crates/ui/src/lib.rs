@@ -4797,19 +4797,18 @@ fn drop_cable(
     let (kind, rest) = key.split_once(':').unwrap();
     let (mid, name) = rest.split_once('.').unwrap();
     let mid: ModuleId = mid.parse().unwrap();
+    let (id, n) = (mid, name.to_string());
+    let to = if kind == "knob" {
+        PortRef::Param { id, param: n }
+    } else {
+        PortRef::Module { id, port: n }
+    };
+    // A drop on a composite face jack patches every target of that public port.
+    let cable = composites::connect(editor, &ui_state.composites.open, from, to);
     if kind == "knob" {
-        let cable = editor.connect_route(from, mid, name);
         let routes = routing::routes_into(editor.state(), mid, name);
         routing::inspect(ui_state, &routes, mid, name);
         ui_state.selected_route = Some(cable);
-    } else {
-        editor.connect(
-            from,
-            PortRef::Module {
-                id: mid,
-                port: name.to_string(),
-            },
-        );
     }
 }
 
@@ -5395,7 +5394,7 @@ fn cable_menu(
     }
     kit::menu_rule(ui, st);
     if remove_row(ui, ui_state, "remove-cable", "Remove cable") {
-        editor.disconnect(cable);
+        composites::disconnect(editor, &ui_state.composites.open, cable);
         ui.close();
     }
 }
@@ -5595,13 +5594,17 @@ fn draw_default_face(
                                     }
                                 }
                             }
+                            for t in &e.also {
+                                register_face_port(drawn, t, dir, r.rect.center(), snapshot);
+                            }
                             if r.clicked() {
                                 if dir == PortDirection::Output {
                                     view.pending_output = Some(e.target.clone());
                                     view.last_message =
                                         Some("Choose an input to connect this output.".into());
                                 } else if let Some(from) = view.pending_output.take() {
-                                    editor.connect(from, e.target.clone());
+                                    let open = &view.composites.open;
+                                    composites::connect(editor, open, from, e.target.clone());
                                 }
                             }
                             let st = view.style.clone();
@@ -5806,13 +5809,11 @@ fn draw_authored_face(
     }
     for (&key, e) in &c.ports {
         if !panel.placements.contains_key(&key) {
-            register_face_port(
-                drawn,
-                &e.target,
-                composites::direction(editor.state(), &e.target).unwrap_or(PortDirection::Input),
-                fallback.center(),
-                editor.state(),
-            );
+            let dir =
+                composites::direction(editor.state(), &e.target).unwrap_or(PortDirection::Input);
+            for t in e.targets() {
+                register_face_port(drawn, t, dir, fallback.center(), editor.state());
+            }
         }
     }
     for (&key, p) in &panel.placements {
@@ -5842,7 +5843,9 @@ fn draw_authored_face(
             if resp.hovered() || resp.has_focus() {
                 painter.circle_stroke(center, 15.0 * z, Stroke::new(1.5, th.sel));
             }
-            register_face_port(drawn, &e.target, dir, center, editor.state());
+            for t in e.targets() {
+                register_face_port(drawn, t, dir, center, editor.state());
+            }
             match &e.target {
                 PortRef::Module { id: leaf, port } => view.record(
                     format!(
@@ -5864,7 +5867,7 @@ fn draw_authored_face(
                 if dir == PortDirection::Output {
                     view.pending_output = Some(e.target.clone());
                 } else if let Some(from) = view.pending_output.take() {
-                    editor.connect(from, e.target.clone());
+                    composites::connect(editor, &view.composites.open, from, e.target.clone());
                 }
             }
             if resp.drag_started() && dir == PortDirection::Output {

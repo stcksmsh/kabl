@@ -191,6 +191,10 @@ impl PatchState {
 
     /// Ops that put back every composite `op` changes, as it is in this state.
     fn changed_composite_ops(&self, op: &Op) -> Vec<Op> {
+        // Most patches have no composites; skip the trial copy for them.
+        if self.composites.is_empty() {
+            return Vec::new();
+        }
         // Tables and labels never affect composites; leave them out of the trial copy.
         let mut after = PatchState {
             composites: self.composites.clone(),
@@ -211,25 +215,35 @@ impl PatchState {
     }
 
     /// A composite binding of a cable parameter goes when its owner (the module the cable ends
-    /// on) is no longer inside the composite: the cable was removed or now ends elsewhere.
+    /// on) is no longer inside the composite: the cable was removed or now ends elsewhere. A
+    /// port that feeds several targets loses only that one and goes with its last.
     fn prune_cable_bindings(&mut self) {
-        let mut stale = Vec::new();
+        let mut changed = Vec::new();
         for (&id, c) in &self.composites {
-            for (&key, e) in c.ports.iter().chain(&c.controls) {
-                if matches!(e.target, PortRef::CableParam { .. })
-                    && !crate::composite::owner(self, &e.target)
-                        .is_some_and(|m| crate::composite::leaves(self, id).contains(&m))
-                {
-                    stale.push((id, key));
+            for (&key, e) in &c.ports {
+                if !e.targets().any(|t| matches!(t, PortRef::CableParam { .. })) {
+                    continue;
+                }
+                let leaves = crate::composite::leaves(self, id);
+                let mut e = e.clone();
+                let live = e.retain_targets(|t| {
+                    !matches!(t, PortRef::CableParam { .. })
+                        || crate::composite::owner(self, t).is_some_and(|m| leaves.contains(&m))
+                });
+                if c.ports[&key] != e || !live {
+                    changed.push((id, key, live.then_some(e)));
                 }
             }
         }
-        for (id, key) in stale {
+        for (id, key, e) in changed {
             let c = self.composites.get_mut(&id).unwrap();
-            c.ports.remove(&key);
-            c.controls.remove(&key);
-            if let Some(panel) = &mut c.panel {
-                panel.placements.remove(&key);
+            if let Some(e) = e {
+                c.ports.insert(key, e);
+            } else {
+                c.ports.remove(&key);
+                if let Some(panel) = &mut c.panel {
+                    panel.placements.remove(&key);
+                }
             }
         }
     }
@@ -304,7 +318,8 @@ impl PatchState {
                 for c in self.composites.values_mut() {
                     c.members.remove(id);
                     c.controls.retain(|_, e| e.target.module_id() != Some(*id));
-                    c.ports.retain(|_, e| e.target.module_id() != Some(*id));
+                    c.ports
+                        .retain(|_, e| e.retain_targets(|t| t.module_id() != Some(*id)));
                     if let Some(panel) = &mut c.panel {
                         panel.placements.retain(|key, _| {
                             c.controls.contains_key(key) || c.ports.contains_key(key)
