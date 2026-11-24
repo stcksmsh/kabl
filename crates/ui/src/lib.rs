@@ -36,6 +36,7 @@ mod fm6;
 mod fx_displays;
 pub mod help;
 pub mod inspect;
+pub mod keys;
 pub mod kit;
 mod label_dim;
 pub mod lessons;
@@ -427,6 +428,8 @@ pub struct UiState {
     pub compare: compare::Compare,
     /// The Learn tab and the running lesson (view only).
     pub lessons: lessons::Learn,
+    /// Notes from the computer keyboard and the on-screen strip (`keys`).
+    pub keys: keys::Keys,
 }
 
 struct Moving {
@@ -586,6 +589,7 @@ impl Default for UiState {
             inspect: Default::default(),
             compare: Default::default(),
             lessons: Default::default(),
+            keys: Default::default(),
         }
     }
 }
@@ -1017,6 +1021,8 @@ pub fn show_with(
     }
     let st = ui_state.style.clone();
     kit::apply(ui.ctx(), &st);
+    // Before any widget reads the keyboard: a key that plays a note is no shortcut.
+    keys::input(ui_state, ui.ctx());
     composites::panel(editor, ui_state, ui.ctx());
     about::show(ui.ctx(), ui_state);
     // Every scene (Rack, Sounds, Perform) takes a dropped `.kablmod`, not just the rack's dock.
@@ -1162,6 +1168,7 @@ pub fn show_with(
         .exact_size(st.metrics.status_h)
         .frame(kit::bar_frame(&st))
         .show(ui, |ui| status_bar(ui_state, ui, &st, status_right));
+    keys::panel(ui_state, ui, &st);
     egui::Panel::right("kabl-rail")
         .exact_size(st.metrics.rail_w)
         .resizable(false)
@@ -1302,6 +1309,7 @@ pub fn show_with(
     show_toasts(ui_state, ui, &st, page);
     ui_state.explain.typing =
         routing::wants_text_input(ui.ctx()) || egui::Popup::is_any_open(ui.ctx());
+    keys::watch(ui_state);
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
 }
 
@@ -1631,19 +1639,30 @@ fn add_search(
             g,
             st.roles.text3,
         );
-        let key = egui::Rect::from_center_size(
-            egui::pos2(rect.right() - st.sp(2) - 10.0, rect.center().y),
-            egui::vec2(20.0, 16.0),
-        );
-        p.rect_filled(key, 4.0, st.roles.inset);
-        let g = p.layout_no_wrap("A".into(), st.font(style::Role::Caption), st.roles.text2);
-        p.galley(key.center() - g.size() / 2.0, g, st.roles.text2);
+        // With computer keys on, A plays a note: no shortcut to show.
+        if !ui_state.keys.computer {
+            let key = egui::Rect::from_center_size(
+                egui::pos2(rect.right() - st.sp(2) - 10.0, rect.center().y),
+                egui::vec2(20.0, 16.0),
+            );
+            p.rect_filled(key, 4.0, st.roles.inset);
+            let g = p.layout_no_wrap("A".into(), st.font(style::Role::Caption), st.roles.text2);
+            p.galley(key.center() - g.size() / 2.0, g, st.roles.text2);
+        }
     }
-    let r = r.tip(st, "Add a module (A)");
+    let r = r.tip(
+        st,
+        if ui_state.keys.computer {
+            "Add a module"
+        } else {
+            "Add a module (A)"
+        },
+    );
     ui_state.record("add-menu".into(), r.rect);
     let pop = egui::Popup::default_response_id(&r);
     if std::mem::take(&mut ui_state.add_menu_req)
-        || (!routing::wants_text_input(ui.ctx())
+        || (!ui_state.keys.computer
+            && !routing::wants_text_input(ui.ctx())
             && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::A)))
     {
         egui::Popup::open_id(ui.ctx(), pop);
@@ -2144,6 +2163,7 @@ fn status_bar(
                 format!("MIDI · {port}"),
             );
         }
+        keys::toggle(ui_state, ui, st);
         if !ui_state.status_audio.is_empty() {
             let text = ui_state.status_audio.clone();
             kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &text)
