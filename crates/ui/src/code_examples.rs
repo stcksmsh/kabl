@@ -208,6 +208,7 @@ pub fn composite_for(
         c.next_interface += 1;
         let e = Exposure {
             label: item.label.into(),
+            also: vec![],
             target,
         };
         if control {

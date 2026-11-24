@@ -20,19 +20,19 @@ use crate::op::Entry;
 /// port (`in`, `out`) where v7 files name the pair `in_l`/`in_r`, `left`/`right`. A v7 build
 /// refuses a v8 file. Files below v8 name the old ports and are refused.
 ///
-/// v9 lets a composite port bind a cable parameter (`PortRef::CableParam`). A v8
-/// build refuses such a binding, so a file is written as v9 only when its log contains one and
-/// stays v8 otherwise; both load.
+/// v9 lets a composite port bind a cable parameter (`PortRef::CableParam`) and feed several
+/// targets (`Exposure::also`, fan-in). A v8 build refuses either, so a file is written as v9
+/// only when its log contains one and stays v8 otherwise; both load.
 pub const CURRENT_SCHEMA_VERSION: u32 = 9;
 const OLDEST_SCHEMA_VERSION: u32 = 8;
 
 /// The lowest schema that can hold `log`: v9 when any entry `save` writes (its op or its
-/// inverse) binds a cable parameter on a composite, else v8.
+/// inverse) has a composite port that binds a cable parameter or feeds several targets, else v8.
 pub fn schema_for(log: &PatchLog) -> u32 {
     fn binds(op: &crate::Op) -> bool {
         match op {
             crate::Op::SetComposite { value: Some(c), .. } => {
-                crate::composite::binds_cable_param(c)
+                crate::composite::binds_cable_param(c) || crate::composite::fans_in(c)
             }
             crate::Op::Group { ops } => ops.iter().any(binds),
             _ => false,
