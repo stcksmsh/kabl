@@ -87,8 +87,10 @@ fn browser_corpus_renders_as_it_did() {
         .map(|d| {
             d.strip_prefix(&root)
                 .unwrap()
-                .to_string_lossy()
-                .into_owned()
+                .components()
+                .map(|c| c.as_os_str().to_str().unwrap())
+                .collect::<Vec<_>>()
+                .join("/")
         })
         .collect();
     names.sort();
