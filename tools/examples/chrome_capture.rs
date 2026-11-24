@@ -332,6 +332,8 @@ impl App {
                 kabl_ui::lessons::start(&mut self.editor, &mut ui, i);
             }
             ui.lessons.active.as_mut().expect("lesson 00").step = step;
+            // A fresh profile shows the Rack; this capture profile has had its first run.
+            ui.browser_open = false;
             ui.inspect.audio = j.scene != "first-run-no-output";
             if j.scene == "first-run-no-output" {
                 ui.lessons.quiet_since = Some(f64::NEG_INFINITY);

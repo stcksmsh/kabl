@@ -1334,7 +1334,7 @@ pub fn show_with(
     }
     browser::dialogs(editor, ui_state, ui.ctx());
     lessons::card(editor, ui_state, ui.ctx(), &st, page, now);
-    lessons::mark(ui_state, ui.ctx(), &st, page, now);
+    lessons::mark(ui_state, ui.ctx(), &st, now);
     show_toasts(ui_state, ui, &st, page);
     ui_state.explain.typing =
         routing::wants_text_input(ui.ctx()) || egui::Popup::is_any_open(ui.ctx());

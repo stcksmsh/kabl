@@ -21,6 +21,7 @@ struct H {
     dir: tempfile::TempDir,
     events: Vec<Event>,
     t: f64,
+    shapes: Vec<egui::epaint::ClippedShape>,
 }
 
 impl H {
@@ -38,6 +39,7 @@ impl H {
             dir,
             events: Vec::new(),
             t: 0.0,
+            shapes: Vec::new(),
         };
         h.frames(3);
         h
@@ -63,7 +65,16 @@ impl H {
             egui::UiBuilder::new().max_rect(Rect::from_min_size(Pos2::ZERO, size)),
         );
         show(&mut self.editor, &mut self.ui, &mut root);
-        let _ = self.ctx.end_pass();
+        self.shapes = self.ctx.end_pass().shapes;
+    }
+
+    /// A ring was painted around `r` (the anchor outline, 6 px out).
+    fn ringed(&self, r: Rect) -> bool {
+        let want = r.expand(6.0);
+        self.shapes.iter().any(|c| {
+            matches!(&c.shape, egui::Shape::Rect(s) if s.rect == want && s.stroke.width == 2.5)
+                && c.clip_rect.contains_rect(want)
+        })
     }
 
     fn frames(&mut self, n: usize) {
@@ -413,4 +424,17 @@ fn learn_starts_it_again_only_over_a_saved_sound() {
     assert_eq!(h.step(), Some(0));
     assert!(h.ui.hits.contains_key("start-card"));
     assert_eq!(h.editor.state(), first_run::start_patch().state());
+}
+
+#[test]
+fn every_step_rings_its_anchor_on_screen_the_sounds_tab_included() {
+    let mut h = H::fresh();
+    let l = lessons::all().iter().find(|l| l.card).unwrap();
+    for (k, s) in l.steps.iter().enumerate() {
+        if let Some(a) = &s.anchor {
+            let r = lessons::anchor_rect(&h.ui, a).unwrap();
+            assert!(h.ringed(r), "step {}: no ring around {a:?}", k + 1);
+        }
+        h.click("start-next");
+    }
 }

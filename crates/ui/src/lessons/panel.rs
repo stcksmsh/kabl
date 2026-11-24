@@ -58,11 +58,12 @@ pub fn anchor_rect(ui_state: &UiState, anchor: &str) -> Option<Rect> {
     }
 }
 
-/// The step's anchor ring: an accent outline with a slow outward pulse, painted over the page
-/// and clipped to it. It takes no input: everything under and around it stays usable. Shown
+/// The step's anchor ring: an accent outline with a slow outward pulse, painted over the
+/// window (the top bar too: the Sounds tab can be an anchor). It takes no input: everything under and around it stays usable. Shown
 /// while Learn is open or the lesson is on the Start card, and only when the step's Show
 /// target is in the patch (a sound without macros gets no ring on a macro).
-pub fn mark(ui_state: &UiState, ctx: &egui::Context, st: &Style, page: Rect, now: f64) {
+pub fn mark(ui_state: &UiState, ctx: &egui::Context, st: &Style, now: f64) {
+    let page = ctx.content_rect();
     let Some(a) = ui_state.lessons.active.as_ref().filter(|a| !a.detached) else {
         return;
     };
