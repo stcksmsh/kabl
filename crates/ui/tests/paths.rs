@@ -6,7 +6,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use kabl_ui::library::paths::{
-    config_dir_in, factory_candidates_in, log_dir_in, user_dir_in, Os, PathsError,
+    config_dir_in, factory_candidates_in, log_dir_in, or_temp, user_dir_in, Os, PathsError,
 };
 
 fn env(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<OsString> {
@@ -92,6 +92,13 @@ fn unix_directories_match_the_old_resolution() {
                 ("XDG_STATE_HOME", ""),
                 ("KABL_CONFIG_DIR", ""),
             ],
+            "/h/.local/share/kabl",
+            "/h/.config/kabl",
+            "/h/.local/state/kabl/logs",
+        ),
+        // Empty override counts as unset (it was an empty path before).
+        case(
+            &[("HOME", "/h"), ("KABL_USER_DIR", "")],
             "/h/.local/share/kabl",
             "/h/.config/kabl",
             "/h/.local/state/kabl/logs",
@@ -196,6 +203,16 @@ fn windows_falls_back_to_userprofile_then_errors() {
         Err(PathsError("%LOCALAPPDATA%"))
     );
     assert!(PathsError("%APPDATA%").to_string().contains("%APPDATA%"));
+    // The plain functions use <tmp>/kabl, never the current directory.
+    let tmp = Path::new("/t");
+    assert_eq!(
+        or_temp(user_dir_in(Os::Windows, &none), tmp),
+        tmp.join("kabl")
+    );
+    assert_eq!(
+        or_temp(user_dir_in(Os::Windows, &e), tmp),
+        base.join("Roaming").join("kabl")
+    );
 }
 
 #[test]
@@ -232,4 +249,13 @@ fn real_environment_wrappers() {
     assert_eq!(paths::config_dir(), r.join("c"));
     assert_eq!(paths::log_dir(), r.join("u").join("logs"));
     assert_eq!(kabl_ui::composites::find_factory_bank(), Some(r.join("fc")));
+    // Empty factory overrides count as unset: the search continues instead of returning "".
+    std::env::set_var("KABL_FACTORY_DIR", "");
+    std::env::set_var("KABL_FACTORY_COMPOSITES_DIR", "");
+    for var in ["KABL_FACTORY_DIR", "KABL_FACTORY_COMPOSITES_DIR"] {
+        assert_eq!(
+            paths::find_factory(var, "no-such-sub", r.to_path_buf(), false),
+            Some(r.to_path_buf())
+        );
+    }
 }

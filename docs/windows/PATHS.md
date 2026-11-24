@@ -16,7 +16,15 @@ The first factory candidate that is a directory wins.
 
 - Linux without `HOME`: the current directory (`./.local/share/kabl` and so on), as before.
 - Windows without `%APPDATA%`: `%USERPROFILE%\AppData\Roaming`. Without `%LOCALAPPDATA%`: `%USERPROFILE%\AppData\Local`.
-- Windows with neither: the lookup returns a `PathsError` ("cannot locate the %APPDATA% folder"). The plain functions (`user_dir`, `config_dir`, `log_dir`) print it to stderr and use the current directory instead of panicking.
+- Windows with neither: the lookup returns a `PathsError` ("cannot locate the %APPDATA% folder"). The plain functions (`user_dir`, `config_dir`, `log_dir`) report it on stderr and through `log::error!`, then use `<temp dir>\kabl` instead of panicking. The current directory is not used: it may be `System32` or the host's folder.
+
+## Plugins on Windows
+
+In a plugin DLL, `current_exe()` is the host's binary (the DAW), not kabl, so factory content next to the executable is never found there. Until the installer (W9) decides the layout (a fixed install directory, or the DLL's own path), only the `KABL_FACTORY_DIR` and `KABL_FACTORY_COMPOSITES_DIR` overrides find factory content in a plugin.
+
+## Empty overrides
+
+An empty `KABL_USER_DIR`, `KABL_FACTORY_DIR` or `KABL_FACTORY_COMPOSITES_DIR` counts as unset. Before, it was used as an empty path.
 
 ## Not used yet
 

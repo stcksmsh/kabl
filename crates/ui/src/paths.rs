@@ -136,10 +136,15 @@ pub fn factory_candidates_in(
     out
 }
 
-fn or_cwd(r: Result<PathBuf, PathsError>) -> PathBuf {
+/// The directory when no base folder exists (Windows without `APPDATA` and `USERPROFILE`):
+/// `<tmp>/kabl`. The current directory could be `System32` or the host's folder. The failure is
+/// reported on stderr and to the `log` crate.
+pub fn or_temp(r: Result<PathBuf, PathsError>, tmp: &Path) -> PathBuf {
     r.unwrap_or_else(|e| {
-        eprintln!("kabl: {e}; using the current directory");
-        PathBuf::from(".")
+        let dir = tmp.join("kabl");
+        eprintln!("kabl: {e}; using {}", dir.display());
+        log::error!("{e}; using {}", dir.display());
+        dir
     })
 }
 
@@ -148,15 +153,15 @@ fn real(key: &str) -> Option<OsString> {
 }
 
 pub fn user_dir() -> PathBuf {
-    or_cwd(user_dir_in(HOST, &real))
+    or_temp(user_dir_in(HOST, &real), &std::env::temp_dir())
 }
 
 pub fn config_dir() -> PathBuf {
-    or_cwd(config_dir_in(HOST, &real))
+    or_temp(config_dir_in(HOST, &real), &std::env::temp_dir())
 }
 
 pub fn log_dir() -> PathBuf {
-    or_cwd(log_dir_in(HOST, &real))
+    or_temp(log_dir_in(HOST, &real), &std::env::temp_dir())
 }
 
 /// A factory directory: `env_var`, else the installed layouts (`factory_candidates_in`), else
