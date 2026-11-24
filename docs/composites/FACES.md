@@ -175,28 +175,36 @@ flushes in the same call; when a compile is in flight or waiting, or the held va
 `MAX_HELD`, it compiles a graph instead (`control.rs:164-170`, `control.rs:188-195`), and a held
 graph is pushed before any action (`control.rs:349-361`). Recall is built around that.
 
-Recall of snapshot `s` on composite `C`, all on the UI thread in one frame:
+Recall of snapshot `s` on composite `C` happens in one frame, in two places on the UI thread:
 
-1. Compute, per control in `s`, the target value through the current target's
+1. **Where the button is pressed** (face drawing, which has the editor and `UiState` but not the
+   `Delivery`). Compute, per control in `s`, the target value through the current target's
    `from_norm(to_norm(v))` (`info.rs:126-158`), so it is clamped to the param's range and a
-   stepped value is a whole option, and the start value: the morph's live value when the UI's
-   morph report shows one driving that param, else the current document value.
-2. Decide jump or morph. It morphs only when the morph length is above 0, a clock is set, and a
-   new `Delivery::can_morph(parts)` holds: audio is attached, no compile is in flight or waiting
-   (`compiling` and `next_compile` both `None`), the held values plus the snapshot's targets stay
-   within `MAX_HELD`, and `held_actions` has room for every part (`MAX_HELD_ACTIONS`,
-   `control.rs:39`). Otherwise it jumps.
-3. Morph only: register the targets with their target values in a new `Delivery::morphing` map
-   (fixed capacity 32, one per control).
-4. Apply one undoable edit, "Snapshot <name>", that sets every changed control with `SetParam` in
-   one `Op::Group`. After it the document holds the target values, so a recompile, a save or an
-   undo sees what the engine ends on. The edit's `sync` runs as usual; for a target in `morphing`
-   whose new value equals the registered one, `sync` holds no `ParamSet` and removes the entry,
-   and `sent` still records the document, so the next diff does not send it either. Because step
-   2 ruled out a compile and the `MAX_HELD` fallback, this edit always goes the values path.
-5. Morph only: queue all parts with a new `Delivery::commands(&[Command])`, which checks room for
-   every part before pushing any and returns false otherwise (it cannot fail here, after step 2,
-   on the same thread). A jump queues nothing; `sync` sent the values in step 4.
+   stepped value is a whole option, and keep only the controls whose document value changes.
+   For each, the start value is the morph's live value when the UI's morph report shows one
+   driving that param, else the current document value. Apply one undoable edit, "Snapshot
+   <name>", that sets those controls with `SetParam` in one `Op::Group`; after it the document
+   holds the target values, so a recompile, a save or an undo sees what the engine ends on. When
+   the morph length is above 0 and a clock is set, also push a `MorphRequest { parts, targets }`
+   onto a new `ui_state.morphs` list, the way launches are queued on `ui_state.launches`.
+2. **In `control::deliver`** (`control.rs:455`, called once per frame by the app,
+   `app/frame.rs:137`, and the plugin, `crates/clap/src/lib.rs:290`), which has
+   `&mut Delivery`. Before its `d.sync(..)` it takes `ui_state.morphs` and keeps a request only
+   when `held_actions` has room for all of its parts (`MAX_HELD_ACTIONS`, `control.rs:39`);
+   nothing else queues actions between that check and step 2c, so the parts cannot be refused.
+   Then:
+   1. `sync` gets the kept requests' targets as a skip list (a new argument, a slice; no state
+      is stored in `Delivery`). On the values path it holds no `ParamSet` for a skipped target;
+      `sent` still records the document, so the next diff does not send it either.
+   2. If `sync` took the compile path instead (a Load, a compile in flight or waiting, or the
+      `MAX_HELD` fallback, `control.rs:164-170`, `control.rs:188-195`), the skip list was never
+      used and the requests are dropped: the new graph is compiled from the document and plays
+      the targets at once, a jump.
+   3. On the values path the parts of each kept request are queued with `d.command`, after
+      `sync`, so they follow every value `sync` held (`control.rs:363-392`).
+
+A refused request (no room) is not kept, so its targets were not skipped and `sync` sends their
+values: a jump. The skip list lives for one `sync` call, so it cannot outlive its recall.
 
 **Why this is atomic.** For a morphing recall the only messages that reach the audio thread are
 the morph parts: no `ToAudio::Set` for those targets is pushed, so no block can render at the
@@ -204,11 +212,10 @@ target before the morph starts, and no value can release the morph it belongs to
 thread stages parts and starts every target of the recall in the same block, when the last part
 arrives (section 3.3); until then the targets keep the values they had, which are the start
 values (or the morph already moving them). A ring that is full delays the whole recall, never
-half of it, and parts keep their place behind earlier requests (`control.rs:363-392`). A graph
-compiled later, for an unrelated edit while the morph runs, is built from the document, which
-holds the targets; the engine writes its morph values into every graph each block before
-rendering (`patch_engine.rs:897-917`, called at `patch_engine.rs:957`), so the swap does not
-jump the morph.
+half of it. A graph compiled later, for an unrelated edit while the morph runs, is built from
+the document, which holds the targets; the engine writes its morph values into every graph each
+block before rendering (`patch_engine.rs:897-917`, called at `patch_engine.rs:957`), so the swap
+does not jump the morph.
 
 A clock that is stopped when the morph lands: the engine jumps (existing rule, `morph.rs:8`).
 
@@ -265,13 +272,19 @@ Changes in `crates/engine/src/morph.rs` and `patch_engine.rs`:
 - **A recall morph always lands.** For a recall the document already holds `to` and the UI sent
   no value for it (section 3.2), so a recall morph the engine abandons would leave the sound at
   `from` while the document says `to`. Every path that drops one therefore goes through one
-  helper, `Morphs::land(target, to)`, which puts the final value into a fixed table (64 entries)
-  that `drive_morphs` writes with `drive_runtime` in the same block. The paths: a pending morph
+  helper, `Morphs::land(target, to)`, which puts the final value into a land table that
+  `drive_morphs` writes with `drive_runtime` in the same block and then empties. The table is
+  keyed by target (landing a target already in it overwrites the entry) and is a fixed array of
+  160 = 64 pending + 64 driven + 32 staged, so it holds every recall morph even when one reset
+  abandons all of them at once. `Morphs::clear` (`morph.rs:78-80`) lands each recall morph and
+  staged part it drops and does not touch the land table, so a land survives the clear that
+  caused it. The paths: a pending morph
   whose clock is gone (`morph.rs:126-129`) or whose target does not resolve
   (`morph.rs:140-145`; the write is then a no-op), a full driven table (`morph.rs:146-148`) or
   pending table (`morph.rs:90-92`), an unfinished part set replaced by a new `seq`, host reset
   (`patch_engine.rs:218`) and cancel (`patch_engine.rs:817`). A Load (`patch_engine.rs:559`)
-  needs none: its graph is compiled from the document, which holds `to`. Cue macros
+  needs none: its graph is compiled from the document, which holds `to`; the land its `clear`
+  makes anyway writes `to` again, or nothing when the target is gone. Cue macros
   (`from: None`) are not landed, which keeps today's cue behaviour.
 - **Report.** The progress report becomes `(RuntimeTarget, value, to, progress)`; the UI ring
   grows from 64 to 128 entries (`audio.rs:260`) and Perform's macro card keeps reading macros
@@ -330,9 +343,15 @@ composite out (dropping a button can orphan a parent's face target; nesting is a
 - drops snapshot values whose key is no longer a control, and clears a snapshot `clock` that no
   longer names a `clock` module.
 
-The editor commits a removal or a composite edit as `Op::Group[edit, pruned SetComposites...]`,
-built in one place (`PatchState::with_prune(op) -> Op`, used where the editor turns a
-`RemoveModule` or `SetComposite` into a log entry). `apply` itself never prunes: applying a
+The editor commits a removal or a composite edit as `Op::Group[op, pruned SetComposites...]`,
+built in one place: `PatchEditor::append` (`editor.rs:243-246`), through which every editor edit
+that can remove or change a composite reaches the log. It checks every op it gets, including the
+ops inside a `Group` at any depth: `remove_module` wraps `RemoveModule` in a `Group` when cue
+references exist (`editor.rs:367-374`), and `edit` (`editor.rs:597-601`) and `restore_to`
+commit `Group`s that can hold `RemoveModule` and `SetComposite`. When any op in it is one of
+those two, `append` runs `composite::prune` on the state after the op and, if that yields
+anything, logs the wrapped `Group` as one entry. The other log paths (`seed_from`, the
+`SetParam` gesture paths, `editor.rs:300-425`) carry no such op. `apply` itself never prunes: applying a
 `SetComposite` writes exactly the value it carries, so every inverse restores the exact prior
 state in any order. That matters because `changed_composite_ops` restores composites in
 `BTreeMap` id order (`state.rs:193-215`): if applying a parent's restore pruned against a child
@@ -407,6 +426,17 @@ snapshot clocks inside the inserted set go through the same maps.
 +}
 ```
 
+`crates/core/src/panel.rs`, on `Panel` (`panel.rs:34-40`), for the compact face (section 6.3):
+
+```diff
+ pub struct Panel {
+     pub width: f32,
++    /// Width of the compact face, in 30-point units, 180 or more and below `width`. None: the
++    /// whole face always shows.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub compact_width: Option<f32>,
+```
+
 `crates/core/src/composite.rs`, on `Composite` (`composite.rs:42-59`):
 
 ```diff
@@ -468,7 +498,8 @@ Pre-1.0 rule: one format step, no migration code. Exactly:
   `OLDEST_SCHEMA_VERSION` stays 8 (`format.rs:27`). `check_schema` already accepts
   `OLDEST..=CURRENT` (`format.rs:125-137`), so it reads 8, 9 and 10 with no change.
 - `schema_for` (`format.rs:31-49`) becomes three tiers, checked in order: v10 when a
-  `SetComposite` uses any new kind, `source`, `label`, `icons` or `snapshots`; else v9 when the
+  `SetComposite` uses any new kind, `source`, `label`, `icons`, `snapshots` or
+  `compact_width`; else v9 when the
   existing `binds_cable_param || fans_in` predicate holds; else v8. A file that uses only v9
   features stays v9, and a file that uses none of them is written exactly as today.
 - Every new field is `#[serde(default)]`, so v8 and v9 files deserialize as they are; that is the
@@ -538,6 +569,36 @@ Plugin build: the CLAP editor draws the same rack through `kabl_ui::show`
 (`crates/clap/src/lib.rs:795`), so every element appears there. A button's `run`/`restart` under
 the host clock shows the existing refusal (`perform.rs:420-423`).
 
+### 6.3 Compact face and expanded part
+
+Owner request, 2026-11-24, after the Space captures: a composite face can be smaller, with the
+rest behind an expand chip, as module faces do.
+
+- **How module faces do it.** A module face shows its primary controls; the rest are listed in
+  `Placed::hidden` (`rack/mod.rs:259`, filled at `rack/mod.rs:871`) and the face draws a "+N"
+  chip (`lib.rs:3269-3276`). A click puts the module id in `ui_state.expanded`
+  (`lib.rs:347`, toggled at `lib.rs:3334-3339`; one module at a time), which is session view
+  state, not the document. Expanded, the off-face controls are laid out in an advanced area to
+  the right of the face (`rack/mod.rs:776-871`, `Placed::adv` at `rack/mod.rs:254`) and the
+  chip reads "Less"; the rack layout bounds do not change (test at `rack_editor.rs:1268-1276`).
+- **Which placements are compact.** Panel height is fixed at 340 (`panel.rs:6`), and the module
+  drawer grows to the right, so the fold is a width, not a height: `compact_width` on `Panel`
+  (section 5.1). A placement whose footprint ends at or left of `compact_width` is in the compact
+  face; one that starts at or right of it is in the expanded part; one that crosses it is refused
+  by `Panel::validate`. Position decides, so no per-placement flag is stored and what the author
+  sees on the design page is what the rack draws.
+- **Drawing.** With `compact_width` set and the composite not expanded, the rack slot is
+  `compact_width` wide (the three width reads at `rack_editor.rs:111`, `composites.rs:1091`,
+  `lib.rs:2756` go through one `Panel::shown_width(expanded)`), the artwork is clipped to it,
+  and a "+N" chip (N = placements in the expanded part) is drawn at the fold with the module
+  chip's look. Expanded, the whole face is drawn at the same origin, over its right-hand
+  neighbours like the module drawer, and the chip reads "Less". The state is a
+  `ui_state.expanded_composites: BTreeSet<CompositeId>`, session only, cleared with
+  `expanded` so one face or module is open at a time.
+- **Design page.** A draggable vertical fold line on the canvas, snapped to 30-point units, with
+  "No compact face" to remove it; elements that would cross it are shown in the error colour
+  until moved, and Apply is refused while any cross (the same rule as validate).
+
 ## 7. Composite design page (decision D8)
 
 A dedicated view for designing one composite's face. It replaces the panel tool window
@@ -586,7 +647,7 @@ opened or last reloaded, and the other three are the parts the page edits. New e
 snapshot ids are taken from the draft's `next_interface`. Apply builds the composite to write
 from the *current* composite with exactly those three fields replaced, so members, exposures and
 everything else stay as the document has them, and writes it with `composites::set`
-(`composites.rs:434-438`) through `PatchState::with_prune` (section 4). Apply refuses when the
+(`composites.rs:434-438`) through `PatchEditor::append`, which prunes (section 4). Apply refuses when the
 current composite's members, controls or ports differ from `base` (the banner below), because
 the draft's keys were validated against `base`. Nested composites the face depends on (face
 targets, nested sources) may also have changed since the page opened, so Apply first runs
@@ -652,6 +713,11 @@ snapshot strip are each offered as one element, as well as single buttons.
 dedicated view to design a composite's face (place, drag, resize, pick element kind and target,
 artwork), opened from the composite. Design: section 7.
 
+**Compact face (owner request, 2026-11-24).** "Perhaps we can do the smaller with expanding
+part thing here or allow it for these": allowed for any composite face; design in section 6.3,
+slice 11. Factory composites such as Space (`docs/ROADMAP.md`, CB1) set `compact_width` in
+their own slices.
+
 ## 9. Slice plan
 
 Each slice branches from `origin/master`, keeps existing patches sounding and looking the same,
@@ -672,7 +738,9 @@ page), under the job scratch dir; anything audible is an offline render or runs 
    load and re-save byte-identical; (e) `schema_for` writes v10 for a log with a snapshot and for
    one with a new kind, v9 for a log with only a fan-in port, v8 otherwise (three tests); package
    schema 3 likewise, `decode` accepts 1..=3; (f) the retain at `state.rs:325-329` is narrowed to
-   exposure-bound kinds and `PatchState::with_prune` wraps removals: removing a module drops
+   exposure-bound kinds and `PatchEditor::append` prunes after every op, including ops inside a
+   `Group` (a `remove_module` with cue references, `edit`, `restore_to`; one test each):
+   removing a module drops
    `source` placements, snapshot values and snapshot clocks of that module, while a `display`,
    `button` and `snapshots` placement whose source is another module survives (test); undo
    restores the exact prior state, tested on a fixture whose parent composite has a smaller id
@@ -750,22 +818,23 @@ page), under the job scratch dir; anything audible is an offline render or runs 
    targets keep their old values while only some parts have arrived (test splitting the parts
    over two `drain` calls); 32 targets plus 16 macros run together; every abandon path of
    section 3.3 (clock gone, full pending table, full driven table, replaced `seq`, reset, cancel)
-   leaves a recall target at `to` (one test per path) and leaves a cue macro where it was;
+   leaves a recall target at `to` (one test per path) and leaves a cue macro where it was; a
+   reset with 64 pending, 64 driven and 32 staged recall targets lands all 160 (test);
    `size_of::<Command>()` is not larger than before (test);
    `drain` and `drive_morphs` run under `assert_no_alloc` (as the engine tests already do, e.g.
    `crates/engine/tests/cue_macros.rs`) with no allocation.
 9. **Snapshots.**
    Scope: `crates/ui/src/lib.rs`, `crates/ui/src/panels.rs`, `crates/ui/src/composites.rs`,
-   `crates/ui/src/control.rs` (`can_morph`, `morphing`, `commands`), a new
+   `crates/ui/src/control.rs` (`deliver` takes `ui_state.morphs`, `sync` gets a skip list), a new
    `crates/ui/src/snapshots.rs`, tests.
    Done means: the page captures, re-captures, renames, deletes snapshots and sets morph beats
    and clock (tests, each one draft change); recall is one project undo step that sets every
-   stored control (test); with a morph length and a clock, `sync` holds no `ParamSet` for the
-   morphing targets and the parts are queued after it (test on the pushed `ToAudio` sequence);
-   with a compile in flight, a compile waiting, `MAX_HELD` nearly full or `held_actions` without
-   room for every part, the recall jumps: values go, no part is queued (one test each); an
-   un-exposed control is not touched by a
-   later recall (test); snapshot buttons and the snapshot strip recall and light the last one
+   control whose value changes, and only those (test); with a morph length and a clock, one
+   `deliver` pushes the values `sync` held for other targets, then the parts, and no `ParamSet`
+   for a morphing target, then or on later frames (test on the pushed `ToAudio` sequence); with
+   a Load, a compile in flight, a compile waiting, the `MAX_HELD` fallback or `held_actions`
+   without room for every part, the recall jumps: values go, no part is queued (one test each);
+   an un-exposed control is not touched by a later recall (test); snapshot buttons and the snapshot strip recall and light the last one
    (test); a nested button chain ending on a snapshot recalls it (test); offline render of a
    recall with morph shows the parameter moving over the set beats; captures of the strip and
    the page's snapshot list.
@@ -779,3 +848,17 @@ page), under the job scratch dir; anything audible is an offline render or runs 
     leaf sits in a nested composite (test), and `pin_source` names the composite path
     (`Composite / Nested · Module #id · param`); removing the exposure leaves the pin on the leaf;
     captures of a face with each block and of the Perform card.
+11. **Compact face.**
+    Scope: `crates/core/src/panel.rs`, `crates/core/src/format.rs`, `crates/ui/src/lib.rs`,
+    `crates/ui/src/rack_editor.rs`, `crates/ui/src/composites.rs`, `crates/ui/src/panels.rs`,
+    tests.
+    Done means: `Panel::compact_width` with its serde default, `Panel::validate` refuses a
+    width outside 180..`width` or off the 30-point grid and a placement that crosses the fold
+    (one test each), and `schema_for` writes v10 for a panel that sets it (test); collapsed, the
+    rack slot is `compact_width` wide, only compact placements draw and take hits, and the chip
+    shows the count of the others (test); a click on the chip draws the whole face at the same
+    origin with "Less", leaves the rack layout bounds unchanged (test, as
+    `rack_editor.rs:1268-1276`) and opening it closes an expanded module (test); a panel without
+    `compact_width` draws as before (test); the design page's fold line sets and removes it as
+    one draft change and marks crossing elements (test); captures of a composite collapsed and
+    expanded, and of the design page with the fold.
