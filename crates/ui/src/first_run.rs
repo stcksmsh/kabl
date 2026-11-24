@@ -128,17 +128,19 @@ fn build(s: &Spec) -> PatchEditor {
     let mut e = PatchEditor::seed_from(&Default::default());
     let at = |x: f32, y: f32| Vec2 { x, y };
     // The mockup's rack. Top row: sequencer, oscillator, filter, with free room to the right of
-    // the filter (where the tour's card goes). Bottom row: envelope, VCA, delay, reverb, output
-    // and, past it, the clock that makes it play by itself.
+    // the filter and below it (where the tour's card goes). Middle row: envelope, VCA, delay,
+    // reverb, output. Bottom row: the clock that makes it play by
+    // itself, and the macros under the effects they reach.
     let seq = e.add_module("seq", at(24.0, 20.0));
     let osc = e.add_module("osc.va", at(714.0, 20.0));
     let svf = e.add_module("filter.svf", at(964.0, 20.0));
     let adsr = e.add_module("env.adsr", at(24.0, 320.0));
     let vca = e.add_module("vca", at(264.0, 320.0));
-    let delay = e.add_module("delay", at(504.0, 320.0));
-    let verb = e.add_module("reverb", at(744.0, 320.0));
-    let out = e.add_module("out", at(984.0, 320.0));
-    let clock = e.add_module("clock", at(1164.0, 320.0));
+    let delay = e.add_module("delay", at(474.0, 320.0));
+    let verb = e.add_module("reverb", at(714.0, 320.0));
+    let out = e.add_module("out", at(954.0, 320.0));
+    let knob = e.add_module("macro", at(474.0, 620.0));
+    let clock = e.add_module("clock", at(24.0, 620.0));
     let m = |id, port: &str| PortRef::Module {
         id,
         port: port.to_string(),
@@ -150,7 +152,6 @@ fn build(s: &Spec) -> PatchEditor {
         e.set_param(seq, &format!("p{}", k + 1), n);
         e.set_param(seq, &format!("g{}", k + 1), if g { 1.0 } else { 0.0 });
     }
-    e.set_param(svf, "cutoff_hz", s.cutoff_hz);
     e.set_param(svf, "resonance", s.resonance);
     for (name, v) in ["attack_ms", "decay_ms", "sustain", "release_ms"]
         .into_iter()
@@ -161,9 +162,7 @@ fn build(s: &Spec) -> PatchEditor {
     e.set_param(vca, "gain", 0.0);
     e.set_param(delay, "sync", s.delay.0);
     e.set_param(delay, "feedback", s.delay.1);
-    e.set_param(delay, "mix", s.delay.2);
     e.set_param(verb, "decay_s", s.reverb.0);
-    e.set_param(verb, "mix", s.reverb.1);
     e.set_param(out, "level_db", s.level_db);
 
     e.connect(m(clock, "gate"), m(seq, "clock"));
@@ -171,14 +170,62 @@ fn build(s: &Spec) -> PatchEditor {
     e.connect(m(seq, "pitch"), m(osc, "pitch"));
     e.connect(m(seq, "gate"), m(adsr, "gate"));
     e.connect(m(osc, "out"), m(svf, "in"));
-    // The one obvious modulated knob: the envelope opens the cutoff on every note.
+    // Brightness (m1) and Space (m2), both resting at 0 with the rack knobs at the spec's
+    // values: a macro only adds. At 0 a route adds exactly nothing, so the start patch plays bit
+    // for bit as it did without the macros (`tests/first_run_macros.rs`).
+    for (key, name) in [("m1", "Brightness"), ("m2", "Space")] {
+        e.set_label(knob, &format!("name.{key}"), Some(name.into()));
+    }
+    let norm = |kind: &str, param: &str, v: f32| {
+        kabl_modules::registry::info_for(kind)
+            .and_then(|i| i.params.iter().find(|p| p.name == param))
+            .expect("a built-in param")
+            .to_norm(v)
+    };
+    // Brightness raises the cutoff to 2.5 times the spec's.
+    e.set_param(svf, "cutoff_hz", s.cutoff_hz);
+    let r = e.connect_route(m(knob, "m1"), svf, "cutoff_hz");
+    let up = norm("filter.svf", "cutoff_hz", s.cutoff_hz * 2.5)
+        - norm("filter.svf", "cutoff_hz", s.cutoff_hz);
+    e.set_route_amount(r, up, true);
+    // Space raises both mixes to twice the spec's.
+    for (id, kind, mix) in [(delay, "delay", s.delay.2), (verb, "reverb", s.reverb.1)] {
+        e.set_param(id, "mix", mix);
+        let r = e.connect_route(m(knob, "m2"), id, "mix");
+        e.set_route_amount(
+            r,
+            norm(kind, "mix", (2.0 * mix).min(100.0)) - norm(kind, "mix", mix),
+            true,
+        );
+    }
+    // The one obvious modulated knob: the envelope opens the cutoff on every note, and
+    // Brightness deepens that (up to 1.4 times the spec's depth).
     let route = e.connect_route(m(adsr, "out"), svf, "cutoff_hz");
     e.set_route_amount(route, s.open, true);
+    let depth = e
+        .connect_cable_route(m(knob, "m1"), route, kabl_engine::compile::DEPTH)
+        .expect("a route has a depth");
+    e.set_route_amount(depth, 0.4 * s.open, true);
     e.connect(m(svf, "lp"), m(vca, "in"));
     e.connect(m(adsr, "out"), m(vca, "cv"));
     e.connect(m(vca, "out"), m(delay, "in"));
     e.connect(m(delay, "out"), m(verb, "in"));
     e.connect(m(verb, "out"), m(out, "in"));
+    // Perform, as the factory presets pin it: the transport, then the macros on CC 20 and 21.
+    // Only the two named macros sit on the module's face.
+    use crate::perform::{CC_PREFIX, PIN_PREFIX, TRANSPORT};
+    let off = (3..=kabl_modules::builtins::MACROS)
+        .map(|k| (knob, crate::rack::face_key(&format!("m{k}")), Some(0.0)));
+    e.set_presentation(
+        &off.chain([
+            (clock, format!("{PIN_PREFIX}{TRANSPORT}"), Some(0.0)),
+            (knob, format!("{PIN_PREFIX}m1"), Some(1.0)),
+            (knob, format!("{CC_PREFIX}m1"), Some(20.0)),
+            (knob, format!("{PIN_PREFIX}m2"), Some(2.0)),
+            (knob, format!("{CC_PREFIX}m2"), Some(21.0)),
+        ])
+        .collect::<Vec<_>>(),
+    );
     e
 }
 
