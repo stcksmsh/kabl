@@ -822,33 +822,16 @@ pub struct FactoryEntry {
     pub definition: Definition,
 }
 /// The factory composite bank: `KABL_FACTORY_COMPOSITES_DIR`, else
-/// `<exe>/../share/kabl/factory-composites` (the package layout), else
-/// `$XDG_DATA_DIRS/kabl/factory-composites`, else the source checkout's `composites/` (a
+/// the installed layout's `factory-composites` (`paths::factory_candidates_in`), else the source checkout's `composites/` (a
 /// development build). Not `share/kabl/composites`: installed under `~/.local` that is the user
 /// library.
 pub fn find_factory_bank() -> Option<std::path::PathBuf> {
-    if let Some(d) = std::env::var_os("KABL_FACTORY_COMPOSITES_DIR") {
-        return Some(d.into());
-    }
-    let mut candidates = Vec::new();
-    if let Some(bin) = std::env::current_exe()
-        .ok()
-        .and_then(|e| e.canonicalize().ok())
-        .and_then(|e| e.parent().map(Path::to_path_buf))
-    {
-        candidates.push(bin.join("../share/kabl/factory-composites"));
-    }
-    let data_dirs = std::env::var("XDG_DATA_DIRS")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "/usr/local/share:/usr/share".into());
-    candidates.extend(
-        data_dirs
-            .split(':')
-            .map(|d| Path::new(d).join("kabl/factory-composites")),
-    );
-    candidates.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composites"));
-    candidates.into_iter().find(|d| d.is_dir())
+    crate::library::paths::find_factory(
+        "KABL_FACTORY_COMPOSITES_DIR",
+        "factory-composites",
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composites"),
+        false,
+    )
 }
 /// Every `<name>/v<N>.json` in the bank, sorted by id then version. The id and version come
 /// from the path alone, so they are the same in every load and every process. A missing bank

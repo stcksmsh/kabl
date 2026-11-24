@@ -596,16 +596,9 @@ impl Default for Prefs {
     }
 }
 
-/// `KABL_CONFIG_DIR`, else `$XDG_CONFIG_HOME/kabl`, else `~/.config/kabl`.
+/// The config folder (`paths::config_dir_in`).
 pub fn config_dir() -> PathBuf {
-    if let Some(d) = std::env::var_os("KABL_CONFIG_DIR").filter(|d| !d.is_empty()) {
-        return PathBuf::from(d);
-    }
-    if let Some(d) = std::env::var_os("XDG_CONFIG_HOME").filter(|d| !d.is_empty()) {
-        return PathBuf::from(d).join("kabl");
-    }
-    let home = std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), PathBuf::from);
-    home.join(".config/kabl")
+    crate::library::paths::config_dir()
 }
 
 pub fn themes_dir() -> PathBuf {

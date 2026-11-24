@@ -133,25 +133,9 @@ pub fn level_from(args: &[String]) -> (LevelFilter, Option<String>) {
 }
 
 /// Where logs go: `KABL_LOG_DIR`, else `KABL_USER_DIR/logs`, else
-/// `$XDG_STATE_HOME/kabl/logs`, else `~/.local/state/kabl/logs`.
+/// the platform state folder (`paths::log_dir_in`).
 pub fn log_dir() -> PathBuf {
-    let var = |k: &str| {
-        std::env::var_os(k)
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from)
-    };
-    if let Some(d) = var("KABL_LOG_DIR") {
-        return d;
-    }
-    if let Some(d) = var("KABL_USER_DIR") {
-        return d.join("logs");
-    }
-    if let Some(d) = var("XDG_STATE_HOME") {
-        return d.join("kabl").join("logs");
-    }
-    var("HOME")
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".local/state/kabl/logs")
+    crate::paths::log_dir()
 }
 
 /// Installs the logger once for this process (`app` prefixes the stderr echo). A second call
