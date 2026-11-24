@@ -18,13 +18,22 @@ use std::path::Path;
 
 use kabl_core::PatchState;
 use kabl_engine::compile::compile;
-use kabl_engine::golden::{chord_hash, patch_dirs};
+use kabl_engine::golden::{chord_render, patch_dirs, SampleHash};
 use kabl_ui::cues;
 
 const COUNT: usize = 129;
 const BLOCKS: usize = 6000;
+/// Some corpus patches run past full scale (expressive/lead peaks near 1.06), so the non-Linux
+/// check only guards against a blow-up.
+#[cfg(not(target_os = "linux"))]
+const CORPUS_MAX_PEAK: f32 = 2.0;
 /// Patches with at least one cue launch; guards against `cues()` silently returning nothing.
 const CUE_PATCHES: usize = 4;
+
+fn hash_text(h: &Option<SampleHash>) -> String {
+    h.as_ref()
+        .map_or_else(|| "compile-error".into(), SampleHash::hex)
+}
 
 /// Cue launches as `(block, sequencer, bank)`, in launch order.
 fn cue_launches(state: &PatchState) -> Vec<(usize, kabl_core::ModuleId, usize)> {
@@ -48,20 +57,21 @@ fn cue_launches(state: &PatchState) -> Vec<(usize, kabl_core::ModuleId, usize)> 
     out
 }
 
-/// FNV-1a over the bit patterns of the left and right output, and the number of cue launches.
-fn render_hash(dir: &Path) -> (String, usize) {
+/// FNV-1a over the bit patterns of the left and right output (`None` when the patch does not
+/// compile), and the number of cue launches.
+fn render_hash(dir: &Path) -> (Option<SampleHash>, usize) {
     let _ftz = kabl_engine::ftz::FtzGuard::new();
     let log = kabl_core::load(dir).expect("loads");
     let launches = cue_launches(log.state());
     let Ok(mut c) = compile(log.state(), 48000.0, 8) else {
-        return ("compile-error".into(), 0);
+        return (None, 0);
     };
     (
-        chord_hash(&mut c, BLOCKS, 3000, |c, b| {
+        Some(chord_render(&mut c, BLOCKS, 3000, |c, b| {
             for &(_, seq, bank) in launches.iter().filter(|l| l.0 == b) {
                 c.arm_bank(seq, bank, 0);
             }
-        }),
+        })),
         launches.len(),
     )
 }
@@ -89,7 +99,7 @@ fn browser_corpus_renders_as_it_did() {
             .map(|n| {
                 let (h, l) = render_hash(&root.join(n));
                 with_cues += usize::from(l > 0);
-                format!("{n} {h}\n")
+                format!("{n} {}\n", hash_text(&h))
             })
             .collect();
         eprintln!("patches with cue launches: {with_cues}");
@@ -107,7 +117,17 @@ fn browser_corpus_renders_as_it_did() {
     let mut with_cues = 0;
     for (name, want) in recorded {
         let (hash, launches) = render_hash(&root.join(name));
-        assert_eq!(hash, want, "{name} sounds different");
+        // Bit-exact hashes are a Linux reference; libm differs in the last bit elsewhere.
+        #[cfg(target_os = "linux")]
+        assert_eq!(hash_text(&hash), want, "{name} sounds different");
+        #[cfg(not(target_os = "linux"))]
+        match &hash {
+            Some(h) => {
+                assert_ne!(want, "compile-error", "{name} now compiles");
+                h.assert_clean(name, CORPUS_MAX_PEAK);
+            }
+            None => assert_eq!(want, "compile-error", "{name} no longer compiles"),
+        }
         with_cues += usize::from(launches > 0);
     }
     assert_eq!(with_cues, CUE_PATCHES, "patches with cue launches changed");
