@@ -1,0 +1,44 @@
+# Lesson 00, the first run: on the Start card over the start patch (crates/ui/src/first_run.rs:
+# Filter #3, Macro #9 with Brightness on m1 and Space on m2). Format: docs/learning/LESSON-FORMAT.md
+id = "start-here"
+title = "Start here"
+summary = "Hear Pluck line, turn its brightest knob, try a macro, find more sounds."
+card = true
+start = { sound = "kabl:start" }
+
+[[step]]
+title = "Hear it"
+text = """
+This is Pluck line, already playing. A clock drives the sequencer, and the \
+sound flows along the glowing cables to the output."""
+
+[[step]]
+title = "Turn this knob"
+text = """
+Cutoff sets how bright the sound is. Drag it up or down. The teal arc is \
+the envelope opening the filter on every note."""
+show = { control = { id = 3, kind = "filter.svf", param = "cutoff_hz" } }
+anchor = "knob:3.cutoff_hz"
+done = [{ param_moved = { id = 3, kind = "filter.svf", param = "cutoff_hz", by = 30.0 } }]
+
+[[step]]
+title = "Try a macro"
+text = """
+Brightness and Space each turn several knobs at once. Drag either one and \
+listen."""
+show = { module = { id = 9, kind = "macro" } }
+anchor = "knob:9.m1"
+done = [{ any_param_moved = { id = 9, kind = "macro", params = ["m1", "m2"], by = 0.05 } }]
+
+[[step]]
+title = "Find more sounds"
+text = """
+Sounds, in the top bar, has many more to play and change. Your own sounds \
+are kept there too."""
+anchor = "browser"
+done = ["sounds_open"]
+
+[end]
+unguided = """
+Pick any sound and press play. Learn, in the drawer, has more lessons \
+whenever you want them."""
