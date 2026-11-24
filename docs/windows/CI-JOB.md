@@ -100,8 +100,10 @@ skips are in [`docs/clap/VALIDATOR.md`](../clap/VALIDATOR.md).
 
 Notes on this job:
 
-- The Windows archive holds a single `clap-validator.exe` (checked by listing the release
-  asset); the Linux and macOS archives differ, so the step is Windows-only.
+- The Windows archive holds a single `clap-validator.exe` at its root, so `Expand-Archive`
+  puts it at `clap-validator/clap-validator.exe`. This was confirmed by downloading the
+  asset and listing it with `unzip -l` on 2026-11-24. The Linux and macOS archives are laid
+  out differently, so the step is Windows-only.
 - The validator processes audio offline, so the runner needs no audio device.
 - Updating the validator means changing the URL and the sha256 together; the digest is on
   the release page next to the asset.

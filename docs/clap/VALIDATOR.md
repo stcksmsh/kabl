@@ -20,8 +20,9 @@ parameter, state, layout and transport tests against them, each in its own proce
   44 tests run, 36 passed, 0 failed, 0 warnings, 8 skipped
   ```
 
-No kabl code needed changing. No test is excluded with `--exclude`; the 8 skips are the
-validator's own decision, because each covers an optional CLAP feature kabl does not offer.
+No kabl code needed changing. No test is excluded with `--exclude`; the validator skips 8
+tests on its own. Seven cover optional CLAP features kabl does not offer; one
+(`process-note-wildcard`) follows from kabl's choice to accept notes in the MIDI dialect only.
 
 ## Skipped tests
 
@@ -32,20 +33,22 @@ validator's own decision, because each covers an optional CLAP feature kabl does
 | `preset-discovery-load` | same | same |
 | `process-audio-double-out-of-place` | does not support 64-bit floating point audio | kabl processes 32-bit float; 64-bit is optional. |
 | `process-audio-double-in-place` | same | same |
-| `process-note-wildcard` | The plugin does not have any input note ports that support CLAP events | Not explained yet; see the note below. Note handling is covered by `process-note-out-of-place-basic` and `process-note-inconsistent`, which pass. |
+| `process-note-wildcard` | The plugin does not have any input note ports that support CLAP events | kabl's choice: its one note input port advertises the MIDI dialect only (see the note below). The test sends CLAP note events with wildcard ids, which kabl does not accept. |
 | `layout-audio-ports-activation` | does not implement `audio-ports-activation` | optional extension; kabl's port layout is fixed. |
 | `layout-configurable-audio-ports` | does not implement `configurable-audio-ports` | optional extension; kabl offers one layout. |
 
 If kabl later adds one of these features, its test stops skipping and must pass.
 
-Note on `process-note-wildcard`: kabl's single note input port advertises both the CLAP and
-the MIDI dialect (`supported_dialects = CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI` in
-`vendor/nice-plug/crates/nice-plug/src/wrapper/clap/wrapper.rs`, `ext_note_ports_get`), and
-the validator's source at the release's commit (`152b982`, `NotePort::supports_clap`) reads
-that bit. The skip still happens on every run, in and out of process. The cause is not in
-`crates/clap`, the skip is not a failure, and the wildcard path (note events with id, port,
-channel or key set to -1) is therefore not yet exercised by the validator. Worth a look when
-the VST3 wrapper (W6) is built, since clap-wrapper translates host notes into CLAP events.
+Note on `process-note-wildcard`: kabl answers the `clap.note-ports` extension itself
+(`get_extension_bridge` in `crates/clap/src/state_bridge.rs`), so the nice-plug wrapper's own
+note-port declaration is never reached. kabl's `note_get` reports one input port, "MIDI
+input", with `supported_dialects` and `preferred_dialect` both `CLAP_NOTE_DIALECT_MIDI`, and
+no output port. This follows `docs/PRODUCT-PLAN.md` ("Advertise only supported note
+dialects"). The validator skips the wildcard test when no input port supports the CLAP
+dialect (`NotePort::supports_clap` at the release's commit `152b982`). The passing
+`process-note-out-of-place-basic` and `process-note-inconsistent` tests therefore send
+MIDI-dialect events only; CLAP note events, wildcard or not, are not exercised. If kabl ever
+advertises the CLAP dialect, this test runs and must pass.
 
 ## How to rerun
 
