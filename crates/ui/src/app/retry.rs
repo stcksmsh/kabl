@@ -106,6 +106,9 @@ impl App {
         core.cc_cutoff = clock_s();
         let session = self.session;
         self.midi.suspend_notes();
+        // The restart ends every live note; the keys forget theirs.
+        core.ui.keys.all_off();
+        core.ui.keys.out.clear();
         reset_pickup(&mut core.ui);
         core.ui.launches.clear();
         core.ui.transport.clear();

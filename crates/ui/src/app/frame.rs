@@ -3,7 +3,6 @@
 use super::*;
 
 use kabl_engine::runtime::Feedback;
-use kabl_standalone::DEFAULT_VOICE_COUNT;
 use kabl_ui::control::{self, Delivery};
 use kabl_ui::kit::{self, Tip, Tone};
 use kabl_ui::style::Role;
@@ -127,6 +126,7 @@ impl eframe::App for App {
         kabl_ui::show_with(editor, ui_state, ui, |ui, ui_state| {
             retry_clicked = self.toolbar(ui, st, ui_state, delivery);
         });
+        self.midi.send_keys(ui_state);
         if let Some(rec) = ui_state.recorder.as_ref() {
             // Keep the chosen folder even if the control pump takes this recorder on a
             // failure before the next UI frame.
@@ -277,6 +277,9 @@ impl App {
             }
         }
         if std::mem::take(&mut ui_state.all_notes_off) {
+            // AllOff below ends them too: only forget what was held here.
+            ui_state.keys.all_off();
+            ui_state.keys.out.clear();
             self.midi.release_all();
             ui_state.last_message = Some("all MIDI voices released".into());
         }
@@ -327,8 +330,7 @@ impl App {
             let frames = t.frames_max.load(Ordering::Relaxed);
             ui_state.status_buffer = (frames > 0).then_some(frames as u32);
         }
-        let (_, sounding) = unpack_keys(self.midi.keys.load(Ordering::Relaxed));
-        ui_state.status_voices = Some((sounding as u32, DEFAULT_VOICE_COUNT as u32));
+        ui_state.status_voices = Some(self.midi.voices());
     }
 
     /// The status bar's right side: Diagnostics, Log, Retry audio and the output choice.
