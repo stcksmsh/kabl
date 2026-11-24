@@ -280,7 +280,7 @@ fn edges_fail_with_a_named_error() {
         "{err}"
     );
 
-    // G1: a route moving a cable parameter across the boundary.
+    // A route moving a cable parameter across the boundary needs a port like any crossing.
     let mut e = PatchEditor::from_log(f.log.clone());
     let route = *e
         .state()
@@ -295,7 +295,10 @@ fn edges_fail_with_a_named_error() {
     let mut log = e.log().clone();
     let err = refused(&mut log, &ports(&f), &controls(&f));
     assert!(
-        err.contains(&format!("Route {g1} moves a cable parameter")),
+        err.contains(&format!(
+            "No curated port covers cable {g1} (cable #{route}.amount inside, #{}.m2 outside)",
+            f.macros
+        )),
         "{err}"
     );
 

@@ -193,7 +193,7 @@ pub fn encapsulate(
         .map(|m| m.pos)
         .ok_or("Missing selected module")?;
     let mut c=Composite{name:name.trim().into(),help:"Open internals to inspect the real modules and routes. Editing affects this instance only.".into(),definition:definition(id),parent:None,members,pos,ports:BTreeMap::new(),controls:BTreeMap::new(),next_interface:1,panel:None};
-    for (_, target) in crossings(&p, &all)? {
+    for (_, target) in crossings(&p, &all) {
         expose(&mut c, target.clone(), binding_label(&target), false)?;
     }
     // Preserve pinned public controls as aliases of the original parameters.
@@ -222,27 +222,19 @@ pub fn encapsulate(
     commit(editor, p)?;
     Ok(id)
 }
-/// Cables that cross the boundary of `inside`, in cable-id order, each with its inside end.
-/// A route that moves a cable parameter across the boundary (G1) is refused.
-fn crossings(
-    p: &PatchState,
-    inside: &BTreeSet<ModuleId>,
-) -> Result<Vec<(kabl_core::CableId, PortRef)>, String> {
+/// Cables that cross the boundary of `inside`, in cable-id order, each with its inside end. A
+/// route into a cable parameter ends where that cable ends, so it crosses when its source and
+/// that module are on different sides; its inside end is then the cable parameter itself.
+fn crossings(p: &PatchState, inside: &BTreeSet<ModuleId>) -> Vec<(kabl_core::CableId, PortRef)> {
     let mut out = Vec::new();
     for (&cid, cable) in &p.cables {
         let a = cable.from.module_id().is_some_and(|m| inside.contains(&m));
         let b = p.end_module(cid).is_some_and(|m| inside.contains(&m));
         if a != b {
-            if matches!(cable.to, PortRef::CableParam { .. }) {
-                return Err(format!(
-                    "Route {cid} moves a cable parameter across the group boundary. Move the \
-                     route's source or the cable it moves into the group, or remove the route."
-                ));
-            }
             out.push((cid, if a { &cable.from } else { &cable.to }.clone()));
         }
     }
-    Ok(out)
+    out
 }
 /// Wraps the leaf modules `members` into a new top-level composite whose whole interface is
 /// curated, and appends it to `log` as one `SetComposite` entry, leaving every earlier entry,
@@ -253,9 +245,10 @@ fn crossings(
 /// `ports` then `controls` become interface keys `1..=n` in the order given (so a `panel` can
 /// place them). Nothing is exposed that the caller did not list. Refused, with nothing
 /// appended: a target outside `members`, a control that is not a parameter, a repeated label
-/// or target, a boundary crossing no port covers, a pinned parameter no control covers, and
-/// crossings a composite cannot express yet (a cable parameter moved across the boundary, or
-/// one outside source feeding several inside targets).
+/// or target, a boundary crossing no port covers, a pinned parameter no control covers, and a
+/// crossing a composite cannot express yet (one outside source feeding several inside
+/// targets). A cable parameter belongs to the module its cable ends on; it can be a port but
+/// not yet a control, because composite faces only draw knobs for module parameters.
 pub fn encapsulate_with(
     log: &mut PatchLog,
     name: &str,
@@ -281,9 +274,7 @@ pub fn encapsulate_with(
     for (list, control) in [(ports, false), (controls, true)] {
         let mut targets = Vec::new();
         for e in list {
-            if !e.target.module_id().is_some_and(|m| members.contains(&m))
-                || matches!(e.target, PortRef::CableParam { .. })
-            {
+            if !kabl_core::composite::owner(p, &e.target).is_some_and(|m| members.contains(&m)) {
                 return Err(format!(
                     "Exposure \"{}\": target {} is not inside the wrapped modules",
                     e.label,
@@ -310,7 +301,7 @@ pub fn encapsulate_with(
             targets.push(&e.target);
         }
     }
-    let crossing = crossings(p, &members)?;
+    let crossing = crossings(p, &members);
     // A curated port is one target; a source feeding two inside targets needs fan-in (G3).
     let mut fed: Vec<(&PortRef, kabl_core::CableId, &PortRef)> = Vec::new();
     for (cid, target) in &crossing {
@@ -469,6 +460,9 @@ pub fn remove_exposure(
     }
     set(editor, id, c)
 }
+/// The composite `root` with its members and the cables between them. A port bound to the
+/// parameter of a cable that crosses the boundary is dropped, because that cable stays behind;
+/// duplicate and publish go through here, so their copies lack that port.
 fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
     if !p.composites.contains_key(&root) {
         return Err("Missing composite".into());
@@ -488,10 +482,52 @@ fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
         .map(|(&id, _)| id)
         .collect();
     snapshot.cables.retain(|id, _| keep.contains(id));
+    // A route into a cable that crosses the boundary stays behind with that cable, and so does
+    // a port bound to that cable's parameter.
+    loop {
+        let ids: BTreeSet<kabl_core::CableId> = snapshot.cables.keys().copied().collect();
+        let before = ids.len();
+        snapshot.cables.retain(
+            |_, c| !matches!(&c.to, PortRef::CableParam { cable, .. } if !ids.contains(cable)),
+        );
+        if snapshot.cables.len() == before {
+            break;
+        }
+    }
+    let ids: BTreeSet<kabl_core::CableId> = snapshot.cables.keys().copied().collect();
+    for c in snapshot.composites.values_mut() {
+        let gone: Vec<u64> = c
+            .ports
+            .iter()
+            .chain(&c.controls)
+            .filter(|(_, e)| {
+                matches!(&e.target, PortRef::CableParam { cable, .. } if !ids.contains(cable))
+            })
+            .map(|(&key, _)| key)
+            .collect();
+        for key in gone {
+            c.ports.remove(&key);
+            c.controls.remove(&key);
+            if let Some(panel) = &mut c.panel {
+                panel.placements.remove(&key);
+            }
+        }
+    }
     snapshot.composites.retain(|id, _| groups.contains(id));
     snapshot.composites.get_mut(&root).unwrap().parent = None;
+    // Like the patch format, a package moves to its next schema only when it uses what an older
+    // reader refuses, so that reader says "unsupported" rather than "invalid public binding".
+    let schema = if snapshot
+        .composites
+        .values()
+        .any(kabl_core::composite::binds_cable_param)
+    {
+        2
+    } else {
+        1
+    };
     Ok(Package {
-        schema: 1,
+        schema,
         root,
         patch: snapshot,
     })
@@ -506,7 +542,7 @@ pub fn decode(bytes: &[u8]) -> Result<Package, String> {
         return Err("Composite package size limit".into());
     }
     let pkg: Package = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
-    if pkg.schema != 1
+    if !(1..=2).contains(&pkg.schema)
         || !pkg.patch.composites.contains_key(&pkg.root)
         || pkg.patch.composites[&pkg.root].parent.is_some()
         || kabl_core::composite::descendants(&pkg.patch, pkg.root).len()
@@ -539,6 +575,28 @@ fn insert_inner(
             .filter(|n| *n < u64::MAX)
             .ok_or("Module identity exhausted")?;
     }
+    // Cables are numbered in the order they are inserted below, so routes into a cable's
+    // parameters and composite bindings of those parameters follow the copy.
+    let mut cables = BTreeMap::new();
+    for (n, &id) in pkg.patch.cables.keys().enumerate() {
+        cables.insert(id, next_cable.saturating_add(n as u64));
+    }
+    let targets = pkg.patch.cables.values().map(|c| &c.to).chain(
+        pkg.patch
+            .composites
+            .values()
+            .flat_map(|c| c.ports.values().chain(c.controls.values()))
+            .map(|e| &e.target),
+    );
+    for t in targets {
+        if let PortRef::CableParam { cable, .. } = t {
+            if !cables.contains_key(cable) {
+                return Err(format!(
+                    "Package routes into cable {cable}, which it does not contain"
+                ));
+            }
+        }
+    }
     for &id in pkg.patch.composites.keys() {
         groups.insert(id, next_group);
         next_group = next_group
@@ -556,7 +614,10 @@ fn insert_inner(
                 id: modules[id],
                 param: param.clone(),
             },
-            PortRef::CableParam { .. } => t.clone(),
+            PortRef::CableParam { cable, param } => PortRef::CableParam {
+                cable: cables[cable],
+                param: param.clone(),
+            },
         }
     };
     let mut p = editor.state().clone();

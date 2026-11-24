@@ -87,6 +87,23 @@ pub fn leaves(p: &PatchState, root: CompositeId) -> BTreeSet<ModuleId> {
         .collect()
 }
 
+/// The module an interface binding belongs to: its own module, or, for a cable parameter, the
+/// module that cable ends on (where its route takes effect). Schema v9 allows a cable parameter
+/// as a port; a control must still be a module parameter, the only kind a face can draw.
+pub fn owner(p: &PatchState, target: &PortRef) -> Option<ModuleId> {
+    match target {
+        PortRef::CableParam { cable, .. } => p.end_module(*cable),
+        t => t.module_id(),
+    }
+}
+
+/// Whether the composite binds a cable parameter, which only schema v9 readers accept.
+pub fn binds_cable_param(c: &Composite) -> bool {
+    c.ports
+        .values()
+        .any(|e| matches!(e.target, PortRef::CableParam { .. }))
+}
+
 pub fn validate(p: &PatchState) -> Result<(), String> {
     if p.composites.len() > 128 {
         return Err("Composite count limit (128)".into());
@@ -159,7 +176,7 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
                 || key >= c.next_interface
                 || e.label.is_empty()
                 || e.label.len() > 128
-                || !e.target.module_id().is_some_and(|m| members.contains(&m))
+                || !owner(p, &e.target).is_some_and(|m| members.contains(&m))
             {
                 return Err(format!("Composite {id}: invalid public binding {key}"));
             }

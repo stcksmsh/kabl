@@ -3341,6 +3341,23 @@ pub fn validate_composites_scoped(patch: &PatchState, scope: &CodeScope) -> Resu
     kabl_core::composite::validate(patch)?;
     for (&id, c) in &patch.composites {
         for e in c.ports.values().chain(c.controls.values()) {
+            // A cable parameter is one a route can move (see `cable_dests`).
+            if let PortRef::CableParam { cable, param } = &e.target {
+                let movable = patch.cables.get(cable).is_some_and(|c| {
+                    if param == DEPTH {
+                        matches!(c.to, PortRef::Param { .. })
+                    } else {
+                        kabl_cables::mod_slot(param).is_some()
+                    }
+                });
+                if !movable {
+                    return Err(format!(
+                        "Composite {id}: missing interface target {:?}",
+                        e.target
+                    ));
+                }
+                continue;
+            }
             let Some(m) = e.target.module_id().and_then(|id| patch.modules.get(&id)) else {
                 return Err(format!(
                     "Composite {id}: missing interface target {:?}",
@@ -3352,7 +3369,7 @@ pub fn validate_composites_scoped(patch: &PatchState, scope: &CodeScope) -> Resu
             let valid = match &e.target {
                 PortRef::Module { port, .. } => info.ports.iter().any(|p| p.name == port),
                 PortRef::Param { param, .. } => info.params.iter().any(|p| p.name == param),
-                PortRef::CableParam { .. } => false,
+                PortRef::CableParam { .. } => unreachable!("handled above"),
             };
             if !valid {
                 return Err(format!(

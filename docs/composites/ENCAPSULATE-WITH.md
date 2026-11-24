@@ -32,8 +32,8 @@ kabl_ui::composites::encapsulate_with(
 - The candidate patch is validated and compiled before anything is written.
 
 The `mapping` part of an exposure (display range, unit, curve, scaled multi-target) is gap G2,
-roadmap row CI5. `Exposure` has no such field yet, and this API adds none, so the saved-file
-schema is unchanged.
+roadmap row CI5. `Exposure` has no such field yet, and this API adds none. Cable-parameter
+bindings are the one schema change; see below.
 
 ## Refusals
 
@@ -41,19 +41,58 @@ Each returns an error and leaves the log untouched:
 
 | Case | Error names |
 |---|---|
-| An exposure target outside `members` (or a cable parameter) | the exposure's label and target |
-| A control whose target is not a parameter | the label and target |
+| An exposure target outside `members` (a cable parameter's owner is outside) | the exposure's label and target |
+| A control whose target is not a module parameter (cable parameters are ports only) | the label and target |
 | Two exposures with the same label | the label |
 | The same target listed twice as a port, or twice as a control | the label and target |
 | A boundary crossing no port covers | every such cable, with its inside and outside ends (`#<module>.<port>`) |
 | A pinned parameter no control covers | the pin (`#<module>.<param>`) |
-| A route moving a cable parameter across the boundary (G1, CI3) | the route, with the same text interactive encapsulation uses |
 | One outside source feeding two inside targets (fan-in, G3, CI4) | both cables and the source |
 | A member that is missing or already owned | the module |
 
 Interactive encapsulation still accepts fan-in by giving each target its own port. The curated
 call refuses it because a curated interface would need one public input for several targets,
 which `Exposure` cannot hold until CI4.
+
+## Cable parameters (G1, CI3)
+
+A route can move a parameter of another cable (`PortRef::CableParam`): most often a macro
+driving the amount of an envelope → cutoff route. Such a parameter belongs to the module its
+cable ends on (`PatchState::end_module`, `kabl_core::composite::owner`). The route into it
+crosses the boundary when its source and that owner sit on different sides:
+
+| Source | Owner (where the moved cable ends) | Result |
+|---|---|---|
+| outside | inside | the route crosses; its inside end is the cable parameter, which becomes a port (interactive) or must be listed as one (curated) |
+| inside | outside | the route crosses; its inside end is the source's output jack |
+| same side | same side | no crossing, whichever way the moved cable itself runs |
+
+So when the moved cable itself straddles the boundary, only its destination decides: an
+envelope inside driving a cutoff outside leaves the amount outside, and the reverse brings it
+in. The flat graph does not change; the outside route still targets the same cable, so cues,
+CC maps on the macro and runtime writes to the route (`RuntimeTarget::Route`) resolve as
+before and the render is bit-identical. Opening the composite shows the inner route and its
+amount, editable as usual.
+
+A cable parameter can be a port, not a control: composite faces and panels only draw knobs
+for module parameters, so the core format refuses a cable-parameter control too
+(`Composite <id>: control must bind a parameter`).
+
+The binding follows its cable. Removing the owner or the cable's source module, disconnecting
+the cable, or reconnecting the cable's id so it ends outside the composite drops the port in
+the same entry, and undoing that entry puts the port back.
+
+Duplicating or publishing a composite copies the inner cables with new ids and rebinds the
+ports to them. A port on the parameter of a cable that crosses the boundary is dropped from
+the copy, because that cable is not copied; the original keeps it. A `.kablc` package is
+schema 2 when it still binds a cable parameter and schema 1 otherwise, so an older build
+refuses a schema 2 package as unsupported.
+
+**Schema.** Binding a cable parameter is schema v9. A v8 build (including `v1.0.0-rc.2`)
+refuses such a file on load with `Composite <id>: invalid public binding <key>`, so the
+writer chooses the version per file: v9 only when a saved log entry binds a cable parameter,
+v8 otherwise.
+Patches without one, every factory patch included, keep their bytes. Both versions load.
 
 ## Stability guarantees
 
