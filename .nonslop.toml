@@ -25,7 +25,7 @@ require = ["clean_tree", "pushed", "pr"]
 run = []
 gate_timeout_s = 1800
 # CLAUDE.md: run `cargo clean` before stopping; /secondary fills with target/ directories.
-auto_clean = true
+auto_clean = false
 # CLAUDE.md: under 30 GB free on /secondary, tell the coordinator before building.
 min_free_gb = 30
 stop_retries = 2
