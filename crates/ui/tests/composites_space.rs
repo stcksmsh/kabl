@@ -5,6 +5,9 @@ use kabl_core::{CompositeId, ModuleId, PatchState, PortRef};
 use kabl_ui::{composites, PatchEditor};
 use std::path::Path;
 
+#[path = "../../../tools/examples/space_composite.rs"]
+mod generator;
+
 const BLOCK: usize = 64;
 
 fn jack(id: ModuleId, port: &str) -> PortRef {
@@ -80,6 +83,18 @@ fn render_notes(p: &PatchState, held: usize, blocks: usize) -> Vec<f32> {
         );
     }
     audio
+}
+
+/// The committed definition is what the generator writes, so the two cannot drift apart.
+#[test]
+fn the_committed_space_is_what_the_generator_writes() {
+    let committed =
+        std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composites/space/v1.json"))
+            .unwrap();
+    assert!(
+        generator::bytes() == committed,
+        "composites/space/v1.json differs from `space_composite write composites`"
+    );
 }
 
 #[test]

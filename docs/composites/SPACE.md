@@ -75,8 +75,9 @@ jacks in two columns on the right. No artwork.
   Room mod.
 - Nothing in the C2 interface needs CI3 (cable amounts) or CI4 (fan-in).
 - The delay's ping-pong `mode` is not exposed (the catalogue does not list it). It stays at
-  mono, Soft Sine's setting. Glass Needle (a C2 patch) and Glass Elevator use ping-pong, so a
-  migration of those two would need it as an extra control.
+  mono, Soft Sine's setting. Glass Needle (a C2 patch) and Glass Elevator are the only presets
+  whose delay stores `mode` 1 (ping-pong), so a migration of those two would need it as an
+  extra control.
 
 ## Regenerating
 
@@ -92,6 +93,8 @@ The same example renders `wav DIR` (a phrase on the default voice, dry and throu
 
 `crates/ui/tests/composites_space.rs`:
 
+- `the_committed_space_is_what_the_generator_writes`: includes the generator example and
+  compares its bytes with `composites/space/v1.json`, so the two cannot drift.
 - `space_loads_from_the_bank_with_its_interface`: the bank lists `kabl.space` v1 with the
   ports and controls above, around `split`, `delay`, `reverb`.
 - `space_alone_renders_a_wet_tail`: `audio.in → Space → out`, a 50 ms tone, then a tail after
