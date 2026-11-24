@@ -387,7 +387,7 @@ fn the_last_folder_of_each_place_survives_a_restart_and_a_missing_one_is_dropped
     // And a place with nothing remembered starts in home.
     assert_eq!(
         filebrowser::start_dir(&after, Place::Patches, ""),
-        std::env::var_os("HOME").map_or(PathBuf::from("/"), PathBuf::from)
+        kabl_ui::library::paths::home_dir().unwrap_or_else(|| PathBuf::from("/"))
     );
 }
 
