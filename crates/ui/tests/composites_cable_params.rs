@@ -327,3 +327,50 @@ fn duplicating_keeps_the_port_on_the_copied_cable() {
     assert!(cable.from.module_id().is_some_and(|m| leaves.contains(&m)));
     assert!(p.end_module(bound[0]).is_some_and(|m| leaves.contains(&m)));
 }
+
+#[test]
+fn duplicating_drops_the_port_on_a_cable_that_stays_outside() {
+    // The route enters the filter from the envelope outside, so its amount is a port of the
+    // filter group, but the route itself is not copied: the copy has no such port.
+    let f = fixture();
+    let mut e = PatchEditor::from_log(f.log.clone());
+    let id = composites::encapsulate(&mut e, BTreeSet::from([FILTER]), BTreeSet::new(), "Filter")
+        .unwrap();
+    assert!(ports_of(e.state(), id).contains(&amount(f.route)));
+
+    let pkg = composites::package(e.state(), id).unwrap();
+    let root = &pkg.patch.composites[&id];
+    assert!(root.ports.values().all(|x| x.target != amount(f.route)));
+    assert!(root
+        .ports
+        .values()
+        .any(|x| x.target == param(FILTER, "cutoff_hz")));
+    assert_eq!(pkg.schema, 1, "no cable parameter left to bind");
+
+    let copy = composites::duplicate(&mut e, id).unwrap();
+    let ports = ports_of(e.state(), copy);
+    assert!(
+        !ports
+            .iter()
+            .any(|t| matches!(t, PortRef::CableParam { .. })),
+        "{ports:?}"
+    );
+    assert_eq!(ports.len(), ports_of(e.state(), id).len() - 1);
+}
+
+#[test]
+fn a_package_binding_a_cable_param_is_schema_2() {
+    let f = fixture();
+    let mut e = PatchEditor::from_log(f.log.clone());
+    let id = composites::encapsulate(&mut e, voice(), BTreeSet::new(), "Voice").unwrap();
+    let pkg = composites::package(e.state(), id).unwrap();
+    assert_eq!(pkg.schema, 2);
+    let bytes = serde_json::to_vec(&pkg).unwrap();
+    assert_eq!(composites::decode(&bytes).unwrap().schema, 2);
+
+    // A package from a newer build is refused as unsupported, not opened.
+    let mut newer = pkg.clone();
+    newer.schema = 3;
+    let err = composites::decode(&serde_json::to_vec(&newer).unwrap()).unwrap_err();
+    assert!(err.contains("Unsupported"), "{err}");
+}

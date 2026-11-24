@@ -460,6 +460,9 @@ pub fn remove_exposure(
     }
     set(editor, id, c)
 }
+/// The composite `root` with its members and the cables between them. A port bound to the
+/// parameter of a cable that crosses the boundary is dropped, because that cable stays behind;
+/// duplicate and publish go through here, so their copies lack that port.
 fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
     if !p.composites.contains_key(&root) {
         return Err("Missing composite".into());
@@ -512,8 +515,19 @@ fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
     }
     snapshot.composites.retain(|id, _| groups.contains(id));
     snapshot.composites.get_mut(&root).unwrap().parent = None;
+    // Like the patch format, a package moves to its next schema only when it uses what an older
+    // reader refuses, so that reader says "unsupported" rather than "invalid public binding".
+    let schema = if snapshot
+        .composites
+        .values()
+        .any(kabl_core::composite::binds_cable_param)
+    {
+        2
+    } else {
+        1
+    };
     Ok(Package {
-        schema: 1,
+        schema,
         root,
         patch: snapshot,
     })
@@ -528,7 +542,7 @@ pub fn decode(bytes: &[u8]) -> Result<Package, String> {
         return Err("Composite package size limit".into());
     }
     let pkg: Package = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
-    if pkg.schema != 1
+    if !(1..=2).contains(&pkg.schema)
         || !pkg.patch.composites.contains_key(&pkg.root)
         || pkg.patch.composites[&pkg.root].parent.is_some()
         || kabl_core::composite::descendants(&pkg.patch, pkg.root).len()

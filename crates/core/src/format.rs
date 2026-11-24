@@ -20,7 +20,7 @@ use crate::op::Entry;
 /// port (`in`, `out`) where v7 files name the pair `in_l`/`in_r`, `left`/`right`. A v7 build
 /// refuses a v8 file. Files below v8 name the old ports and are refused.
 ///
-/// v9 lets a composite port or control bind a cable parameter (`PortRef::CableParam`). A v8
+/// v9 lets a composite port bind a cable parameter (`PortRef::CableParam`). A v8
 /// build refuses such a binding, so a file is written as v9 only when its log contains one and
 /// stays v8 otherwise; both load.
 pub const CURRENT_SCHEMA_VERSION: u32 = 9;

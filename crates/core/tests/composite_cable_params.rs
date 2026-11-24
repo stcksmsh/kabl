@@ -96,24 +96,104 @@ fn wrap(log: &mut PatchLog, members: &[u64], control: bool) {
 
 #[test]
 fn the_owner_is_the_module_the_cable_ends_on() {
-    for control in [false, true] {
-        let mut log = base();
-        wrap(&mut log, &[ENV, FILTER], control);
-        composite::validate(log.state()).unwrap();
-        assert_eq!(composite::owner(log.state(), &amount()), Some(FILTER));
-
-        // The route ends on the filter: wrapping only the envelope does not own its amount.
-        let mut log = base();
-        wrap(&mut log, &[ENV], control);
-        let err = composite::validate(log.state()).unwrap_err();
-        assert!(err.contains("invalid public binding 1"), "{err}");
-    }
-
-    // A binding of a cable that is gone has no owner.
     let mut log = base();
     wrap(&mut log, &[ENV, FILTER], false);
-    log.append(Op::Disconnect { id: ROUTE }, 0, Source::User);
-    assert!(composite::validate(log.state()).is_err());
+    composite::validate(log.state()).unwrap();
+    assert_eq!(composite::owner(log.state(), &amount()), Some(FILTER));
+
+    // The route ends on the filter: wrapping only the envelope does not own its amount.
+    let mut log = base();
+    wrap(&mut log, &[ENV], false);
+    let err = composite::validate(log.state()).unwrap_err();
+    assert!(err.contains("invalid public binding 1"), "{err}");
+}
+
+#[test]
+fn a_cable_param_cannot_be_a_control() {
+    // A face draws module parameters only, so a control on a cable parameter would be invisible.
+    let mut log = base();
+    wrap(&mut log, &[ENV, FILTER], true);
+    let err = composite::validate(log.state()).unwrap_err();
+    assert!(err.contains("control must bind a parameter"), "{err}");
+}
+
+fn ports(log: &PatchLog) -> Vec<PortRef> {
+    log.state().composites[&1]
+        .ports
+        .values()
+        .map(|e| e.target.clone())
+        .collect()
+}
+
+/// Applies `op` to a wrapped voice: the binding goes and the composite stays valid; undo brings
+/// the binding back, redo drops it again.
+fn assert_binding_drops_until_undone(op: Op) {
+    let mut log = base();
+    wrap(&mut log, &[ENV, FILTER], false);
+    let before = log.state().clone();
+    log.append(op, 0, Source::User);
+    assert!(ports(&log).is_empty());
+    composite::validate(log.state()).unwrap();
+    assert!(log.undo());
+    assert_eq!(log.state(), &before);
+    assert_eq!(ports(&log), vec![amount()]);
+    assert!(log.redo());
+    assert!(ports(&log).is_empty());
+}
+
+#[test]
+fn removing_the_owner_drops_the_binding_until_undone() {
+    assert_binding_drops_until_undone(Op::RemoveModule { id: FILTER });
+}
+
+#[test]
+fn removing_the_source_module_drops_the_binding_until_undone() {
+    // The envelope takes its route with it, so the amount has nothing to belong to.
+    assert_binding_drops_until_undone(Op::RemoveModule { id: ENV });
+}
+
+#[test]
+fn disconnecting_the_route_drops_the_binding_until_undone() {
+    assert_binding_drops_until_undone(Op::Disconnect { id: ROUTE });
+}
+
+#[test]
+fn moving_the_route_out_of_the_composite_drops_the_binding_until_undone() {
+    // The macro module 1 is outside the voice; reconnecting the route there moves its owner out.
+    assert_binding_drops_until_undone(Op::Connect {
+        id: ROUTE,
+        from: PortRef::Module {
+            id: ENV,
+            port: "out".into(),
+        },
+        to: PortRef::Param {
+            id: 1,
+            param: "value".into(),
+        },
+    });
+}
+
+#[test]
+fn moving_the_route_inside_the_composite_keeps_the_binding() {
+    let mut log = base();
+    wrap(&mut log, &[ENV, FILTER], false);
+    log.append(
+        Op::Connect {
+            id: ROUTE,
+            from: PortRef::Module {
+                id: ENV,
+                port: "out".into(),
+            },
+            to: PortRef::Param {
+                id: FILTER,
+                param: "q".into(),
+            },
+        },
+        0,
+        Source::User,
+    );
+    assert_eq!(ports(&log), vec![amount()]);
+    composite::validate(log.state()).unwrap();
 }
 
 #[test]

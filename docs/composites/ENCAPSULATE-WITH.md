@@ -74,12 +74,19 @@ CC maps on the macro and runtime writes to the route (`RuntimeTarget::Route`) re
 before and the render is bit-identical. Opening the composite shows the inner route and its
 amount, editable as usual.
 
-A cable parameter can be a port, not yet a control: composite faces and panels only draw
-knobs for module parameters. The core format accepts both.
+A cable parameter can be a port, not a control: composite faces and panels only draw knobs
+for module parameters, so the core format refuses a cable-parameter control too
+(`Composite <id>: control must bind a parameter`).
+
+The binding follows its cable. Removing the owner or the cable's source module, disconnecting
+the cable, or reconnecting the cable's id so it ends outside the composite drops the port in
+the same entry, and undoing that entry puts the port back.
 
 Duplicating or publishing a composite copies the inner cables with new ids and rebinds the
 ports to them. A port on the parameter of a cable that crosses the boundary is dropped from
-the copy, because that cable is not copied.
+the copy, because that cable is not copied; the original keeps it. A `.kablc` package is
+schema 2 when it still binds a cable parameter and schema 1 otherwise, so an older build
+refuses a schema 2 package as unsupported.
 
 **Schema.** Binding a cable parameter is schema v9. A v8 build (including `v1.0.0-rc.2`)
 refuses such a file on load with `Composite <id>: invalid public binding <key>`, so the

@@ -115,30 +115,19 @@ impl PatchState {
                     });
                 }
                 ops.extend(self.removed_cable_ops(op));
-                for (&cid, c) in &self.composites {
-                    if c.members.contains(id)
-                        || c.controls
-                            .values()
-                            .chain(c.ports.values())
-                            .any(|e| e.target.module_id() == Some(*id))
-                    {
-                        ops.push(Op::SetComposite {
-                            id: cid,
-                            value: Some(c.clone()),
-                        });
-                    }
-                }
+                ops.extend(self.changed_composite_ops(op));
                 Op::Group { ops }
             }
             Op::Connect { id, .. } => match self.cables.get(id) {
-                // Connecting over an existing id replaces it; the inverse puts the old one back.
+                // Connecting over an existing id replaces it; the inverse puts the old one back,
+                // with any cable-parameter binding the move dropped.
                 Some(c) => Op::Group {
-                    ops: cable_restore_ops(*id, c),
+                    ops: [cable_restore_ops(*id, c), self.changed_composite_ops(op)].concat(),
                 },
                 None => Op::Disconnect { id: *id },
             },
             Op::Disconnect { .. } => Op::Group {
-                ops: self.removed_cable_ops(op),
+                ops: [self.removed_cable_ops(op), self.changed_composite_ops(op)].concat(),
             },
             Op::SetParam { target, .. } | Op::UnsetParam { target } => match self.param(target) {
                 Some(old) => Op::SetParam {
@@ -198,6 +187,51 @@ impl PatchState {
             }
         }
         None
+    }
+
+    /// Ops that put back every composite `op` changes, as it is in this state.
+    fn changed_composite_ops(&self, op: &Op) -> Vec<Op> {
+        // Tables and labels never affect composites; leave them out of the trial copy.
+        let mut after = PatchState {
+            composites: self.composites.clone(),
+            tables: BTreeMap::new(),
+            modules: self.modules.clone(),
+            cables: self.cables.clone(),
+            labels: BTreeMap::new(),
+        };
+        after.apply(op);
+        self.composites
+            .iter()
+            .filter(|(id, c)| after.composites.get(id) != Some(*c))
+            .map(|(&id, c)| Op::SetComposite {
+                id,
+                value: Some(c.clone()),
+            })
+            .collect()
+    }
+
+    /// A composite binding of a cable parameter goes when its owner (the module the cable ends
+    /// on) is no longer inside the composite: the cable was removed or now ends elsewhere.
+    fn prune_cable_bindings(&mut self) {
+        let mut stale = Vec::new();
+        for (&id, c) in &self.composites {
+            for (&key, e) in c.ports.iter().chain(&c.controls) {
+                if matches!(e.target, PortRef::CableParam { .. })
+                    && !crate::composite::owner(self, &e.target)
+                        .is_some_and(|m| crate::composite::leaves(self, id).contains(&m))
+                {
+                    stale.push((id, key));
+                }
+            }
+        }
+        for (id, key) in stale {
+            let c = self.composites.get_mut(&id).unwrap();
+            c.ports.remove(&key);
+            c.controls.remove(&key);
+            if let Some(panel) = &mut c.panel {
+                panel.placements.remove(&key);
+            }
+        }
     }
 
     /// Ops that put back every cable `op` (a `RemoveModule` or `Disconnect`) removes from this
@@ -282,6 +316,7 @@ impl PatchState {
                     c.from.module_id() != Some(*id) && c.to.module_id() != Some(*id)
                 });
                 self.prune_cable_routes();
+                self.prune_cable_bindings();
             }
             Op::Connect { id, from, to } => {
                 self.cables.insert(
@@ -293,10 +328,12 @@ impl PatchState {
                         steps: Vec::new(),
                     },
                 );
+                self.prune_cable_bindings();
             }
             Op::Disconnect { id } => {
                 self.cables.remove(id);
                 self.prune_cable_routes();
+                self.prune_cable_bindings();
             }
             Op::SetParam { target, value } => match target {
                 ParamTarget::Module { id, param } => {
