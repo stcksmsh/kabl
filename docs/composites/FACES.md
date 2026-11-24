@@ -7,7 +7,7 @@ and whole module blocks, all laid out on a dedicated design page. Owner request,
 in/out jacks, knobs, sliders, buttons (like cues of their own or the sine/triangle/...
 selection things), facets for visuals like the waveforms do etc."
 
-This is a design, not code. Every reference is `file:line` on `origin/master` at `76699c8a`.
+This is a design, not code. Every reference is `file:line` on `origin/master` at `266bb279`.
 The owner's decisions (section 8) were given on 2026-11-24 and the sections before them follow
 them.
 
@@ -540,7 +540,7 @@ Pre-1.0 rule: one format step, no migration code. Exactly:
 
 ### 6.2 Composite-level kinds
 
-- `display`: `displays::draw` takes `(id, info)` instead of `&Placed`. Checked at `76699c8a`: the
+- `display`: `displays::draw` takes `(id, info)` instead of `&Placed`. Checked at `266bb279`: the
   three display files read only `m.id` and `m.info` (29 field uses: 15 in `displays.rs`, 12 in
   `fx_displays.rs`, 2 in `drum_displays.rs`), and every function they pass `m` to (`param`,
   `displays.rs:365`; `live_param`, `fx_displays.rs:43`; the per-kind drawers) is in the same three
@@ -585,13 +585,18 @@ rest behind an expand chip, as module faces do.
   drawer grows to the right, so the fold is a width, not a height: `compact_width` on `Panel`
   (section 5.1). A placement whose footprint ends at or left of `compact_width` is in the compact
   face; one that starts at or right of it is in the expanded part; one that crosses it is refused
-  by `Panel::validate`. Position decides, so no per-placement flag is stored and what the author
+  by `Panel::validate`. A `jack` placement must be in the compact face: module faces draw every
+  jack whatever is hidden (`draw_jacks` runs after the control loop, `lib.rs:3267`), so a cable
+  always has an anchor, and refusing jacks past the fold keeps that true for composites without
+  a second anchor rule. The chip has a reserved rect, 54x22 in the compact face's bottom-right
+  corner (x from `compact_width - 62`, y from 310), and `Panel::validate` refuses a compact
+  placement that overlaps it, so the chip never covers a control. Position decides, so no per-placement flag is stored and what the author
   sees on the design page is what the rack draws.
 - **Drawing.** With `compact_width` set and the composite not expanded, the rack slot is
   `compact_width` wide (the three width reads at `rack_editor.rs:111`, `composites.rs:1091`,
   `lib.rs:2756` go through one `Panel::shown_width(expanded)`), the artwork is clipped to it,
-  and a "+N" chip (N = placements in the expanded part) is drawn at the fold with the module
-  chip's look. Expanded, the whole face is drawn at the same origin, over its right-hand
+  and a "+N" chip (N = placements in the expanded part) is drawn in its reserved rect with the
+  module chip's look. Expanded, the whole face is drawn at the same origin, over its right-hand
   neighbours like the module drawer, and the chip reads "Less". The state is a
   `ui_state.expanded_composites: BTreeSet<CompositeId>`, session only, cleared with
   `expanded` so one face or module is open at a time.
@@ -853,10 +858,12 @@ page), under the job scratch dir; anything audible is an offline render or runs 
     `crates/ui/src/rack_editor.rs`, `crates/ui/src/composites.rs`, `crates/ui/src/panels.rs`,
     tests.
     Done means: `Panel::compact_width` with its serde default, `Panel::validate` refuses a
-    width outside 180..`width` or off the 30-point grid and a placement that crosses the fold
-    (one test each), and `schema_for` writes v10 for a panel that sets it (test); collapsed, the
-    rack slot is `compact_width` wide, only compact placements draw and take hits, and the chip
-    shows the count of the others (test); a click on the chip draws the whole face at the same
+    width outside 180..`width` or off the 30-point grid, a placement that crosses the fold, a
+    `jack` placement past the fold and a compact placement overlapping the chip rect (one test
+    each), and `schema_for` writes v10 for a panel that sets it (test); collapsed, the
+    rack slot is `compact_width` wide, only compact placements draw and take hits, every jack
+    draws and anchors its cables at the same point collapsed and expanded (test), and the chip
+    draws in its reserved rect with the count of the others (test); a click on the chip draws the whole face at the same
     origin with "Less", leaves the rack layout bounds unchanged (test, as
     `rack_editor.rs:1268-1276`) and opening it closes an expanded module (test); a panel without
     `compact_width` draws as before (test); the design page's fold line sets and removes it as
