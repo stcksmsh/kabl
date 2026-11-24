@@ -2809,7 +2809,7 @@ fn acid_line() -> Rack {
             ("sync", 3.0),
             ("time_ms", 240.0),
             ("feedback", 35.0),
-            ("mix", 0.16),
+            ("mix", 16.0),
             ("tone_hz", 3000.0),
         ],
     );
@@ -2818,7 +2818,7 @@ fn acid_line() -> Rack {
         &[
             ("decay_s", 0.8),
             ("damp_hz", 3500.0),
-            ("mix", 0.08),
+            ("mix", 8.0),
             ("predelay_ms", 0.0),
             ("width", 60.0),
         ],
