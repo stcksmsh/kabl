@@ -305,6 +305,7 @@ impl AudioHost {
             sample_rate,
             channels,
             rt_tried: !realtime,
+            #[cfg(not(windows))]
             _rt_handle: None,
             #[cfg(test)]
             warmups: 0,

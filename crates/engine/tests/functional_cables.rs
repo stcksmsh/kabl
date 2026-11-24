@@ -609,8 +609,9 @@ fn undo_save_and_reload_recall_the_cable() {
     let dir = tempfile::tempdir().unwrap();
     kabl_core::save(dir.path(), &log).unwrap();
     let meta = std::fs::read_to_string(dir.path().join("meta.toml")).unwrap();
-    assert!(meta.contains(&format!("schema_version = {CURRENT_SCHEMA_VERSION}")));
-    assert_eq!(CURRENT_SCHEMA_VERSION, 8);
+    // No composite binds a cable parameter, so the file stays readable by v8 builds.
+    assert!(meta.contains("schema_version = 8"), "{meta}");
+    assert_eq!(CURRENT_SCHEMA_VERSION, 9);
     let back = kabl_core::load(dir.path()).unwrap();
     assert_eq!(back.state(), &functional);
     assert_eq!(render_state(back.state()), sound, "recall sounds the same");

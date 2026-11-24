@@ -115,30 +115,19 @@ impl PatchState {
                     });
                 }
                 ops.extend(self.removed_cable_ops(op));
-                for (&cid, c) in &self.composites {
-                    if c.members.contains(id)
-                        || c.controls
-                            .values()
-                            .chain(c.ports.values())
-                            .any(|e| e.target.module_id() == Some(*id))
-                    {
-                        ops.push(Op::SetComposite {
-                            id: cid,
-                            value: Some(c.clone()),
-                        });
-                    }
-                }
+                ops.extend(self.changed_composite_ops(op));
                 Op::Group { ops }
             }
             Op::Connect { id, .. } => match self.cables.get(id) {
-                // Connecting over an existing id replaces it; the inverse puts the old one back.
+                // Connecting over an existing id replaces it; the inverse puts the old one back,
+                // with any cable-parameter binding the move dropped.
                 Some(c) => Op::Group {
-                    ops: cable_restore_ops(*id, c),
+                    ops: [cable_restore_ops(*id, c), self.changed_composite_ops(op)].concat(),
                 },
                 None => Op::Disconnect { id: *id },
             },
             Op::Disconnect { .. } => Op::Group {
-                ops: self.removed_cable_ops(op),
+                ops: [self.removed_cable_ops(op), self.changed_composite_ops(op)].concat(),
             },
             Op::SetParam { target, .. } | Op::UnsetParam { target } => match self.param(target) {
                 Some(old) => Op::SetParam {
@@ -198,6 +187,67 @@ impl PatchState {
             }
         }
         None
+    }
+
+    /// Ops that put back every composite `op` changes, as it is in this state.
+    fn changed_composite_ops(&self, op: &Op) -> Vec<Op> {
+        // Most patches have no composites; skip the trial copy for them.
+        if self.composites.is_empty() {
+            return Vec::new();
+        }
+        #[cfg(test)]
+        TRIALS.with(|n| n.set(n.get() + 1));
+        // Tables and labels never affect composites; leave them out of the trial copy.
+        let mut after = PatchState {
+            composites: self.composites.clone(),
+            tables: BTreeMap::new(),
+            modules: self.modules.clone(),
+            cables: self.cables.clone(),
+            labels: BTreeMap::new(),
+        };
+        after.apply(op);
+        self.composites
+            .iter()
+            .filter(|(id, c)| after.composites.get(id) != Some(*c))
+            .map(|(&id, c)| Op::SetComposite {
+                id,
+                value: Some(c.clone()),
+            })
+            .collect()
+    }
+
+    /// A composite binding of a cable parameter goes when its owner (the module the cable ends
+    /// on) is no longer inside the composite: the cable was removed or now ends elsewhere. A
+    /// port that feeds several targets loses only that one and goes with its last.
+    fn prune_cable_bindings(&mut self) {
+        let mut changed = Vec::new();
+        for (&id, c) in &self.composites {
+            for (&key, e) in &c.ports {
+                if !e.targets().any(|t| matches!(t, PortRef::CableParam { .. })) {
+                    continue;
+                }
+                let leaves = crate::composite::leaves(self, id);
+                let mut e = e.clone();
+                let live = e.retain_targets(|t| {
+                    !matches!(t, PortRef::CableParam { .. })
+                        || crate::composite::owner(self, t).is_some_and(|m| leaves.contains(&m))
+                });
+                if c.ports[&key] != e || !live {
+                    changed.push((id, key, live.then_some(e)));
+                }
+            }
+        }
+        for (id, key, e) in changed {
+            let c = self.composites.get_mut(&id).unwrap();
+            if let Some(e) = e {
+                c.ports.insert(key, e);
+            } else {
+                c.ports.remove(&key);
+                if let Some(panel) = &mut c.panel {
+                    panel.placements.remove(&key);
+                }
+            }
+        }
     }
 
     /// Ops that put back every cable `op` (a `RemoveModule` or `Disconnect`) removes from this
@@ -270,7 +320,8 @@ impl PatchState {
                 for c in self.composites.values_mut() {
                     c.members.remove(id);
                     c.controls.retain(|_, e| e.target.module_id() != Some(*id));
-                    c.ports.retain(|_, e| e.target.module_id() != Some(*id));
+                    c.ports
+                        .retain(|_, e| e.retain_targets(|t| t.module_id() != Some(*id)));
                     if let Some(panel) = &mut c.panel {
                         panel.placements.retain(|key, _| {
                             c.controls.contains_key(key) || c.ports.contains_key(key)
@@ -282,6 +333,7 @@ impl PatchState {
                     c.from.module_id() != Some(*id) && c.to.module_id() != Some(*id)
                 });
                 self.prune_cable_routes();
+                self.prune_cable_bindings();
             }
             Op::Connect { id, from, to } => {
                 self.cables.insert(
@@ -293,10 +345,12 @@ impl PatchState {
                         steps: Vec::new(),
                     },
                 );
+                self.prune_cable_bindings();
             }
             Op::Disconnect { id } => {
                 self.cables.remove(id);
                 self.prune_cable_routes();
+                self.prune_cable_bindings();
             }
             Op::SetParam { target, value } => match target {
                 ParamTarget::Module { id, param } => {
@@ -381,4 +435,68 @@ fn cable_restore_ops(id: CableId, c: &CableState) -> Vec<Op> {
         });
     }
     ops
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Trial states `changed_composite_ops` built on this thread.
+    static TRIALS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Composite, Definition};
+
+    fn trials_for(p: &PatchState, op: &Op) -> usize {
+        let before = TRIALS.with(|n| n.get());
+        p.inverse_for(op);
+        TRIALS.with(|n| n.get()) - before
+    }
+
+    #[test]
+    fn the_composite_trial_state_is_built_only_when_there_are_composites() {
+        let mut p = PatchState::new();
+        for id in [1, 2] {
+            p.apply(&Op::AddModule {
+                id,
+                kind: "osc.va".into(),
+                pos: Vec2::default(),
+            });
+        }
+        let jack = |id, port: &str| PortRef::Module {
+            id,
+            port: port.into(),
+        };
+        p.apply(&Op::Connect {
+            id: 1,
+            from: jack(1, "out"),
+            to: jack(2, "pitch"),
+        });
+        let edits = [Op::RemoveModule { id: 1 }, Op::Disconnect { id: 1 }];
+        for op in &edits {
+            assert_eq!(trials_for(&p, op), 0, "{op:?}");
+        }
+        p.apply(&Op::SetComposite {
+            id: 1,
+            value: Some(Composite {
+                name: "Pair".into(),
+                help: String::new(),
+                definition: Definition {
+                    id: "pair".into(),
+                    version: 1,
+                },
+                parent: None,
+                members: [2].into(),
+                pos: Vec2::default(),
+                ports: BTreeMap::new(),
+                controls: BTreeMap::new(),
+                next_interface: 1,
+                panel: None,
+            }),
+        });
+        for op in &edits {
+            assert_eq!(trials_for(&p, op), 1, "{op:?}");
+        }
+    }
 }

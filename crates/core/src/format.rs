@@ -19,7 +19,35 @@ use crate::op::Entry;
 /// v8 is not a superset: stereo effects, `out`, `audio.in`, `pan` and `delay` have one width-2
 /// port (`in`, `out`) where v7 files name the pair `in_l`/`in_r`, `left`/`right`. A v7 build
 /// refuses a v8 file. Files below v8 name the old ports and are refused.
-pub const CURRENT_SCHEMA_VERSION: u32 = 8;
+///
+/// v9 lets a composite port bind a cable parameter (`PortRef::CableParam`) and feed several
+/// targets (`Exposure::also`, fan-in). A v8 build refuses either, so a file is written as v9
+/// only when its log contains one and stays v8 otherwise; both load.
+pub const CURRENT_SCHEMA_VERSION: u32 = 9;
+const OLDEST_SCHEMA_VERSION: u32 = 8;
+
+/// The lowest schema that can hold `log`: v9 when any entry `save` writes (its op or its
+/// inverse) has a composite port that binds a cable parameter or feeds several targets, else v8.
+pub fn schema_for(log: &PatchLog) -> u32 {
+    fn binds(op: &crate::Op) -> bool {
+        match op {
+            crate::Op::SetComposite { value: Some(c), .. } => {
+                crate::composite::binds_cable_param(c) || crate::composite::fans_in(c)
+            }
+            crate::Op::Group { ops } => ops.iter().any(binds),
+            _ => false,
+        }
+    }
+    if log
+        .entries()
+        .iter()
+        .any(|e| binds(&e.op) || binds(&e.inverse))
+    {
+        CURRENT_SCHEMA_VERSION
+    } else {
+        OLDEST_SCHEMA_VERSION
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Meta {
@@ -77,7 +105,7 @@ pub fn save(dir: &Path, log: &PatchLog) -> Result<(), FormatError> {
     fs::write(dir.join("checkpoint.json"), checkpoint)?;
 
     let meta = Meta {
-        schema_version: CURRENT_SCHEMA_VERSION,
+        schema_version: schema_for(log),
     };
     let meta_toml = toml::to_string_pretty(&meta).map_err(|e| FormatError::Toml(e.to_string()))?;
     fs::write(dir.join("meta.toml"), meta_toml)?;
@@ -94,12 +122,12 @@ pub fn load(dir: &Path) -> Result<PatchLog, FormatError> {
     replay(&fs::read_to_string(dir.join("log.jsonl"))?)
 }
 
-/// Accepts only the current schema. Older development builds wrote other port names and are
+/// Accepts v8 and v9. Older development builds wrote other port names and are
 /// not supported (nothing is fixed before 1.0), so they get a clear refusal instead of a guess.
 fn check_schema(schema_version: u32) -> Result<(), FormatError> {
-    if schema_version == CURRENT_SCHEMA_VERSION {
+    if (OLDEST_SCHEMA_VERSION..=CURRENT_SCHEMA_VERSION).contains(&schema_version) {
         Ok(())
-    } else if schema_version < CURRENT_SCHEMA_VERSION {
+    } else if schema_version < OLDEST_SCHEMA_VERSION {
         Err(FormatError::Unsupported(format!(
             "schema {schema_version} was made by an older kabl development build; not supported"
         )))
@@ -221,7 +249,7 @@ pub fn write_kabl_full<W: Write>(
     w.write_all(&HEADER_PAYLOAD.to_le_bytes())?;
     w.write_all(b"KABL")?;
     w.write_all(&KABL_CONTAINER_VERSION.to_le_bytes())?;
-    w.write_all(&(CURRENT_SCHEMA_VERSION as u16).to_le_bytes())?;
+    w.write_all(&(schema_for(log) as u16).to_le_bytes())?;
     w.write_all(&KABL_DICT_ID.to_le_bytes())?;
     if let Some(m) = meta {
         write_frame(&mut w, SKIPPABLE_META, m.as_bytes())?;

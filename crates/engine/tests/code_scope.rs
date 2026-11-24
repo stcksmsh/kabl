@@ -197,6 +197,7 @@ fn a_composite_validates_against_its_own_blobs_interface() {
             0,
             Exposure {
                 label: "In".into(),
+                also: vec![],
                 target: PortRef::Module {
                     id: 1,
                     port: "in".into(),

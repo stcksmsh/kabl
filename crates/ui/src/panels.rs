@@ -576,7 +576,8 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
                                 if dir == kabl_modules::PortDirection::Output {
                                     view.pending_output = Some(e.target.clone());
                                 } else if let Some(from) = view.pending_output.take() {
-                                    editor.connect(from, e.target.clone());
+                                    let open = &view.composites.open;
+                                    composites::connect(editor, open, from, e.target.clone());
                                 }
                             }
                         }
