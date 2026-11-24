@@ -1,14 +1,16 @@
-//! First run (UI spec 7): the patch a new user starts on, and the guided tour over it.
+//! First run (UI spec 7): the patch a new user starts on, already playing in the rack, with
+//! lesson 00 (`lessons/00-start-here.toml`, on the Start card) over it.
 //!
 //! **The start patch.** It has to sound good untouched (a clock drives a sequencer, so it plays
 //! by itself), have one obvious modulated knob (the filter's cutoff, opened by the envelope on
-//! every note: the teal arc the tour points at) and show the living rack (sequencer lane, beads
+//! every note: the teal arc lesson 00 points at) and show the living rack (sequencer lane, beads
 //! on the cables, scopes). Three candidates are built here from one recipe; `START` picks the one
 //! the app ships. `tools/examples/first_run_candidates.rs` renders each for the listening gate.
 
-use kabl_core::{ModuleId, PortRef, Vec2};
+use kabl_core::{PortRef, Vec2};
 
-use crate::PatchEditor;
+use crate::browser::{Doc, DocOrigin};
+use crate::{PatchEditor, UiState};
 
 /// One candidate start patch.
 pub struct Candidate {
@@ -128,7 +130,7 @@ fn build(s: &Spec) -> PatchEditor {
     let mut e = PatchEditor::seed_from(&Default::default());
     let at = |x: f32, y: f32| Vec2 { x, y };
     // The mockup's rack. Top row: sequencer, oscillator, filter, with free room to the right of
-    // the filter and below it (where the tour's card goes). Middle row: envelope, VCA, delay,
+    // the filter and below it. Middle row: envelope, VCA, delay,
     // reverb, output. Bottom row: the clock that makes it play by
     // itself, and the macros under the effects they reach.
     let seq = e.add_module("seq", at(24.0, 20.0));
@@ -229,13 +231,15 @@ fn build(s: &Spec) -> PatchEditor {
     e
 }
 
-/// The filter of a start patch (or any patch): where the tour's spotlight goes.
-pub fn find_filter(state: &kabl_core::PatchState) -> Option<ModuleId> {
-    state
-        .modules
-        .iter()
-        .find(|(_, m)| m.kind.starts_with("filter."))
-        .map(|(&id, _)| id)
+/// The standalone app's first document when no patch is named: the start patch, playing. On a
+/// fresh profile it opens in the Rack with lesson 00 on the Start card; after that, with Sounds
+/// open over it. The plugin never calls this: it starts silent on its own patch.
+pub fn open(ui: &mut UiState) -> PatchEditor {
+    let start = start_patch();
+    // Its own name in the header, and clean: nothing edited yet.
+    ui.doc = Some(Doc::new(start_name(), DocOrigin::New, start.state()));
+    ui.browser_open = !crate::lessons::first_run(&start, ui);
+    start
 }
 
 /// Renders `secs` of `state` offline at `rate`, stereo interleaved: what the patch plays on its

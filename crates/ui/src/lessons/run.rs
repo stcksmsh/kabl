@@ -3,8 +3,8 @@
 
 use kabl_core::{ModuleId, PatchState, PortRef};
 
-use super::{all, Cond, Lesson, Target};
-use crate::browser::{self, DocOrigin, Pending};
+use super::{all, Cond, Lesson, Step, Target, START_PATCH};
+use crate::browser::{self, Doc, DocOrigin, Pending};
 use crate::explain;
 use crate::{PatchEditor, UiState};
 
@@ -35,6 +35,9 @@ pub struct Active {
     /// Another sound was opened since: the steps no longer apply.
     pub detached: bool,
     pub base: Baseline,
+    /// The patch when the lesson started: a later step met already (the knob turned before its
+    /// step asks) counts as done when it is reached.
+    pub origin: Baseline,
     /// When the last step completed by its conditions (the panel says so briefly).
     pub completed_at: Option<f64>,
     /// The step's conditions have not all held at some frame since it was entered. Only then
@@ -53,6 +56,8 @@ pub struct Learn {
     /// A start waiting for its open (lesson, editor instance at the request).
     pending: Option<(usize, u64)>,
     pub note: Option<String>,
+    /// Since when the Start card has seen no running audio output.
+    pub quiet_since: Option<f64>,
 }
 
 /// Is `t` in `state` with the kind the lesson expects? The resolved Show target when it is.
@@ -155,6 +160,24 @@ pub fn holds(c: &Cond, editor: &PatchEditor, ui: &UiState, base: &Baseline) -> b
                         })
                 })
         }
+        Cond::AnyParamMoved {
+            id,
+            kind,
+            params,
+            by,
+        } => {
+            kind_ok(state, *id, kind)
+                && params.iter().any(|param| {
+                    match (
+                        param_value(state, *id, param),
+                        param_value(&base.state, *id, param),
+                    ) {
+                        (Some(now), Some(then)) => (now - then).abs() >= *by,
+                        _ => false,
+                    }
+                })
+        }
+        Cond::SoundsOpen => ui.browser_open,
         Cond::Inspecting { id, port } => ui
             .inspect
             .sel
@@ -167,10 +190,27 @@ pub fn holds(c: &Cond, editor: &PatchEditor, ui: &UiState, base: &Baseline) -> b
     }
 }
 
-/// Starts lesson `i`: asks the ordinary unsaved question before opening its patch.
+/// Starts lesson `i`: asks the ordinary unsaved question before opening its patch. The start
+/// patch is not a library sound, so a lesson on it opens only over a sound with nothing unsaved.
 pub fn start(editor: &mut PatchEditor, ui: &mut UiState, i: usize) {
-    ui.lessons.pending = Some((i, editor.instance()));
     ui.lessons.note = None;
+    if all()[i].start.sound == START_PATCH {
+        if browser::io_busy(ui) || browser::is_modified(editor, ui) {
+            ui.lessons.note = Some(
+                "Save your sound first: this lesson opens the start patch in its place.".into(),
+            );
+            return;
+        }
+        browser::replace_patch(editor, ui, crate::first_run::start_patch().log().clone());
+        ui.doc = Some(Doc::new(
+            crate::first_run::start_name(),
+            DocOrigin::New,
+            editor.state(),
+        ));
+        activate(editor, ui, i);
+        return;
+    }
+    ui.lessons.pending = Some((i, editor.instance()));
     log::debug!(target: "lesson", "start requested lesson={}", all()[i].id);
     browser::request(editor, ui, Pending::Open(all()[i].start.sound.clone()));
 }
@@ -184,27 +224,9 @@ pub fn frame(editor: &PatchEditor, ui: &mut UiState, now: f64) {
         let opened = editor.instance() != before
             && matches!(&ui.doc, Some(d) if d.origin == DocOrigin::Library(l.start.sound.clone()));
         if opened {
-            // Resume where the user left off; a finished lesson starts over.
-            let step = ui
-                .library
-                .as_ref()
-                .and_then(|lib| lib.prefs.lessons.get(&l.id))
-                .map_or(0, |p| p.step);
-            let step = if step < l.steps.len() { step } else { 0 };
             ui.lessons.pending = None;
-            ui.lessons.active = Some(Active {
-                lesson: i,
-                step,
-                editor: editor.instance(),
-                detached: false,
-                base: Baseline::of(editor),
-                completed_at: None,
-                armed: false,
-                done: vec![false; l.steps.len()],
-            });
+            activate(editor, ui, i);
             ui.lessons.open = true;
-            ui.compare.capture(editor, "the lesson start");
-            log::debug!(target: "lesson", "active lesson={} step={step}", l.id);
         } else if ui.browser.dialog.is_none() {
             ui.lessons.pending = None;
             ui.lessons.note = Some("The lesson did not start; your sound is unchanged.".into());
@@ -226,6 +248,20 @@ pub fn frame(editor: &PatchEditor, ui: &mut UiState, now: f64) {
         return;
     };
     let step = a.step;
+    let l = &all()[a.lesson];
+    let early: Vec<usize> = (step + 1..l.steps.len())
+        .filter(|&k| !a.done[k] && meets(&l.steps[k], editor, ui, &a.origin))
+        .collect();
+    if !early.is_empty() {
+        if let Some(a) = ui.lessons.active.as_mut() {
+            for k in early {
+                a.done[k] = true;
+            }
+        }
+    }
+    let Some(a) = ui.lessons.active.as_ref() else {
+        return;
+    };
     // Already done, or the end page: nothing to watch.
     if a.done.get(step).copied().unwrap_or(true) {
         return;
@@ -252,7 +288,57 @@ pub fn frame(editor: &PatchEditor, ui: &mut UiState, now: f64) {
 pub(super) fn complete(l: &Lesson, a: &Active, editor: &PatchEditor, ui: &UiState) -> bool {
     l.steps
         .get(a.step)
-        .is_some_and(|s| !s.done.is_empty() && s.done.iter().all(|c| holds(c, editor, ui, &a.base)))
+        .is_some_and(|s| meets(s, editor, ui, &a.base))
+}
+
+/// `s` has conditions and all of them hold against `base`.
+fn meets(s: &Step, editor: &PatchEditor, ui: &UiState, base: &Baseline) -> bool {
+    !s.done.is_empty() && s.done.iter().all(|c| holds(c, editor, ui, base))
+}
+
+/// Makes lesson `i` the running one on the patch now open, resuming where the user left off (a
+/// finished lesson starts over).
+fn activate(editor: &PatchEditor, ui: &mut UiState, i: usize) {
+    let l = &all()[i];
+    let step = ui
+        .library
+        .as_ref()
+        .and_then(|lib| lib.prefs.lessons.get(&l.id))
+        .map_or(0, |p| p.step);
+    let step = if step < l.steps.len() { step } else { 0 };
+    let base = Baseline::of(editor);
+    ui.lessons.active = Some(Active {
+        lesson: i,
+        step,
+        editor: editor.instance(),
+        detached: false,
+        origin: base.clone(),
+        base,
+        completed_at: None,
+        armed: false,
+        done: vec![false; l.steps.len()],
+    });
+    ui.compare.capture(editor, "the lesson start");
+    log::debug!(target: "lesson", "active lesson={} step={step}", l.id);
+}
+
+/// The first run: lesson 00 (the Start card) over the start patch already open, once per
+/// profile. `Prefs::first_run_done` (also what the tour before it set) is saved as it starts,
+/// so a profile that has it, or an app closed mid-lesson, does not start it again; Learn
+/// always has it. True when it started.
+pub fn first_run(editor: &PatchEditor, ui: &mut UiState) -> bool {
+    let Some(i) = all().iter().position(|l| l.card) else {
+        return false;
+    };
+    let Some(lib) = ui.library.as_mut().filter(|l| !l.prefs.first_run_done) else {
+        return false;
+    };
+    lib.prefs.first_run_done = true;
+    if let Some(e) = lib.save_prefs() {
+        log::warn!(target: "lesson", "{e}");
+    }
+    activate(editor, ui, i);
+    true
 }
 
 /// Moves the active lesson to `step` (the step count is the unguided page) and records it.
