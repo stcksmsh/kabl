@@ -169,38 +169,51 @@ A snapshot is a named set of values for the composite's exposed controls (decisi
 
 ### 3.2 Recall
 
+Values reach the audio thread only through `Delivery::sync` (`crates/ui/src/control.rs:161-199`):
+it diffs the document against what was last sent, holds one `ParamSet` per changed target, and
+flushes in the same call; when a compile is in flight or waiting, or the held values would pass
+`MAX_HELD`, it compiles a graph instead (`control.rs:164-170`, `control.rs:188-195`), and a held
+graph is pushed before any action (`control.rs:349-361`). Recall is built around that.
+
 Recall of snapshot `s` on composite `C`, all on the UI thread in one frame:
 
 1. Compute, per control in `s`, the target value through the current target's
    `from_norm(to_norm(v))` (`info.rs:126-158`), so it is clamped to the param's range and a
    stepped value is a whole option, and the start value: the morph's live value when the UI's
    morph report shows one driving that param, else the current document value.
-2. Apply one undoable edit, "Snapshot <name>", that sets every changed control with `SetParam`
-   in one `Op::Group`. After it the document holds the target values, so a recompile, a save or
-   an undo sees what the engine ends on. Applying the edit puts one held value per target in the
-   control queue (`control.rs:340-392`, held per target, newest wins).
-3. Only when the morph length is above 0, a clock is set and the command is accepted (it is
-   refused with no audio or with `MAX_HELD_ACTIONS` actions waiting, `control.rs:39`,
-   `control.rs:433-440`): queue the morph (section 3.3) carrying each target's start and target
-   value, then remove those targets' held values from the queue with a new
-   `Control::absorb(&[RuntimeTarget])`. When the command is refused nothing is absorbed and the
-   held values jump the controls, as a length-0 recall does.
+2. Decide jump or morph. It morphs only when the morph length is above 0, a clock is set, and a
+   new `Delivery::can_morph(parts)` holds: audio is attached, no compile is in flight or waiting
+   (`compiling` and `next_compile` both `None`), the held values plus the snapshot's targets stay
+   within `MAX_HELD`, and `held_actions` has room for every part (`MAX_HELD_ACTIONS`,
+   `control.rs:39`). Otherwise it jumps.
+3. Morph only: register the targets with their target values in a new `Delivery::morphing` map
+   (fixed capacity 32, one per control).
+4. Apply one undoable edit, "Snapshot <name>", that sets every changed control with `SetParam` in
+   one `Op::Group`. After it the document holds the target values, so a recompile, a save or an
+   undo sees what the engine ends on. The edit's `sync` runs as usual; for a target in `morphing`
+   whose new value equals the registered one, `sync` holds no `ParamSet` and removes the entry,
+   and `sent` still records the document, so the next diff does not send it either. Because step
+   2 ruled out a compile and the `MAX_HELD` fallback, this edit always goes the values path.
+5. Morph only: queue all parts with a new `Delivery::commands(&[Command])`, which checks room for
+   every part before pushing any and returns false otherwise (it cannot fail here, after step 2,
+   on the same thread). A jump queues nothing; `sync` sent the values in step 4.
 
 **Why this is atomic.** For a morphing recall the only messages that reach the audio thread are
-the morph parts: no `ToAudio::Set` for those targets is pushed at all, so no block can render at
-the target before the morph starts, and no value can release the morph it belongs to. The audio
+the morph parts: no `ToAudio::Set` for those targets is pushed, so no block can render at the
+target before the morph starts, and no value can release the morph it belongs to. The audio
 thread stages parts and starts every target of the recall in the same block, when the last part
-arrives (section 3.3). Until then the targets keep the values they had, which are the start
-values (or the morph already moving them), so a ring that is full and delays the parts to a
-later callback delays the whole recall, never half of it. Parts are actions, so they keep their
-place in `held_actions` order behind earlier requests (`control.rs:363-392`).
+arrives (section 3.3); until then the targets keep the values they had, which are the start
+values (or the morph already moving them). A ring that is full delays the whole recall, never
+half of it, and parts keep their place behind earlier requests (`control.rs:363-392`). A graph
+compiled later, for an unrelated edit while the morph runs, is built from the document, which
+holds the targets; the engine writes its morph values into every graph each block before
+rendering (`patch_engine.rs:897-917`, called at `patch_engine.rs:957`), so the swap does not
+jump the morph.
 
-Length 0, no clock, a refused command: no morph; the held values set the controls (a jump). A
-clock that is stopped when the morph lands: the engine jumps (existing rule, `morph.rs:8`).
+A clock that is stopped when the morph lands: the engine jumps (existing rule, `morph.rs:8`).
 
-Undo of a recall is one project undo step: its values (a later revision) release the morphs and
-put the old values back. A hand on a control during a morph ends that control's morph (existing
-rule, `morph.rs:10`).
+Undo of a recall is one project undo step: its values release the morphs and put the old values
+back. A hand on a control during a morph ends that control's morph (existing rule, `morph.rs:10`).
 
 ### 3.3 Engine change: morphs of any parameter
 
@@ -239,18 +252,27 @@ Changes in `crates/engine/src/morph.rs` and `patch_engine.rs`:
   `ToAudio::Set` is moved through a slot of that size, so the variant must not be the largest.
   The recall is sent as parts: `Command::Morph(MorphPart { seq: u32, last: bool, clock,
   pulses, count: u8, targets: [MorphTarget; 8] })`, with `MorphTarget { target: RuntimeTarget,
-  from: f32, to: f32 }` (40 bytes: `RuntimeTarget` is 32). A part is about 350 bytes, under the
-  `Command::Faces` variant (`patch_engine.rs:195`, about 0.5 KB, the largest today), so
+  from: f32, to: f32 }` (40 bytes: `RuntimeTarget` is 32). A part is about 350 bytes, under
+  `Command::Launch` (`patch_engine.rs:129-138`, about 560 bytes, the largest variant today), so
   `size_of::<Command>()` and the ring do not grow; slice 8 pins that with a test. Cost: a
   32-control recall is 4 ring slots of 256. The audio thread copies parts into a fixed staging
   table of 32 (`MAX_MORPH_TARGETS`, one per exposed control, `composite.rs:164`) and schedules
-  them all when the part with `last` arrives; a part with a new `seq` drops an unfinished one.
-  No `Box`: dropping one on the audio thread would free memory there.
+  them all when the part with `last` arrives. No `Box`: dropping one on the audio thread would
+  free memory there.
 - **Limits.** `MAX_DRIVEN` rises from 16 to 64 (`morph.rs:26`), so two composites' recalls and
   a cue's 16 macros can move at once; pending and driven stay fixed arrays (`morph.rs:71-75`),
-  and the per-block scan of 64 slots replaces one of 16. Past 64 a new morph is dropped as today
-  (`morph.rs:146-148`); because its held value was absorbed, the engine then writes the target
-  once with `drive_runtime` instead, so the control still lands.
+  and the per-block scan of 64 slots replaces one of 16.
+- **A recall morph always lands.** For a recall the document already holds `to` and the UI sent
+  no value for it (section 3.2), so a recall morph the engine abandons would leave the sound at
+  `from` while the document says `to`. Every path that drops one therefore goes through one
+  helper, `Morphs::land(target, to)`, which puts the final value into a fixed table (64 entries)
+  that `drive_morphs` writes with `drive_runtime` in the same block. The paths: a pending morph
+  whose clock is gone (`morph.rs:126-129`) or whose target does not resolve
+  (`morph.rs:140-145`; the write is then a no-op), a full driven table (`morph.rs:146-148`) or
+  pending table (`morph.rs:90-92`), an unfinished part set replaced by a new `seq`, host reset
+  (`patch_engine.rs:218`) and cancel (`patch_engine.rs:817`). A Load (`patch_engine.rs:559`)
+  needs none: its graph is compiled from the document, which holds `to`. Cue macros
+  (`from: None`) are not landed, which keeps today's cue behaviour.
 - **Report.** The progress report becomes `(RuntimeTarget, value, to, progress)`; the UI ring
   grows from 64 to 128 entries (`audio.rs:260`) and Perform's macro card keeps reading macros
   from it (`perform_view.rs:1458-1465`). Composite face controls show the live value while a
@@ -259,8 +281,8 @@ Changes in `crates/engine/src/morph.rs` and `patch_engine.rs`:
 ### 3.4 Edges
 
 - **Control later un-exposed.** `remove_exposure` (`composites.rs:455-490`) already drops the
-  placement (`composites.rs:486-488`); the prune of section 4 also drops that key from every
-  snapshot, in the same edit. `composite::validate` refuses a snapshot key that is not a
+  placement (`composites.rs:486-488`); it also drops that key from every snapshot, in the same
+  `SetComposite`. `composite::validate` refuses a snapshot key that is not a
   control, so a hand-edited file cannot carry a stale one.
 - **Control retargeted.** No path retargets an exposure in place today: the only target rewrite
   is the ID remap on insert and duplicate (`composites.rs:731`), which keeps the same param. A
@@ -292,31 +314,40 @@ hops. "A fires B fires A" cannot be stored: `B` is inside `A`, and `A` is not in
 `composite::validate` (`composite.rs:139`) checks the rule, so a file that breaks it is refused at
 load, and the press walker needs no visited set.
 
-**Lifetime: one prune.** Several edits can leave a reference dangling: removing a module, a
-composite, an exposure, a placement or a snapshot, and a `SetComposite` that shrinks `members`
-(a module leaves the composite, so it is no longer in `leaves`). Instead of a rule per edit, one
-function, `composite::prune(state)`, runs at the end of `Op::RemoveModule` and
-`Op::SetComposite` in `apply` (`state.rs:293-299`, `state.rs:317-331`) and, for every composite,
-from the innermost out:
+**Lifetime: one prune, in the forward edit only.** Several edits can leave a reference dangling:
+removing a module, a composite, an exposure, a placement or a snapshot, and a `SetComposite`
+that shrinks `members` (a module leaves the composite, so it is no longer in `leaves`). One
+function, `composite::prune(state) -> Vec<Op>`, finds them. On the state after the edit it
+returns one `Op::SetComposite` per composite that needs a change, computed from the innermost
+composite out (dropping a button can orphan a parent's face target; nesting is at most 8,
+`composite.rs:180-191`, so one pass in that order is complete). For each composite it:
 
 - keeps an exposure-bound placement (knob, selector, slider, toggle, icons, jack) only while its
-  key is still a control or port, as today;
+  key is still a control or port;
 - keeps a `Module` source placement only while the module is in `leaves(state, C)`;
 - keeps a `Face` target only while `(D, key2)` is still a strict descendant's `button`;
 - keeps a `Snapshot` source only while a snapshot with that `id` exists;
 - drops snapshot values whose key is no longer a control, and clears a snapshot `clock` that no
   longer names a `clock` module.
 
-Dropping a button can orphan a parent's face target, so the walk goes from the deepest composite
-outwards; nesting is at most 8 (`composite.rs:180-191`), so one pass in that order is complete.
+The editor commits a removal or a composite edit as `Op::Group[edit, pruned SetComposites...]`,
+built in one place (`PatchState::with_prune(op) -> Op`, used where the editor turns a
+`RemoveModule` or `SetComposite` into a log entry). `apply` itself never prunes: applying a
+`SetComposite` writes exactly the value it carries, so every inverse restores the exact prior
+state in any order. That matters because `changed_composite_ops` restores composites in
+`BTreeMap` id order (`state.rs:193-215`): if applying a parent's restore pruned against a child
+not yet restored, undo would lose the parent's elements.
 
-This replaces the retain in `Op::RemoveModule` (`state.rs:325-329`), which keeps only keys that
-are controls or ports and would therefore wipe every new composite-level placement (their keys
-come from `next_interface` and are neither) on any module removal anywhere in the patch.
+`Op::RemoveModule`'s own retain (`state.rs:325-329`) keeps only keys that are controls or ports,
+so it would wipe every new composite-level placement (their keys come from `next_interface`) on
+any module removal anywhere in the patch. It is narrowed to exposure-bound kinds: it drops a
+placement only when its kind binds an exposure and that key is gone, and leaves the rest to the
+prune ops in the group. `SetComposite`'s inverse stays its own restore (`state.rs:83-86`); the
+group's inverse is the reverse of its parts' inverses, so undo restores the pruned composites
+and then the edit.
 
-Undo: `RemoveModule`'s inverse already restores every composite it changed (`state.rs:118`,
-`state.rs:193-215`). `SetComposite`'s inverse (`state.rs:83-86`) becomes `Op::Group` of its own
-restore and `changed_composite_ops`, the same way, so undo puts pruned parents back.
+Applying a log that leaves a dangling reference (a hand-edited file) is refused by
+`composite::validate`, as any invalid composite is now.
 
 Insert and duplicate remap leaf IDs through `remap` (`composites.rs:634`) and composite IDs
 through the `groups` map (`composites.rs:628`); `source` modules, face-target composites and
@@ -555,8 +586,12 @@ opened or last reloaded, and the other three are the parts the page edits. New e
 snapshot ids are taken from the draft's `next_interface`. Apply builds the composite to write
 from the *current* composite with exactly those three fields replaced, so members, exposures and
 everything else stay as the document has them, and writes it with `composites::set`
-(`composites.rs:434-438`). Apply refuses when the current composite's members, controls or ports
-differ from `base` (the banner below), because the draft's keys were validated against `base`.
+(`composites.rs:434-438`) through `PatchState::with_prune` (section 4). Apply refuses when the
+current composite's members, controls or ports differ from `base` (the banner below), because
+the draft's keys were validated against `base`. Nested composites the face depends on (face
+targets, nested sources) may also have changed since the page opened, so Apply first runs
+`composite::prune` on the composite it would write: when that would drop anything, Apply lists
+the elements it would drop and asks before applying; when it would drop nothing, it applies.
 
 **Undo.** Two levels, on purpose:
 
@@ -636,12 +671,16 @@ page), under the job scratch dir; anything audible is an offline render or runs 
    kind with "not supported yet" (later slices lift this per kind); (d) a v8 and a v9 fixture
    load and re-save byte-identical; (e) `schema_for` writes v10 for a log with a snapshot and for
    one with a new kind, v9 for a log with only a fan-in port, v8 otherwise (three tests); package
-   schema 3 likewise, `decode` accepts 1..=3; (f) `composite::prune` replaces the retain at
-   `state.rs:325-329`: `RemoveModule` drops `source` placements, snapshot values and snapshot
-   clocks of the removed module, a `display`, `button` and `snapshots` placement whose source is
-   another module survives the removal (test), and undo restores everything; (g) `SetComposite`
-   removing a composite, a button placement or a snapshot, or shrinking `members`, drops the
-   dependent placements and face targets in every parent, and undo restores them (tests); (h)
+   schema 3 likewise, `decode` accepts 1..=3; (f) the retain at `state.rs:325-329` is narrowed to
+   exposure-bound kinds and `PatchState::with_prune` wraps removals: removing a module drops
+   `source` placements, snapshot values and snapshot clocks of that module, while a `display`,
+   `button` and `snapshots` placement whose source is another module survives (test); undo
+   restores the exact prior state, tested on a fixture whose parent composite has a smaller id
+   than its nested child (so `changed_composite_ops` restores the parent first) with a parent
+   display sourced from the child; (g) removing a composite, a button placement or a snapshot,
+   or shrinking `members`, drops the dependent placements and face targets in every parent, and
+   undo restores them exactly (tests, same parent-id-below-child fixture); applying a
+   `SetComposite` alone never changes another composite (test); (h)
    `remove_exposure` drops the key from every snapshot; (i) insert and duplicate remap `Module`
    sources, `Face` composites and snapshot clocks (test); (j) deleting a snapshot leaves buttons
    on the other snapshots pointing at the same snapshots (test on ids).
@@ -694,7 +733,9 @@ page), under the job scratch dir; anything audible is an offline render or runs 
    the face buttons of nested composites (test); pressing a cue button launches that cue on the
    inside `cues` module (test on the queued launch); a button on the outer face targeting a
    button two composites down fires the innermost action (test); host-clock refusal holds (test);
-   lit state follows the cue or bank state, through a chain too; captures.
+   lit state follows the cue or bank state, through a chain too; Apply on the design page after
+   a nested composite lost a button the draft targets lists that element and asks before
+   applying (test); captures.
 8. **Engine morph of any parameter.**
    Scope: `crates/engine/src/morph.rs`, `crates/engine/src/patch_engine.rs`,
    `crates/engine/tests/`, `crates/ui/src/cues.rs`, `crates/ui/src/app/audio.rs`,
@@ -707,19 +748,23 @@ page), under the job scratch dir; anything audible is an offline render or runs 
    not smooth moves with no step larger than one block's `RAMP_MS` ramp (test on rendered
    values); a 32-target recall sent as 4 parts starts every target in the same block, and the
    targets keep their old values while only some parts have arrived (test splitting the parts
-   over two `drain` calls); 32 targets plus 16 macros run together; a full table drops the extra
-   morph and the target still lands; `size_of::<Command>()` is not larger than before (test);
+   over two `drain` calls); 32 targets plus 16 macros run together; every abandon path of
+   section 3.3 (clock gone, full pending table, full driven table, replaced `seq`, reset, cancel)
+   leaves a recall target at `to` (one test per path) and leaves a cue macro where it was;
+   `size_of::<Command>()` is not larger than before (test);
    `drain` and `drive_morphs` run under `assert_no_alloc` (as the engine tests already do, e.g.
    `crates/engine/tests/cue_macros.rs`) with no allocation.
 9. **Snapshots.**
    Scope: `crates/ui/src/lib.rs`, `crates/ui/src/panels.rs`, `crates/ui/src/composites.rs`,
-   `crates/ui/src/control.rs` (`absorb`), a new `crates/ui/src/snapshots.rs`, tests.
+   `crates/ui/src/control.rs` (`can_morph`, `morphing`, `commands`), a new
+   `crates/ui/src/snapshots.rs`, tests.
    Done means: the page captures, re-captures, renames, deletes snapshots and sets morph beats
    and clock (tests, each one draft change); recall is one project undo step that sets every
-   stored control (test) and, with a morph length and a clock, queues the morph parts and absorbs
-   the held values of those targets, so no `ToAudio::Set` for them is pushed (test on the control
-   queue, `Control::absorb` in `crates/ui/src/control.rs`); with the command refused the held
-   values stay and the controls jump (test); an un-exposed control is not touched by a
+   stored control (test); with a morph length and a clock, `sync` holds no `ParamSet` for the
+   morphing targets and the parts are queued after it (test on the pushed `ToAudio` sequence);
+   with a compile in flight, a compile waiting, `MAX_HELD` nearly full or `held_actions` without
+   room for every part, the recall jumps: values go, no part is queued (one test each); an
+   un-exposed control is not touched by a
    later recall (test); snapshot buttons and the snapshot strip recall and light the last one
    (test); a nested button chain ending on a snapshot recalls it (test); offline render of a
    recall with morph shows the parameter moving over the set beats; captures of the strip and
