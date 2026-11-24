@@ -289,7 +289,7 @@ impl Sink {
         for n in (0..KEEP).rev() {
             let from = name(n);
             if from.exists() {
-                if let Err(e) = fs::rename(&from, name(n + 1)) {
+                if let Err(e) = kabl_core::fsutil::move_file(&from, &name(n + 1)) {
                     return self.fail("rotate log", e);
                 }
             }
@@ -444,6 +444,35 @@ mod tests {
         assert!(total <= (KEEP as u64 + 1) * MAX_FILE_BYTES, "{total}");
         assert!(f.iter().all(|(_, n)| *n <= MAX_FILE_BYTES));
         assert_eq!(stats.failed.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn a_failed_rotation_keeps_every_log() {
+        let tmp = tempfile::tempdir().unwrap();
+        let blocked = tmp.path().join(format!("kabl.{KEEP}.log"));
+        fs::create_dir(&blocked).unwrap();
+        fs::write(blocked.join("x"), "").unwrap();
+        fs::write(tmp.path().join("kabl.2.log"), "two").unwrap();
+        let stats = Arc::new(Stats::default());
+        let mut s = Sink {
+            dir: tmp.path().into(),
+            file: None,
+            size: 0,
+            stats: stats.clone(),
+            app: "test",
+            retry_at: None,
+        };
+        fs::write(tmp.path().join("kabl.log"), "current").unwrap();
+        s.rotate();
+        assert_eq!(
+            fs::read_to_string(tmp.path().join("kabl.log")).unwrap(),
+            "current"
+        );
+        assert_eq!(
+            fs::read_to_string(tmp.path().join("kabl.2.log")).unwrap(),
+            "two"
+        );
+        assert_eq!(stats.failed.load(Ordering::Relaxed), 1);
     }
 
     #[test]
