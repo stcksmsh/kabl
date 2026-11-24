@@ -1098,8 +1098,30 @@ fn committed_engine_patches_match_builders_and_play() {
     for (dir, build, events, secs, name, ..) in PATCHES {
         let saved = kabl_core::load(&patch_dir(dir)).unwrap();
         let built = build();
-        assert_eq!(saved.state(), built.state(), "{dir}");
         let st = saved.state();
+        let mut want = built.state().clone();
+        // An imported table's samples come from f64 `sin` and `exp`, which each platform's libm
+        // may round differently in the last bit; quantising to 16 bits then moves a handful of
+        // samples by one step (seen on Windows for `imported-morph`). Linux is the reference
+        // and must match byte for byte; elsewhere every table must agree within one 16-bit
+        // step, and the rest of the state still exactly.
+        if !cfg!(target_os = "linux") {
+            for (id, t) in &mut want.tables {
+                let Some(s) = st.tables.get(id) else { continue };
+                let a = kabl_modules::wavetable::decode_canonical(&s.wav).unwrap();
+                let b = kabl_modules::wavetable::decode_canonical(&t.wav).unwrap();
+                assert_eq!(a.len(), b.len(), "{dir}: table {id} frames");
+                let worst = a
+                    .iter()
+                    .flatten()
+                    .zip(b.iter().flatten())
+                    .map(|(x, y)| (x - y).abs())
+                    .fold(0.0, f32::max);
+                assert!(worst <= 1.5 / 32768.0, "{dir}: table {id} off by {worst}");
+                t.wav.clone_from(&s.wav);
+            }
+        }
+        assert_eq!(st, &want, "{dir}");
         assert!(
             st.modules.values().any(|m| matches!(
                 m.kind.as_str(),

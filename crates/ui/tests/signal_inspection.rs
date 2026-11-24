@@ -723,7 +723,11 @@ fn escape_in_a_dialog_over_inspection_and_comparison_closes_only_the_dialog() {
 fn every_lesson_target_resolves_on_its_patch() {
     let lib = Library::open(Some(factory()), tempfile::tempdir().unwrap().path().into());
     for l in lessons::all() {
-        let state = lib.read(&l.start.sound).unwrap().state().clone();
+        let state = if l.start.sound == lessons::START_PATCH {
+            kabl_ui::first_run::start_patch().state().clone()
+        } else {
+            lib.read(&l.start.sound).unwrap().state().clone()
+        };
         assert!((3..=5).contains(&l.steps.len()), "{}", l.id);
         for s in &l.steps {
             if let Some(t) = &s.show {
@@ -742,7 +746,11 @@ fn every_lesson_target_resolves_on_its_patch() {
         .state()
         .clone();
     s.modules.get_mut(&6).unwrap().kind = "lfo".into();
-    let t = lessons::all()[0].steps[1].show.clone().unwrap();
+    let pluck = lessons::all()
+        .iter()
+        .find(|l| l.id == "pluck-to-pad")
+        .unwrap();
+    let t = pluck.steps[1].show.clone().unwrap();
     assert!(lessons::resolve(&s, &t).is_none());
 }
 
@@ -803,7 +811,8 @@ fn a_recipe_starts_through_the_unsaved_question_and_exit_keeps_the_patch() {
         h.click("lesson:pluck-to-pad");
         h.click("dlg:discard");
         let a = h.ui.lessons.active.clone().expect("started");
-        assert_eq!((a.lesson, a.step, a.detached), (0, 0, false));
+        assert_eq!(lessons::all()[a.lesson].id, "pluck-to-pad");
+        assert_eq!((a.step, a.detached), (0, false));
         assert_eq!(
             h.ui.doc.as_ref().unwrap().origin,
             DocOrigin::Library("factory:recipes/pluck-to-pad".into())
@@ -866,7 +875,7 @@ fn opening_another_sound_detaches_a_recipe() {
     assert!(h.ui.hits.contains_key("lesson-reopen"));
     h.click("lesson-reopen");
     let a = h.ui.lessons.active.clone().unwrap();
-    assert!(!a.detached && a.lesson == 1);
+    assert!(!a.detached && lessons::all()[a.lesson].id == "filter-movement");
 }
 
 #[test]
