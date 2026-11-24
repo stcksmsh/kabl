@@ -276,8 +276,6 @@ impl App {
         ui.status_cpu = Some(6.0);
         ui.status_buffer = Some(128);
         ui.status_voices = Some((4, 8));
-        ui.status_bpm = Some(124.0);
-        ui.status_pos = Some("17 . 3 . 2".into());
         // The mockup: -9.4 dB peak on both channels, KeyStep on the MIDI input.
         ui.meter.level = [0.34, 0.34];
         ui.meter.max_db = Some(-9.4);
@@ -563,21 +561,23 @@ impl App {
         }
         ui.perform_open = j.scene == "perform";
         ui.perform_tall = j.scene == "perform";
+        let state = self.editor.state();
+        let ids = |kind: &str| -> Vec<kabl_core::ModuleId> {
+            state
+                .modules
+                .iter()
+                .filter(|(_, m)| m.kind == kind)
+                .map(|(&id, _)| id)
+                .collect()
+        };
+        // Every scene's clock stands at bar 17 beat 3, so the status bar shows the patch's own
+        // tempo and that position, as a running host would.
+        for c in ids("clock") {
+            ui.clock_pos.insert(c, 16.0 * 16.0 + 2.0 * 4.0 + 1.0);
+        }
         if j.scene == "perform" {
-            // A moving show: bar 17 beat 3 on the clock, the first scene playing, the second
-            // queued for the next bar, and a playhead on every sequencer.
-            let state = self.editor.state();
-            let ids = |kind: &str| -> Vec<kabl_core::ModuleId> {
-                state
-                    .modules
-                    .iter()
-                    .filter(|(_, m)| m.kind == kind)
-                    .map(|(&id, _)| id)
-                    .collect()
-            };
-            for c in ids("clock") {
-                ui.clock_pos.insert(c, 16.0 * 16.0 + 2.0 * 4.0 + 1.0);
-            }
+            // A moving show: the first scene playing, the second queued for the next bar, and a
+            // playhead on every sequencer.
             for s in ids("seq") {
                 ui.seq_steps.insert(s, 0);
             }

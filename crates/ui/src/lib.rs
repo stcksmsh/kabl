@@ -4632,10 +4632,17 @@ fn draw_jacks(
                 th.panel.gamma_multiply(0.96),
             );
         }
-        let label = macro_name(editor.state(), m.id, port.name)
+        let named = macro_name(editor.state(), m.id, port.name);
+        let label = named
+            .clone()
             .unwrap_or_else(|| face_port_label(m.info.kind, port.name));
         if let Some(font) = kit::face::face_font(&st, style::Role::Label, z) {
-            if j.label_right {
+            if let (Some(name), false) = (&named, j.label_right) {
+                let at = c - vec2(0.0, rack::jack_text_dy(z, font.size * 1.075));
+                let g = jack_label(painter, name, font, ink, (m.jack_room(j) - 4.0) * z);
+                let r = egui::Align2::CENTER_CENTER.anchor_size(at, g.size());
+                painter.galley(r.min, g, ink);
+            } else if j.label_right {
                 painter.text(
                     c + vec2(20.0 * z, 0.0),
                     egui::Align2::LEFT_CENTER,
@@ -6060,6 +6067,20 @@ fn control_face_text(label: &str, kind: &str, param: &kabl_modules::ParamInfo) -
         label.to_string()
     }
 }
+/// A macro's name over its jack, on one line and ellipsized to `max_w`: names can be any
+/// length, and neighbouring jacks' names must not run into each other.
+fn jack_label(
+    p: &egui::Painter,
+    name: &str,
+    font: egui::FontId,
+    ink: Color32,
+    max_w: f32,
+) -> std::sync::Arc<egui::Galley> {
+    let mut job = egui::text::LayoutJob::simple_singleline(name.into(), font, ink);
+    job.wrap = egui::text::TextWrapping::truncate_at_width(max_w);
+    p.layout_job(job)
+}
+
 fn face_label(p: &egui::Painter, r: Rect, label: &str, z: f32, th: &Theme) {
     p.rect_filled(r, 2.0, th.panel);
     let mut job = egui::text::LayoutJob::simple_singleline(
@@ -6236,6 +6257,45 @@ mod tests {
         assert_eq!(
             super::transport_readout(editor.state(), &view).unwrap().1,
             "3 . 2 . 2"
+        );
+    }
+
+    #[test]
+    fn macro_jack_names_never_overlap() {
+        let mut e = crate::PatchEditor::new();
+        let id = e.add_module("macro", kabl_core::Vec2 { x: 0.0, y: 0.0 });
+        let face: Vec<_> = (3..=8)
+            .map(|k| (id, crate::rack::face_key(&format!("m{k}")), Some(0.0)))
+            .collect();
+        e.set_presentation(&face);
+        e.set_label(id, "name.m1", Some("Brightness".into()));
+        e.set_label(id, "name.m2", Some("Space".into()));
+        let l = crate::rack::layout(e.state(), &crate::rack::View::default());
+        let m = l.get(id).unwrap();
+        let st = crate::style::line_solid_default(true);
+        let font = crate::kit::face::face_font(&st, crate::style::Role::Label, 1.0).unwrap();
+        let ctx = egui::Context::default();
+        let mut rects = Vec::new();
+        // A frame only to load the fonts; its output (shapes, platform output) is not needed.
+        let _ = ctx.run_ui(Default::default(), |ui| {
+            for j in &m.jacks {
+                let name = super::macro_name(e.state(), id, j.port.name).unwrap();
+                let g = super::jack_label(
+                    ui.painter(),
+                    &name,
+                    font.clone(),
+                    egui::Color32::WHITE,
+                    m.jack_room(j) - 4.0,
+                );
+                rects.push(egui::Align2::CENTER_CENTER.anchor_size(j.c, g.size()));
+            }
+        });
+        assert_eq!(rects.len(), 2);
+        assert!(
+            rects[0].max.x < rects[1].min.x,
+            "{:?} runs into {:?}",
+            rects[0],
+            rects[1]
         );
     }
 
