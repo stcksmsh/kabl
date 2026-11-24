@@ -1,13 +1,15 @@
 //! Production instrument. REAPER owns audio/MIDI; no device backend is started here.
 mod automation;
+mod notes;
 mod schedule;
 mod sound_state;
 mod state_bridge;
 mod tail;
 
 use basedrop::{Collector, Handle, Owned};
+#[cfg(test)]
+use kabl_engine::keyboard::{MidiEvent, Source};
 use kabl_engine::{
-    keyboard::{MidiEvent, Source},
     patch_engine::PatchEngine,
     runtime::{Feedback, ToAudio},
     timeline::Timeline,
@@ -100,6 +102,8 @@ struct Control {
     banks: rtrb::Producer<(automation::Bank, automation::Bank)>,
     bank_dirty: bool,
     published_bank: automation::Bank,
+    /// The editor's key strip into the audio path (`notes`).
+    ui_notes: rtrb::Producer<kabl_engine::keyboard::KeyEvent>,
     // Last: all queued Owned values and Handles must drop before collector storage.
     collector: CollectorGuard,
 }
@@ -574,6 +578,9 @@ impl Shared {
         c.view.button_rearm = true;
         c.view.learn = None;
         c.view.doc = None;
+        // The new session starts silent: the strip forgets what it held.
+        c.view.keys.all_off();
+        c.view.keys.out.clear();
         c.epoch = epoch;
         self.tail_samples
             .store(tail::samples(&c.patch, c.rate), Ordering::Relaxed);
@@ -612,6 +619,12 @@ impl NiceEguiApp for RackApp {
         Ok(())
     }
     fn editor_closed(&mut self) {
+        // A note held on the strip ends with the window.
+        if let Ok(mut c) = self.shared.control.lock() {
+            let Control { view, ui_notes, .. } = &mut *c;
+            view.keys.all_off();
+            notes::send(ui_notes, view);
+        }
         if let Some(gui) = &self.gui {
             for (i, active) in self.active_gestures.iter_mut().enumerate() {
                 if *active {
@@ -772,8 +785,14 @@ impl NiceEguiApp for RackApp {
                     });
             });
         });
-        let Control { editor, view, .. } = &mut *c;
+        let Control {
+            editor,
+            view,
+            ui_notes,
+            ..
+        } = &mut *c;
         kabl_ui::show(editor, view, ui);
+        notes::send(ui_notes, view);
         for (i, previous) in before.iter().enumerate() {
             let after = c.lanes[i]
                 .target
@@ -808,6 +827,8 @@ pub struct Instrument {
     shared: Arc<Shared>,
     loads: rtrb::Consumer<Owned<Session>>,
     midi: rtrb::Consumer<(u32, [u8; 3])>,
+    /// The editor's key strip (`notes`), merged with the host's MIDI.
+    ui_notes: rtrb::Consumer<kabl_engine::keyboard::KeyEvent>,
     events: rtrb::Consumer<(u32, schedule::Event)>,
     schedule: schedule::Schedule,
     raw_position: Option<(schedule::Position, usize)>,
@@ -848,6 +869,7 @@ impl Default for Instrument {
             prepare(&patch, 48000.0, &handle, 0, 1.0, &scope).expect("factory patch");
         let (tx, loads) = rtrb::RingBuffer::new(2);
         let (midi_tx, midi) = rtrb::RingBuffer::new(1024);
+        let (ui_notes_tx, ui_notes) = notes::ring();
         let shared = Arc::new(Shared {
             control: Mutex::new(Control {
                 editor: PatchEditor::seed_from(&patch),
@@ -871,6 +893,7 @@ impl Default for Instrument {
                 banks,
                 bank_dirty: true,
                 published_bank,
+                ui_notes: ui_notes_tx,
             }),
             params: Arc::new(InstrumentParams {
                 gain: FloatParam::new(
@@ -992,6 +1015,7 @@ impl Default for Instrument {
             shared,
             loads,
             midi,
+            ui_notes,
             events,
             schedule: schedule::Schedule::new(initial_values),
             raw_position: None,
@@ -1386,26 +1410,7 @@ impl Plugin for Instrument {
                 );
             }
         }
-        for _ in 0..1024 {
-            let Ok((offset, bytes)) = self.midi.pop() else {
-                break;
-            };
-            if bytes[0] & 0xF0 == 0xB0 && !matches!(bytes[1], 64 | 120 | 121 | 123) {
-                if let Some(s) = &mut self.session {
-                    let _ = s.cc.push((bytes[0] & 15, bytes[1], bytes[2]));
-                }
-            }
-            if let Some(event) = MidiEvent::parse(Source::Host, &bytes) {
-                self.timeline.push(offset as usize, frames, event);
-            }
-        }
-        if self.shared.midi_overflow.swap(false, Ordering::Relaxed) {
-            self.timeline.push(
-                frames.saturating_sub(1),
-                frames,
-                MidiEvent::new(Source::Host, 0, kabl_engine::keyboard::KeyEvent::SourceLost),
-            );
-        }
+        self.take_midi(frames);
         // Only bounded parameter events reach the wrapper. No native-note dialect advertised.
         while context.next_event().is_some() {}
         let dropped_before = self.schedule.dropped;

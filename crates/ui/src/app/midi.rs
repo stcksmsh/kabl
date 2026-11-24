@@ -187,6 +187,31 @@ impl Midi {
         self.send(KeyEvent::AllOff);
     }
 
+    /// Notes from the computer keys and the key strip take the controller's path, channel 1,
+    /// so a keyboard patch plays them as it would a MIDI keyboard.
+    pub(crate) fn send_keys(&self, ui_state: &mut UiState) {
+        if ui_state.keys.out.is_empty() {
+            return;
+        }
+        let mut s = self.sink.lock().unwrap();
+        // No queue: an audio restart is under way and ends every live note anyway.
+        let Some(notes) = s.notes.as_mut() else {
+            ui_state.keys.out.clear();
+            return;
+        };
+        // What does not fit waits for the next frame, so no note-off is lost.
+        let n = ui_state.keys.out.len().min(notes.slots());
+        for e in ui_state.keys.out.drain(..n) {
+            notes.push(note_now(e)).expect("checked free slots");
+        }
+    }
+
+    /// Voices sounding and available, for the status bar.
+    pub(crate) fn voices(&self) -> (u32, u32) {
+        let (_, sounding) = unpack_keys(self.keys.load(Ordering::Relaxed));
+        (sounding as u32, kabl_standalone::DEFAULT_VOICE_COUNT as u32)
+    }
+
     pub(crate) fn suspend_notes(&self) {
         self.sink.lock().unwrap().notes = None;
         self.keys.store(0, Ordering::Relaxed);

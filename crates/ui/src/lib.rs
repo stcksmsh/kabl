@@ -36,6 +36,7 @@ mod fm6;
 mod fx_displays;
 pub mod help;
 pub mod inspect;
+pub mod keys;
 pub mod kit;
 mod label_dim;
 pub mod lessons;
@@ -427,6 +428,8 @@ pub struct UiState {
     pub compare: compare::Compare,
     /// The Learn tab and the running lesson (view only).
     pub lessons: lessons::Learn,
+    /// Notes from the computer keyboard and the on-screen strip (`keys`).
+    pub keys: keys::Keys,
 }
 
 struct Moving {
@@ -586,6 +589,7 @@ impl Default for UiState {
             inspect: Default::default(),
             compare: Default::default(),
             lessons: Default::default(),
+            keys: Default::default(),
         }
     }
 }
@@ -1017,6 +1021,8 @@ pub fn show_with(
     }
     let st = ui_state.style.clone();
     kit::apply(ui.ctx(), &st);
+    // Before any widget reads the keyboard: a key that plays a note is no shortcut.
+    keys::input(ui_state, ui.ctx());
     composites::panel(editor, ui_state, ui.ctx());
     about::show(ui.ctx(), ui_state);
     // Every scene (Rack, Sounds, Perform) takes a dropped `.kablmod`, not just the rack's dock.
@@ -1162,6 +1168,7 @@ pub fn show_with(
         .exact_size(st.metrics.status_h)
         .frame(kit::bar_frame(&st))
         .show(ui, |ui| status_bar(ui_state, ui, &st, status_right));
+    keys::panel(ui_state, ui, &st);
     egui::Panel::right("kabl-rail")
         .exact_size(st.metrics.rail_w)
         .resizable(false)
@@ -1302,6 +1309,7 @@ pub fn show_with(
     show_toasts(ui_state, ui, &st, page);
     ui_state.explain.typing =
         routing::wants_text_input(ui.ctx()) || egui::Popup::is_any_open(ui.ctx());
+    keys::watch(ui_state);
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
 }
 
@@ -2144,6 +2152,7 @@ fn status_bar(
                 format!("MIDI · {port}"),
             );
         }
+        keys::toggle(ui_state, ui, st);
         if !ui_state.status_audio.is_empty() {
             let text = ui_state.status_audio.clone();
             kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &text)
