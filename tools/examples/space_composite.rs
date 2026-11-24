@@ -39,6 +39,7 @@ fn expose(label: &str, target: PortRef) -> Exposure {
     Exposure {
         label: label.into(),
         target,
+        also: Vec::new(),
     }
 }
 
