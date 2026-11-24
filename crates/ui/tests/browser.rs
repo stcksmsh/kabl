@@ -10,6 +10,7 @@ use kabl_engine::patch_engine::Command;
 use kabl_modules::builtins::Transport;
 use kabl_ui::browser::{is_modified, Dialog, DocOrigin, Pending};
 use kabl_ui::library::Library;
+use kabl_ui::sound_preview;
 use kabl_ui::{show, PatchEditor, UiState};
 use std::path::{Path, PathBuf};
 
@@ -26,6 +27,8 @@ struct H {
     events: Vec<Event>,
     t: f64,
     pointer: Pos2,
+    /// The audio end of the preview player, when `with_output` attached one.
+    voice: Option<(basedrop::Collector, sound_preview::Voice)>,
     _user: tempfile::TempDir,
 }
 
@@ -48,6 +51,7 @@ impl H {
             events: Vec::new(),
             t: 0.0,
             pointer: Pos2::ZERO,
+            voice: None,
             _user: user,
         };
         h.frame();
@@ -64,6 +68,9 @@ impl H {
             ..Default::default()
         };
         self.t += 1.0 / 60.0;
+        if let Some((_, v)) = &mut self.voice {
+            v.poll();
+        }
         self.ctx.begin_pass(raw);
         let mut root = egui::Ui::new(
             self.ctx.clone(),
@@ -83,6 +90,7 @@ impl H {
         if let Some(id) = key
             .strip_prefix("sound:")
             .or_else(|| key.strip_prefix("fav:"))
+            .or_else(|| key.strip_prefix("play:"))
         {
             self.ui.browser.query = self
                 .ui
@@ -126,7 +134,10 @@ impl H {
             self.frame();
         }
         self.frame();
-        if key.starts_with("sound:") || key.starts_with("fav:") {
+        if ["sound:", "fav:", "play:"]
+            .iter()
+            .any(|p| key.starts_with(p))
+        {
             self.ui.browser.query = previous_query;
             self.frame();
             self.frame();
@@ -145,6 +156,17 @@ impl H {
         }
         self.frame();
         self.frame();
+    }
+
+    /// Gives the browser a preview player, as the standalone has (tests have no device).
+    fn with_output(mut self) -> Self {
+        let collector = basedrop::Collector::new();
+        let (player, voice) = sound_preview::channel(collector.handle());
+        self.ui.browser.clips.attach(Some(player));
+        self.ui.sample_rate = 48000.0;
+        self.voice = Some((collector, voice));
+        self.frame();
+        self
     }
 
     fn open(&mut self, id: &str) {
@@ -817,6 +839,77 @@ fn every_control_is_reachable_at_both_sizes() {
             }
         }
     }
+}
+
+const KEYS: &str = "factory:init-keyboard";
+const PAD: &str = "factory:palette/pad";
+
+/// Nothing previews: no sound sounds, none waits for its clip.
+fn silent(t: &H) -> bool {
+    let c = &t.ui.browser.clips;
+    c.playing().is_none() && !c.busy(KEYS) && !c.busy(PAD)
+}
+
+#[test]
+fn a_row_click_never_previews_even_with_an_output() {
+    let mut t = H::new(1440.0, 900.0).with_output();
+    assert!(t.ui.browser.clips.available());
+    for id in [KEYS, PAD] {
+        t.click(&format!("sound:{id}"));
+        assert_eq!(t.ui.browser.selected.as_deref(), Some(id));
+        for _ in 0..5 {
+            t.frame();
+        }
+        assert!(silent(&t), "a click on {id} previewed");
+    }
+    // An old library.json that turned "Preview when selected" on changes nothing.
+    assert!(!t.has("preview-on-select"));
+}
+
+#[test]
+fn play_previews_the_row_and_shows_its_card() {
+    let mut t = H::new(1440.0, 900.0).with_output();
+    t.click(&format!("sound:{PAD}"));
+    assert!(t.has(&format!("card:{PAD}")));
+    t.click(&format!("play:{KEYS}"));
+    assert!(t.ui.browser.clips.busy(KEYS), "preview asked for");
+    assert_eq!(t.ui.browser.selected.as_deref(), Some(KEYS));
+    assert!(t.has(&format!("card:{KEYS}")), "its card is shown");
+    assert!(!t.has(&format!("card:{PAD}")));
+    // The clip renders, then really plays.
+    let start = std::time::Instant::now();
+    while t.ui.browser.clips.playing() != Some(KEYS) {
+        assert!(start.elapsed().as_secs() < 60, "the clip never played");
+        t.frame();
+    }
+    assert!(t.ui.launches.is_empty(), "a preview, not the patch");
+}
+
+#[test]
+fn play_switches_toggles_and_stops_when_the_browser_closes() {
+    let mut t = H::new(1440.0, 900.0).with_output();
+    t.click(&format!("play:{KEYS}"));
+    assert!(t.ui.browser.clips.busy(KEYS));
+    // Another row's ▶: the first stops, the second starts, its card shows.
+    t.click(&format!("play:{PAD}"));
+    assert!(!t.ui.browser.clips.busy(KEYS));
+    assert!(t.ui.browser.clips.busy(PAD));
+    assert!(t.has(&format!("card:{PAD}")));
+    // ▶ on the previewing row stops it; the card stays.
+    t.click(&format!("play:{PAD}"));
+    assert!(silent(&t));
+    assert!(t.has(&format!("card:{PAD}")));
+    // Space on the selected row is ▶.
+    t.key(Key::Space, Modifiers::NONE);
+    assert!(t.ui.browser.clips.busy(PAD));
+    t.key(Key::Space, Modifiers::NONE);
+    assert!(silent(&t));
+    // Leaving the browser stops a preview.
+    t.click(&format!("play:{PAD}"));
+    assert!(t.ui.browser.clips.busy(PAD));
+    t.click("rack");
+    assert!(!t.ui.browser_open);
+    assert!(silent(&t));
 }
 
 #[test]
