@@ -718,6 +718,25 @@ pub(crate) fn param_knob(
     r: f32,
     look: Look,
 ) -> Vec<(CableId, Pos2)> {
+    param_knob_named(
+        editor, ui_state, ui, painter, id, param, center, r, look, true,
+    )
+}
+
+/// `param_knob`, with `named: false` leaving its name off: a composite face prints its own label.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn param_knob_named(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    painter: &egui::Painter,
+    id: ModuleId,
+    param: &'static ParamInfo,
+    center: Pos2,
+    r: f32,
+    look: Look,
+    named: bool,
+) -> Vec<(CableId, Pos2)> {
     let th = theme(&ui_state.style);
     let z = look.z;
     let base = base_value(editor.state(), id, param);
@@ -1070,7 +1089,7 @@ pub(crate) fn param_knob(
     let seq_step = SEQ_INFO.params.iter().any(|q| std::ptr::eq(q, param))
         && seq::slot_name(param.name).starts_with('p');
     if let Some(font) = crate::kit::face::face_font(&ui_state.style, crate::style::Role::Label, z)
-        .filter(|_| !seq_step)
+        .filter(|_| !seq_step && named)
     {
         painter.text(
             center - EguiVec2::new(0.0, crate::rack::knob_text_dy(r, z, font.size * 1.075)),

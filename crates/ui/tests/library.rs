@@ -1028,12 +1028,12 @@ fn write_factory_library() {
     kabl_core::save(&root.join("init-keyboard"), init_keyboard().log()).unwrap();
     kabl_core::save(
         &root.join("recipes/pluck-to-pad"),
-        kabl_ui::recipes::pluck_to_pad().log(),
+        kabl_ui::lessons::patches::pluck_to_pad().log(),
     )
     .unwrap();
     kabl_core::save(
         &root.join("recipes/filter-movement"),
-        kabl_ui::recipes::filter_movement().log(),
+        kabl_ui::lessons::patches::filter_movement().log(),
     )
     .unwrap();
     for (dir, name, category, tags, description) in FACTORY {
@@ -1063,10 +1063,13 @@ fn open(user: &Path) -> Library {
 #[test]
 fn the_recipe_patches_are_what_the_code_builds() {
     for (dir, e) in [
-        ("recipes/pluck-to-pad", kabl_ui::recipes::pluck_to_pad()),
+        (
+            "recipes/pluck-to-pad",
+            kabl_ui::lessons::patches::pluck_to_pad(),
+        ),
         (
             "recipes/filter-movement",
-            kabl_ui::recipes::filter_movement(),
+            kabl_ui::lessons::patches::filter_movement(),
         ),
     ] {
         let saved = kabl_core::load(&source().join(dir)).unwrap();

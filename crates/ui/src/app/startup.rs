@@ -29,6 +29,8 @@ pub(crate) fn run() -> eframe::Result<()> {
     }
     let mut ui_state = UiState::default();
     ui_state.use_user_prefs();
+    // D6: the computer keyboard plays notes in the standalone; the key strip waits to be opened.
+    ui_state.keys.computer = true;
     let library = kabl_ui::browser::open_library();
     log::info!(
         target: "library",

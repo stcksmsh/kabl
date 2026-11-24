@@ -21,6 +21,10 @@ use std::path::{Path, PathBuf};
 use kabl_core::{PatchLog, PatchState};
 use serde::{Deserialize, Serialize};
 
+/// Every kabl directory; declared here so `lib.rs` needs no line.
+#[path = "paths.rs"]
+pub mod paths;
+
 pub const META_FILE: &str = "sound.toml";
 pub const PREFS_FILE: &str = "library.json";
 pub const MAX_RECENTS: usize = 12;
@@ -154,6 +158,8 @@ pub struct Prefs {
     pub preview_on_select: bool,
     /// The first-run tour was finished or skipped: it is not shown again.
     pub first_run_done: bool,
+    /// Lesson progress by lesson id. Missing in files written before lessons: no progress.
+    pub lessons: std::collections::BTreeMap<String, crate::lessons::Progress>,
 }
 
 #[derive(Debug)]
@@ -244,36 +250,10 @@ pub struct Library {
     pub notes: Vec<String>,
 }
 
-/// The factory sound directory: `KABL_FACTORY_DIR`, else `<exe>/../share/kabl/patches`
-/// (the package layout), else `$XDG_DATA_DIRS/kabl/patches`, else the source checkout's
-/// `patches/` (a development build).
+/// The factory sound directory: `KABL_FACTORY_DIR`, else the installed layout's `patches`
+/// (`paths::factory_candidates_in`), else the source checkout's `patches/` (a development build).
 pub fn find_factory_dir() -> Option<PathBuf> {
-    if let Some(d) = std::env::var_os("KABL_FACTORY_DIR") {
-        return Some(PathBuf::from(d));
-    }
-    let mut candidates = Vec::new();
-    if let Some(bin) = std::env::current_exe().ok().and_then(|e| {
-        e.canonicalize()
-            .ok()
-            .and_then(|e| e.parent().map(Path::to_path_buf))
-    }) {
-        candidates.push(bin.join("../share/kabl/patches"));
-    }
-    let data_dirs = std::env::var("XDG_DATA_DIRS")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "/usr/local/share:/usr/share".into());
-    candidates.extend(
-        data_dirs
-            .split(':')
-            .map(|d| Path::new(d).join("kabl/patches")),
-    );
-    // A development build: the checkout's `patches/` packed by this crate's build script.
-    candidates.push(built_factory_dir());
-    candidates
-        .into_iter()
-        .find(|d| d.is_dir())
-        .map(|d| d.canonicalize().unwrap_or(d))
+    paths::find_factory("KABL_FACTORY_DIR", "patches", built_factory_dir(), true)
 }
 
 /// The factory sounds as `.kabl` files, packed from the checkout's `patches/` folders when this
@@ -282,16 +262,9 @@ pub fn built_factory_dir() -> PathBuf {
     PathBuf::from(env!("KABL_FACTORY_BUILD"))
 }
 
-/// `KABL_USER_DIR`, else `$XDG_DATA_HOME/kabl`, else `~/.local/share/kabl`.
+/// The user library root (`paths::user_dir_in`).
 pub fn default_user_root() -> PathBuf {
-    if let Some(d) = std::env::var_os("KABL_USER_DIR") {
-        return PathBuf::from(d);
-    }
-    if let Some(d) = std::env::var_os("XDG_DATA_HOME").filter(|d| !d.is_empty()) {
-        return PathBuf::from(d).join("kabl");
-    }
-    let home = std::env::var_os("HOME").map_or_else(|| PathBuf::from("."), PathBuf::from);
-    home.join(".local/share/kabl")
+    paths::user_dir()
 }
 
 fn is_patch_file(p: &Path) -> bool {
@@ -483,10 +456,7 @@ fn fail_point(stage: &str) -> Result<(), LibError> {
 fn write_atomic(path: &Path, text: &str) -> Result<(), LibError> {
     let tmp = path.with_extension("tmp");
     fs::write(&tmp, text).map_err(|e| io("can't write", &tmp, e))?;
-    fs::rename(&tmp, path).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        io("can't write", path, e)
-    })
+    kabl_core::fsutil::replace_file(&tmp, path).map_err(|e| io("can't write", path, e))
 }
 
 impl Library {
@@ -677,7 +647,8 @@ impl Library {
                 return Err(LibError::Io("saved copy doesn't match the sound".into()));
             }
             fail_point("staged")?;
-            fs::rename(&staged, &target).map_err(|e| io("can't write", &target, e))
+            kabl_core::fsutil::replace_file(&staged, &target)
+                .map_err(|e| io("can't write", &target, e))
         })();
         if written.is_err() {
             let _ = fs::remove_file(&staged);

@@ -15,6 +15,29 @@ pub struct Definition {
 pub struct Exposure {
     pub label: String,
     pub target: PortRef,
+    /// Further inputs this port feeds (fan-in, schema v9): one outside source reaching several
+    /// inside targets is one public port. Empty for a control and for a one-target port.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub also: Vec<PortRef>,
+}
+impl Exposure {
+    /// `target` then `also`.
+    pub fn targets(&self) -> impl Iterator<Item = &PortRef> {
+        std::iter::once(&self.target).chain(&self.also)
+    }
+    /// Keeps the targets `keep` accepts, the first of them as `target`. False when none is
+    /// left, and the caller drops the exposure.
+    pub fn retain_targets(&mut self, mut keep: impl FnMut(&PortRef) -> bool) -> bool {
+        let mut left = std::iter::once(self.target.clone())
+            .chain(std::mem::take(&mut self.also))
+            .filter(|t| keep(t));
+        let Some(first) = left.next() else {
+            return false;
+        };
+        self.target = first;
+        self.also = left.collect();
+        true
+    }
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -87,6 +110,32 @@ pub fn leaves(p: &PatchState, root: CompositeId) -> BTreeSet<ModuleId> {
         .collect()
 }
 
+/// The module an interface binding belongs to: its own module, or, for a cable parameter, the
+/// module that cable ends on (where its route takes effect). Schema v9 allows a cable parameter
+/// as a port; a control must still be a module parameter, the only kind a face can draw.
+pub fn owner(p: &PatchState, target: &PortRef) -> Option<ModuleId> {
+    match target {
+        PortRef::CableParam { cable, .. } => p.end_module(*cable),
+        t => t.module_id(),
+    }
+}
+
+/// Whether the composite binds a cable parameter, which only schema v9 readers accept.
+pub fn binds_cable_param(c: &Composite) -> bool {
+    c.ports
+        .values()
+        .flat_map(Exposure::targets)
+        .any(|t| matches!(t, PortRef::CableParam { .. }))
+}
+
+/// The most further targets (`Exposure::also`) one port may hold.
+pub const MAX_ALSO: usize = 32;
+
+/// Whether a port of the composite feeds several targets, which only schema v9 readers accept.
+pub fn fans_in(c: &Composite) -> bool {
+    c.ports.values().any(|e| !e.also.is_empty())
+}
+
 pub fn validate(p: &PatchState) -> Result<(), String> {
     if p.composites.len() > 128 {
         return Err("Composite count limit (128)".into());
@@ -155,11 +204,17 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
         let members = leaves(p, id);
         let mut public = BTreeSet::new();
         for (&key, e) in c.ports.iter().chain(&c.controls) {
+            let mut targets = Vec::new();
             if !public.insert(key)
                 || key >= c.next_interface
                 || e.label.is_empty()
                 || e.label.len() > 128
-                || !e.target.module_id().is_some_and(|m| members.contains(&m))
+                || e.also.len() > MAX_ALSO
+                || !e.targets().all(|t| {
+                    let fresh = !targets.contains(&t);
+                    targets.push(t);
+                    fresh && owner(p, t).is_some_and(|m| members.contains(&m))
+                })
             {
                 return Err(format!("Composite {id}: invalid public binding {key}"));
             }
@@ -180,7 +235,7 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
         }
         if c.controls
             .values()
-            .any(|e| !matches!(e.target, PortRef::Param { .. }))
+            .any(|e| !matches!(e.target, PortRef::Param { .. }) || !e.also.is_empty())
         {
             return Err(format!("Composite {id}: control must bind a parameter"));
         }

@@ -36,8 +36,10 @@ mod fm6;
 mod fx_displays;
 pub mod help;
 pub mod inspect;
+pub mod keys;
 pub mod kit;
 mod label_dim;
+pub mod lessons;
 pub mod library;
 pub mod module_install;
 pub mod panels;
@@ -50,7 +52,6 @@ pub mod rack;
 mod rack_editor;
 mod wheel;
 use wheel::OwnedScroll;
-pub mod recipes;
 pub mod record;
 pub mod routing;
 mod seq_editor;
@@ -355,6 +356,12 @@ pub struct UiState {
     /// Module in choose-primary mode and its pending face choice (committed by `Done`).
     pub choose: Option<(ModuleId, Vec<bool>)>,
     flash: Option<(ModuleId, &'static str, f64)>,
+    /// Every macro output's value as last seen and when it last changed (egui time), for the
+    /// editor `macro_seen_of`: what `explain::track_macros` reads a turned macro from.
+    macro_seen: HashMap<(ModuleId, u8), (f32, f64)>,
+    macro_seen_of: u64,
+    /// Controls a macro being turned changes: their rings pulse in the rack.
+    pub macro_pulse: Vec<(ModuleId, &'static str)>,
     /// Module to pan into view after the next layout (just expanded or revealed).
     reveal: Option<ModuleId>,
     canvas: Rect,
@@ -425,8 +432,10 @@ pub struct UiState {
     pub inspect: inspect::Inspect,
     /// The comparison reference (D03, session only).
     pub compare: compare::Compare,
-    /// The listening recipes (D03, view only).
-    pub recipes: recipes::Learn,
+    /// The Learn tab and the running lesson (view only).
+    pub lessons: lessons::Learn,
+    /// Notes from the computer keyboard and the on-screen strip (`keys`).
+    pub keys: keys::Keys,
 }
 
 struct Moving {
@@ -547,6 +556,9 @@ impl Default for UiState {
             skin_labels_on_art: None,
             choose: None,
             flash: None,
+            macro_seen: HashMap::new(),
+            macro_seen_of: 0,
+            macro_pulse: Vec::new(),
             reveal: None,
             canvas: Rect::NOTHING,
             fitted: false,
@@ -585,7 +597,8 @@ impl Default for UiState {
             explain: Default::default(),
             inspect: Default::default(),
             compare: Default::default(),
-            recipes: Default::default(),
+            lessons: Default::default(),
+            keys: Default::default(),
         }
     }
 }
@@ -967,6 +980,29 @@ impl UiState {
     fn flash_on(&self, id: ModuleId, param: &str, now: f64) -> bool {
         matches!(self.flash, Some((fid, p, t)) if fid == id && p == param && now - t < 1.5)
     }
+
+    /// Macro output `k` of `id` moved within the last `explain::REVEAL_HOLD` seconds.
+    pub fn macro_turning(&self, id: ModuleId, k: u8, now: f64) -> bool {
+        self.macro_seen
+            .get(&(id, k))
+            .is_some_and(|&(_, at)| now - at < explain::REVEAL_HOLD)
+    }
+
+    /// The flash ring's colour, breathing, while a turned macro changes this control.
+    fn pulse_on(
+        &self,
+        id: ModuleId,
+        param: &str,
+        now: f64,
+        sel: egui::Color32,
+    ) -> Option<egui::Color32> {
+        self.macro_pulse
+            .iter()
+            .any(|&(m, p)| m == id && p == param)
+            .then(|| {
+                sel.gamma_multiply(0.65 + 0.35 * (now * std::f64::consts::TAU * 1.5).sin() as f32)
+            })
+    }
 }
 
 /// Draws the rack editor for one frame and applies user edits to `editor` directly. Call once
@@ -1017,6 +1053,8 @@ pub fn show_with(
     }
     let st = ui_state.style.clone();
     kit::apply(ui.ctx(), &st);
+    // Before any widget reads the keyboard: a key that plays a note is no shortcut.
+    keys::input(ui_state, ui.ctx());
     composites::panel(editor, ui_state, ui.ctx());
     about::show(ui.ctx(), ui_state);
     // Every scene (Rack, Sounds, Perform) takes a dropped `.kablmod`, not just the rack's dock.
@@ -1037,8 +1075,8 @@ pub fn show_with(
     ui_state.validate(editor);
     ui_state.explain.validate(editor);
     ui_state.compare.validate(editor);
-    recipes::frame(editor, ui_state);
     let now = ui.input(|i| i.time);
+    lessons::frame(editor, ui_state, now);
     if let Some(c) = ui_state.inspect.frame(editor, ui_state.drawer_open, now) {
         ui_state.launches.push(c);
     }
@@ -1121,6 +1159,7 @@ pub fn show_with(
     // MIDI CCs are applied by the control layer (`control::midi`), not here: pickup only
     // follows edits made in this frame.
     perform::sync_takeover(editor, ui_state);
+    explain::track_macros(editor, ui_state, ui.ctx());
     if !ui.input(|i| i.pointer.any_down()) {
         ui_state.drag = None;
     }
@@ -1162,6 +1201,7 @@ pub fn show_with(
         .exact_size(st.metrics.status_h)
         .frame(kit::bar_frame(&st))
         .show(ui, |ui| status_bar(ui_state, ui, &st, status_right));
+    keys::panel(ui_state, ui, &st);
     egui::Panel::right("kabl-rail")
         .exact_size(st.metrics.rail_w)
         .resizable(false)
@@ -1298,9 +1338,11 @@ pub fn show_with(
     }
     browser::dialogs(editor, ui_state, ui.ctx());
     tour::frame(editor, ui_state, ui, &st, page);
+    lessons::mark(ui_state, ui.ctx(), &st, page, now);
     show_toasts(ui_state, ui, &st, page);
     ui_state.explain.typing =
         routing::wants_text_input(ui.ctx()) || egui::Popup::is_any_open(ui.ctx());
+    keys::watch(ui_state);
     ui_state.hits = std::mem::take(&mut ui_state.frame_hits);
 }
 
@@ -1315,12 +1357,12 @@ fn drawer(
 ) {
     drawer::tabs(ui_state, ui, st);
     // Learn and Compare are tabs of their own: each replaces the drawer's body.
-    if ui_state.recipes.open {
+    if ui_state.lessons.open {
         egui::ScrollArea::vertical()
-            .id_salt("kabl-recipes")
+            .id_salt("kabl-lessons")
             .show_owned(ui, |ui| {
                 ui.set_max_width(DRAWER_W - 24.0);
-                recipes::panel(editor, ui_state, ui, now);
+                lessons::panel(editor, ui_state, ui, now);
             });
         return;
     }
@@ -1630,19 +1672,30 @@ fn add_search(
             g,
             st.roles.text3,
         );
-        let key = egui::Rect::from_center_size(
-            egui::pos2(rect.right() - st.sp(2) - 10.0, rect.center().y),
-            egui::vec2(20.0, 16.0),
-        );
-        p.rect_filled(key, 4.0, st.roles.inset);
-        let g = p.layout_no_wrap("A".into(), st.font(style::Role::Caption), st.roles.text2);
-        p.galley(key.center() - g.size() / 2.0, g, st.roles.text2);
+        // With computer keys on, A plays a note: no shortcut to show.
+        if !ui_state.keys.computer {
+            let key = egui::Rect::from_center_size(
+                egui::pos2(rect.right() - st.sp(2) - 10.0, rect.center().y),
+                egui::vec2(20.0, 16.0),
+            );
+            p.rect_filled(key, 4.0, st.roles.inset);
+            let g = p.layout_no_wrap("A".into(), st.font(style::Role::Caption), st.roles.text2);
+            p.galley(key.center() - g.size() / 2.0, g, st.roles.text2);
+        }
     }
-    let r = r.tip(st, "Add a module (A)");
+    let r = r.tip(
+        st,
+        if ui_state.keys.computer {
+            "Add a module"
+        } else {
+            "Add a module (A)"
+        },
+    );
     ui_state.record("add-menu".into(), r.rect);
     let pop = egui::Popup::default_response_id(&r);
     if std::mem::take(&mut ui_state.add_menu_req)
-        || (!routing::wants_text_input(ui.ctx())
+        || (!ui_state.keys.computer
+            && !routing::wants_text_input(ui.ctx())
             && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::A)))
     {
         egui::Popup::open_id(ui.ctx(), pop);
@@ -2143,6 +2196,7 @@ fn status_bar(
                 format!("MIDI · {port}"),
             );
         }
+        keys::toggle(ui_state, ui, st);
         if !ui_state.status_audio.is_empty() {
             let text = ui_state.status_audio.clone();
             kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &text)
@@ -4402,6 +4456,9 @@ fn draw_control(
             if ui_state.flash_on(m.id, c.param.name, now) {
                 painter.circle_stroke(xf.p(cen), (r + 20.0) * z, Stroke::new(3.0 * z, th.sel));
             }
+            if let Some(col) = ui_state.pulse_on(m.id, c.param.name, now, th.sel) {
+                painter.circle_stroke(xf.p(cen), (r + 20.0) * z, Stroke::new(3.0 * z, col));
+            }
         }
         Geo::Select { rect } => {
             let plugs = routing::stepped_selector(
@@ -4421,6 +4478,14 @@ fn draw_control(
                     xf.r(rect).expand(5.0 * z),
                     CornerRadius::same(6),
                     Stroke::new(3.0 * z, th.sel),
+                    egui::StrokeKind::Outside,
+                );
+            }
+            if let Some(col) = ui_state.pulse_on(m.id, c.param.name, now, th.sel) {
+                painter.rect_stroke(
+                    xf.r(rect).expand(5.0 * z),
+                    CornerRadius::same(6),
+                    Stroke::new(3.0 * z, col),
                     egui::StrokeKind::Outside,
                 );
             }
@@ -4783,7 +4848,7 @@ fn drop_cable(
                 },
             })
         });
-        let new = editor.replug(old, to.clone());
+        let new = composites::replug(editor, &ui_state.composites.open, old, to.clone());
         if let (Some(cable), Some(PortRef::Param { id, param })) = (new, to) {
             let routes = routing::routes_into(editor.state(), id, &param);
             routing::inspect(ui_state, &routes, id, &param);
@@ -4797,19 +4862,18 @@ fn drop_cable(
     let (kind, rest) = key.split_once(':').unwrap();
     let (mid, name) = rest.split_once('.').unwrap();
     let mid: ModuleId = mid.parse().unwrap();
+    let (id, n) = (mid, name.to_string());
+    let to = if kind == "knob" {
+        PortRef::Param { id, param: n }
+    } else {
+        PortRef::Module { id, port: n }
+    };
+    // A drop on a composite face jack patches every target of that public port.
+    let cable = composites::connect(editor, &ui_state.composites.open, from, to);
     if kind == "knob" {
-        let cable = editor.connect_route(from, mid, name);
         let routes = routing::routes_into(editor.state(), mid, name);
         routing::inspect(ui_state, &routes, mid, name);
         ui_state.selected_route = Some(cable);
-    } else {
-        editor.connect(
-            from,
-            PortRef::Module {
-                id: mid,
-                port: name.to_string(),
-            },
-        );
     }
 }
 
@@ -5395,7 +5459,7 @@ fn cable_menu(
     }
     kit::menu_rule(ui, st);
     if remove_row(ui, ui_state, "remove-cable", "Remove cable") {
-        editor.disconnect(cable);
+        composites::disconnect(editor, &ui_state.composites.open, cable);
         ui.close();
     }
 }
@@ -5595,13 +5659,17 @@ fn draw_default_face(
                                     }
                                 }
                             }
+                            for t in &e.also {
+                                register_face_port(drawn, t, dir, r.rect.center(), snapshot);
+                            }
                             if r.clicked() {
                                 if dir == PortDirection::Output {
                                     view.pending_output = Some(e.target.clone());
                                     view.last_message =
                                         Some("Choose an input to connect this output.".into());
                                 } else if let Some(from) = view.pending_output.take() {
-                                    editor.connect(from, e.target.clone());
+                                    let open = &view.composites.open;
+                                    composites::connect(editor, open, from, e.target.clone());
                                 }
                             }
                             let st = view.style.clone();
@@ -5806,13 +5874,11 @@ fn draw_authored_face(
     }
     for (&key, e) in &c.ports {
         if !panel.placements.contains_key(&key) {
-            register_face_port(
-                drawn,
-                &e.target,
-                composites::direction(editor.state(), &e.target).unwrap_or(PortDirection::Input),
-                fallback.center(),
-                editor.state(),
-            );
+            let dir =
+                composites::direction(editor.state(), &e.target).unwrap_or(PortDirection::Input);
+            for t in e.targets() {
+                register_face_port(drawn, t, dir, fallback.center(), editor.state());
+            }
         }
     }
     for (&key, p) in &panel.placements {
@@ -5842,7 +5908,9 @@ fn draw_authored_face(
             if resp.hovered() || resp.has_focus() {
                 painter.circle_stroke(center, 15.0 * z, Stroke::new(1.5, th.sel));
             }
-            register_face_port(drawn, &e.target, dir, center, editor.state());
+            for t in e.targets() {
+                register_face_port(drawn, t, dir, center, editor.state());
+            }
             match &e.target {
                 PortRef::Module { id: leaf, port } => view.record(
                     format!(
@@ -5864,7 +5932,7 @@ fn draw_authored_face(
                 if dir == PortDirection::Output {
                     view.pending_output = Some(e.target.clone());
                 } else if let Some(from) = view.pending_output.take() {
-                    editor.connect(from, e.target.clone());
+                    composites::connect(editor, &view.composites.open, from, e.target.clone());
                 }
             }
             if resp.drag_started() && dir == PortDirection::Output {
@@ -5878,15 +5946,7 @@ fn draw_authored_face(
             face_label(
                 &painter,
                 Rect::from_min_size(screen.min, vec2(screen.width(), 22.0 * z)),
-                &format!(
-                    "{} {}",
-                    if dir == PortDirection::Output {
-                        "OUT"
-                    } else {
-                        "IN"
-                    },
-                    e.label
-                ),
+                &port_face_text(dir, &e.label),
                 z,
                 &th,
             );
@@ -5919,7 +5979,7 @@ fn draw_authored_face(
                 painter.rect_filled(value, 2.0, th.panel);
             }
             let plugs = match panel_control_geo(face, p) {
-                Geo::Knob { c: cen, r } => routing::param_knob(
+                Geo::Knob { c: cen, r } => routing::param_knob_named(
                     editor,
                     view,
                     &mut local,
@@ -5929,6 +5989,7 @@ fn draw_authored_face(
                     xf.p(cen),
                     r,
                     look,
+                    false,
                 ),
                 Geo::Select { rect } => routing::stepped_selector(
                     editor,
@@ -5943,15 +6004,60 @@ fn draw_authored_face(
                 ),
             };
             drawn.plugs.extend(plugs);
+            let now = ui.input(|i| i.time);
+            if let Some(col) = view.pulse_on(*leaf, param.name, now, th.sel) {
+                let ring = Stroke::new(3.0 * z, col);
+                match panel_control_geo(face, p) {
+                    Geo::Knob { c: cen, r } => {
+                        painter.circle_stroke(xf.p(cen), (r + 20.0) * z, ring);
+                    }
+                    Geo::Select { rect } => {
+                        painter.rect_stroke(
+                            xf.r(rect).expand(5.0 * z),
+                            CornerRadius::same(6),
+                            ring,
+                            egui::StrokeKind::Outside,
+                        );
+                    }
+                }
+            }
             view.record(format!("composite:{id}:control:{key}"), screen);
             face_label(
                 &painter,
                 Rect::from_min_size(screen.min, vec2(screen.width(), 22.0 * z)),
-                &e.label,
+                &control_face_text(&e.label, info.kind, param),
                 z,
                 &th,
             );
         }
+    }
+}
+
+/// A port's face text: the direction cue once. A label that already opens with the direction
+/// word ("In", "Input", "out R") stands alone; a blank label leaves the bare cue.
+fn port_face_text(dir: PortDirection, label: &str) -> String {
+    let (cue, words) = if dir == PortDirection::Output {
+        ("OUT", ["out", "output"])
+    } else {
+        ("IN", ["in", "input"])
+    };
+    let label = label.trim();
+    let first = label.split_whitespace().next().unwrap_or("");
+    if label.is_empty() {
+        cue.to_string()
+    } else if words.iter().any(|w| first.eq_ignore_ascii_case(w)) {
+        label.to_string()
+    } else {
+        format!("{cue} {label}")
+    }
+}
+
+/// The one name a face control carries: the author's label, else the param's own face label.
+fn control_face_text(label: &str, kind: &str, param: &kabl_modules::ParamInfo) -> String {
+    if label.trim().is_empty() {
+        routing::face_label(kind, param)
+    } else {
+        label.to_string()
     }
 }
 fn face_label(p: &egui::Painter, r: Rect, label: &str, z: f32, th: &Theme) {

@@ -6,6 +6,9 @@
 pub mod applog;
 pub mod code_load;
 pub mod input;
+/// One file shared with `kabl-ui` (which sits above this crate); see its header.
+#[path = "../../ui/src/paths.rs"]
+pub mod paths;
 
 /// Stream errors from the error callback to another thread (`stream_errors`). This bounds the
 /// errors whose ownership is outstanding at once; every error is also counted by kind.

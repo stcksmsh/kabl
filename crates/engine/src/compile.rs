@@ -3340,24 +3340,46 @@ pub fn validate_composites(patch: &PatchState) -> Result<(), String> {
 pub fn validate_composites_scoped(patch: &PatchState, scope: &CodeScope) -> Result<(), String> {
     kabl_core::composite::validate(patch)?;
     for (&id, c) in &patch.composites {
-        for e in c.ports.values().chain(c.controls.values()) {
-            let Some(m) = e.target.module_id().and_then(|id| patch.modules.get(&id)) else {
+        for (e, target) in c
+            .ports
+            .values()
+            .chain(c.controls.values())
+            .flat_map(|e| e.targets().map(move |t| (e, t)))
+        {
+            // A cable parameter is one a route can move (see `cable_dests`).
+            if let PortRef::CableParam { cable, param } = target {
+                let movable = patch.cables.get(cable).is_some_and(|c| {
+                    if param == DEPTH {
+                        matches!(c.to, PortRef::Param { .. })
+                    } else {
+                        kabl_cables::mod_slot(param).is_some()
+                    }
+                });
+                if !movable {
+                    return Err(format!(
+                        "Composite {id}: missing interface target {target:?}"
+                    ));
+                }
+                continue;
+            }
+            let Some(m) = target.module_id().and_then(|id| patch.modules.get(&id)) else {
                 return Err(format!(
-                    "Composite {id}: missing interface target {:?}",
-                    e.target
+                    "Composite {id}: missing interface target {target:?}"
                 ));
             };
             let info = registry::info_for_in(scope, &m.kind)
                 .ok_or_else(|| format!("Composite {id}: missing built-in {}", m.kind))?;
-            let valid = match &e.target {
-                PortRef::Module { port, .. } => info.ports.iter().any(|p| p.name == port),
+            let valid = match target {
+                // A port feeding several targets is a public input, so each target is one.
+                PortRef::Module { port, .. } => info.ports.iter().any(|p| {
+                    p.name == port && (e.also.is_empty() || p.direction == PortDirection::Input)
+                }),
                 PortRef::Param { param, .. } => info.params.iter().any(|p| p.name == param),
-                PortRef::CableParam { .. } => false,
+                PortRef::CableParam { .. } => unreachable!("handled above"),
             };
             if !valid {
                 return Err(format!(
-                    "Composite {id}: missing interface target {:?}",
-                    e.target
+                    "Composite {id}: missing interface target {target:?}"
                 ));
             }
         }

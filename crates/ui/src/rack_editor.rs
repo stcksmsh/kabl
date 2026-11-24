@@ -970,6 +970,7 @@ mod tests {
                 key,
                 kabl_core::composite::Exposure {
                     label: format!("Control {key}"),
+                    also: vec![],
                     target: PortRef::Param {
                         id: leaf,
                         param: "cutoff_hz".into(),
