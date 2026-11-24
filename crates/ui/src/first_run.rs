@@ -242,6 +242,24 @@ pub fn open(ui: &mut UiState) -> PatchEditor {
     start
 }
 
+/// A plugin's first run: lesson 00 on the Start card over the plugin's own patch, once per
+/// profile, shared with the standalone app and every other instance. It neither replaces the
+/// patch nor plays anything: the host's transport and MIDI decide when it sounds. True when it
+/// started.
+pub fn plugin(editor: &PatchEditor, ui: &mut UiState) -> bool {
+    // Another instance, or the standalone app, may have had the first run since this one read
+    // `library.json`.
+    if let Some(lib) = ui.library.as_mut() {
+        let on_disk = std::fs::read_to_string(lib.user_root.join(crate::library::PREFS_FILE))
+            .ok()
+            .and_then(|t| serde_json::from_str::<crate::library::Prefs>(&t).ok());
+        if on_disk.is_some_and(|p| p.first_run_done) {
+            lib.prefs.first_run_done = true;
+        }
+    }
+    crate::lessons::first_run(editor, ui)
+}
+
 /// Renders `secs` of `state` offline at `rate`, stereo interleaved: what the patch plays on its
 /// own from a fresh start (the clock restarts). Used by the listening-gate renders and tests.
 pub fn render(state: &kabl_core::PatchState, secs: f32, rate: f32) -> Result<Vec<f32>, String> {

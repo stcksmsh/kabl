@@ -21,6 +21,7 @@ Tick each box when the expected result happens; note anything off next to the it
 
 ## 3. REAPER plugin
 - [ ] Rescan plugins and load kabl as an instrument on a track. The GUI opens and the track sounds on MIDI input.
+- [ ] With a clean config folder, the first plugin instance shows the Start card once, silent: it starts no transport, preview or note. A second instance, or the standalone app afterwards, shows none.
 - [ ] Automation: arm a kabl parameter for write, move a knob, play back. The knob follows the envelope and a bounce repeats.
 - [ ] Save the project, close, reopen. Patch, knob values and automation return identically.
 - [ ] Sounds browser in the plugin: search and click a sound. Preview is audible and stops when you leave; the project sound is unaffected.

@@ -58,6 +58,9 @@ pub struct Learn {
     pub note: Option<String>,
     /// Since when the Start card has seen no running audio output.
     pub quiet_since: Option<f64>,
+    /// Set by `use_user_prefs`; the first frame with a library clears it and, in a plugin
+    /// (`UiState::devices` is `None`), starts the first run (`first_run::plugin`).
+    pub(crate) plugin_check: bool,
 }
 
 /// Is `t` in `state` with the kind the lesson expects? The resolved Show target when it is.
@@ -219,6 +222,12 @@ pub fn start(editor: &mut PatchEditor, ui: &mut UiState, i: usize) {
 /// one that was cancelled or failed is dropped; another open detaches an active lesson; a step
 /// whose conditions all hold advances.
 pub fn frame(editor: &PatchEditor, ui: &mut UiState, now: f64) {
+    if ui.lessons.plugin_check && ui.library.is_some() {
+        ui.lessons.plugin_check = false;
+        if ui.devices.is_none() {
+            crate::first_run::plugin(editor, ui);
+        }
+    }
     if let Some((i, before)) = ui.lessons.pending {
         let l = &all()[i];
         let opened = editor.instance() != before
