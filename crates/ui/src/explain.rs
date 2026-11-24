@@ -727,9 +727,11 @@ fn hidden_in(state: &PatchState, view: &UiState, id: ModuleId) -> Option<Composi
     hidden
 }
 
-/// Tracks every macro output's value (stored knob or a cue's morph) and when it last changed,
-/// whatever moved it: a drag, the wheel, a MIDI CC, a cue, undo. While any is moving, the rack
-/// pulses the controls those macros change. Idle frames compare values and allocate nothing.
+/// Tracks every macro knob's stored value and when it last changed: a hand or controller
+/// moved it (drag, wheel, keys, MIDI CC, undo). A cue's morph is left out on purpose: it never
+/// touches the stored knob, so neither the morph nor its end (the live value falling back to
+/// the knob) reveals. While any knob is moving, the rack pulses the controls those macros
+/// change. Idle frames compare values and allocate nothing.
 pub(crate) fn track_macros(editor: &PatchEditor, ui_state: &mut UiState, ctx: &egui::Context) {
     let now = ctx.input(|i| i.time);
     if ui_state.macro_seen_of != editor.instance() {
@@ -743,7 +745,8 @@ pub(crate) fn track_macros(editor: &PatchEditor, ui_state: &mut UiState, ctx: &e
             continue;
         }
         for k in 0..kabl_modules::builtins::MACRO_INFO.params.len() as u8 {
-            let v = ui_state.macro_now(state, id, k);
+            let p = &kabl_modules::builtins::MACRO_INFO.params[k as usize];
+            let v = routing::base_value(state, id, p);
             let seen = ui_state
                 .macro_seen
                 .entry((id, k))

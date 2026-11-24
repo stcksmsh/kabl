@@ -3,11 +3,12 @@
 //! controls' rings pulse in the rack while it moves, and both settle after the hold.
 
 use std::collections::BTreeSet;
+use std::time::{Duration, Instant};
 
 use egui::{Event, Pos2, RawInput, Rect};
 use kabl_core::{ModuleId, PortRef};
 use kabl_ui::explain::{self, Reach, REVEAL_HOLD, REVEAL_SHOWN};
-use kabl_ui::{show, PatchEditor, UiState};
+use kabl_ui::{composites, cues, show, MacroLive, PatchEditor, UiState};
 
 struct H {
     ctx: egui::Context,
@@ -274,6 +275,106 @@ fn many_destinations_show_the_deepest_first_then_how_many_more() {
     for (row, line) in rows[..REVEAL_SHOWN].iter().zip(&lines) {
         assert_eq!(row.0, line.text);
     }
+}
+
+#[test]
+fn a_cue_morphing_a_macro_reveals_nothing_during_or_after_the_morph() {
+    let mut h = H::new("presets/laundromat");
+    let id = h.macro_module();
+    let port = twin_port(&h, id);
+    let k = port.as_bytes()[1] - b'1';
+    let cues_id = *h
+        .editor
+        .state()
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "cues")
+        .expect("Laundromat has cues")
+        .0;
+    let n = cues::cues(h.editor.state(), cues_id)[0].n;
+    cues::set_macro(&mut h.editor, cues_id, n, id, k, Some(0.9));
+    cues::set_morph(&mut h.editor, cues_id, n, 2.0);
+    cues::launch(&mut h.ui.launches, h.editor.state(), cues_id, n).unwrap();
+    h.frame();
+    // The audio thread reports the morph as it goes, as `app::frame` feeds it in.
+    for i in 0..20 {
+        let progress = i as f32 / 20.0;
+        h.ui.macro_live.insert(
+            (id, k),
+            (
+                MacroLive {
+                    value: 0.2 + 0.7 * progress,
+                    to: 0.9,
+                    progress,
+                },
+                Instant::now(),
+            ),
+        );
+        h.frame();
+        assert!(!h.ui.hits.contains_key(&format!("preveal:{id}.{port}")));
+        assert!(h.ui.macro_pulse.is_empty());
+    }
+    // The reports stop: after 400 ms the knob reads its stored value again, quietly.
+    let (last, _) = h.ui.macro_live[&(id, k)];
+    h.ui.macro_live
+        .insert((id, k), (last, Instant::now() - Duration::from_millis(500)));
+    assert!(h.ui.live_macro(id, k).is_none());
+    h.frame();
+    h.frame();
+    assert!(!h.ui.hits.contains_key(&format!("preveal:{id}.{port}")));
+    assert!(h.ui.macro_pulse.is_empty());
+    assert!(!h.ui.macro_turning(id, k, h.t));
+}
+
+#[test]
+fn a_target_in_a_closed_composite_is_named_by_its_exposed_control_or_the_composite() {
+    let mut h = H::new("presets/laundromat");
+    let id = h.macro_module();
+    let port = twin_port(&h, id);
+    let (rows, _) = explain::destinations(h.editor.state(), id, port);
+    let (to, param, amount) = rows
+        .iter()
+        .find_map(|d| match d.reach {
+            Reach::Param { param, amount, .. } if d.via.is_none() => {
+                Some((d.to, param.name, amount))
+            }
+            _ => None,
+        })
+        .unwrap();
+    let line_for = |h: &H| {
+        explain::reveal(h.editor.state(), &h.ui, id, port)
+            .into_iter()
+            .find(|l| l.pulse == Some((to, param)))
+            .expect("a line for the target")
+    };
+    let open = line_for(&h);
+    let signed = format!(" {:+.0} %", amount * 100.0);
+    let plain = open.text.strip_suffix(&signed).expect("ends in its depth");
+    assert!(plain.contains(&format!("#{to} ")), "{plain}");
+
+    let comp = composites::encapsulate(&mut h.editor, [to].into(), Default::default(), "Comp")
+        .expect("encapsulate");
+    h.ui.composites.open.remove(&comp);
+    h.frame();
+    assert_eq!(line_for(&h).text, format!("Comp ({plain}){signed}"));
+
+    let target = PortRef::Param {
+        id: to,
+        param: param.into(),
+    };
+    composites::add_exposure(&mut h.editor, comp, target.clone(), true).expect("expose");
+    let label = h.editor.state().composites[&comp]
+        .controls
+        .values()
+        .find(|e| e.target == target)
+        .unwrap()
+        .label
+        .clone();
+    assert_eq!(line_for(&h).text, format!("Comp {label}{signed}"));
+
+    // Opened, the module shows in the rack again and reads by its own number.
+    h.ui.composites.open.insert(comp);
+    assert_eq!(line_for(&h).text, open.text);
 }
 
 #[test]
