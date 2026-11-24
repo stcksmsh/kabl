@@ -619,7 +619,7 @@ impl Prefs {
         std::fs::create_dir_all(dir)?;
         let tmp = dir.join("settings.toml.tmp");
         std::fs::write(&tmp, toml::to_string(self).expect("prefs serialise"))?;
-        std::fs::rename(tmp, dir.join("settings.toml"))
+        kabl_core::fsutil::replace_file(&tmp, &dir.join("settings.toml"))
     }
 }
 
