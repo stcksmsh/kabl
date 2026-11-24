@@ -4,6 +4,7 @@ pub mod cli;
 pub mod composite;
 pub mod embedded;
 pub mod format;
+pub mod fsutil;
 mod log;
 mod op;
 mod state;

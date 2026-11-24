@@ -424,7 +424,7 @@ pub fn save_kabl_full(
         let mut f = fs::File::create(&tmp)?;
         write_kabl_full(io::BufWriter::new(&mut f), log, meta, code)?;
         f.sync_all()?;
-        fs::rename(&tmp, path)?;
+        crate::fsutil::replace_file(&tmp, path)?;
         // So the rename survives a power loss.
         #[cfg(unix)]
         if let Some(dir) = path.parent() {

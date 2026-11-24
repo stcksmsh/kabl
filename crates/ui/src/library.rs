@@ -456,10 +456,7 @@ fn fail_point(stage: &str) -> Result<(), LibError> {
 fn write_atomic(path: &Path, text: &str) -> Result<(), LibError> {
     let tmp = path.with_extension("tmp");
     fs::write(&tmp, text).map_err(|e| io("can't write", &tmp, e))?;
-    fs::rename(&tmp, path).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        io("can't write", path, e)
-    })
+    kabl_core::fsutil::replace_file(&tmp, path).map_err(|e| io("can't write", path, e))
 }
 
 impl Library {
@@ -650,7 +647,8 @@ impl Library {
                 return Err(LibError::Io("saved copy doesn't match the sound".into()));
             }
             fail_point("staged")?;
-            fs::rename(&staged, &target).map_err(|e| io("can't write", &target, e))
+            kabl_core::fsutil::replace_file(&staged, &target)
+                .map_err(|e| io("can't write", &target, e))
         })();
         if written.is_err() {
             let _ = fs::remove_file(&staged);

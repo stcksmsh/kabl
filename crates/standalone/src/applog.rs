@@ -289,7 +289,7 @@ impl Sink {
         for n in (0..KEEP).rev() {
             let from = name(n);
             if from.exists() {
-                if let Err(e) = fs::rename(&from, name(n + 1)) {
+                if let Err(e) = kabl_core::fsutil::replace_file(&from, &name(n + 1)) {
                     return self.fail("rotate log", e);
                 }
             }
