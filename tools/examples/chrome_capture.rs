@@ -563,14 +563,10 @@ impl App {
         let toggle = j.scene == "design-page-toggle" || j.scene.starts_with("face-toggle");
         if toggle && self.editor.state().composites.len() < 2 {
             use kabl_core::PortRef;
-            let vca = *self
+            // The mockup patch has no VCA: one goes beside the mixer.
+            let vca = self
                 .editor
-                .state()
-                .modules
-                .iter()
-                .find(|(_, m)| m.kind == "vca")
-                .unwrap()
-                .0;
+                .add_module("vca", kabl_core::Vec2 { x: 904.0, y: 320.0 });
             let id = kabl_ui::composites::encapsulate(
                 &mut self.editor,
                 [vca].into(),
