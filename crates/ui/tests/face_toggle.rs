@@ -5,7 +5,7 @@ use kabl_core::{
     panel::{Kind, Panel, Placement},
     PortRef,
 };
-use kabl_ui::{composites, show, PatchEditor, UiState};
+use kabl_ui::{composites, show, CableView, PatchEditor, UiState};
 
 /// The default patch's VCA.
 const VCA: u64 = 5;
@@ -16,6 +16,16 @@ struct H {
     ui: UiState,
     t: f64,
     events: Vec<Event>,
+    /// Every string painted by the last frame.
+    texts: Vec<String>,
+}
+
+fn texts(shape: &egui::Shape, out: &mut Vec<String>) {
+    match shape {
+        egui::Shape::Text(t) => out.push(t.galley.text().to_string()),
+        egui::Shape::Vec(v) => v.iter().for_each(|s| texts(s, out)),
+        _ => {}
+    }
 }
 
 impl H {
@@ -52,6 +62,7 @@ impl H {
             ui: UiState::default(),
             t: 0.0,
             events: Vec::new(),
+            texts: Vec::new(),
         };
         h.frames(3);
         h
@@ -74,8 +85,10 @@ impl H {
                 egui::UiBuilder::new().max_rect(Rect::from_min_size(Pos2::ZERO, size)),
             );
             show(&mut self.editor, &mut self.ui, &mut root);
-            // Nothing painted is read: the tests click recorded hit rects.
-            drop(self.ctx.end_pass());
+            self.texts.clear();
+            for s in self.ctx.end_pass().shapes {
+                texts(&s.shape, &mut self.texts);
+            }
         }
     }
 
@@ -152,4 +165,22 @@ fn a_modulated_toggle_flips_its_base_value() {
     h.editor.undo();
     assert!(h.editor.state().cables.values().any(|c| c.to == target));
     assert_eq!(h.exponential(), 0.0);
+}
+
+#[test]
+fn a_modulated_toggle_shows_the_route_badge() {
+    let mut h = H::new();
+    h.ui.cable_view = CableView::Hidden;
+    h.frames(2);
+    assert!(!h.texts.iter().any(|t| t == "< 1 mod"));
+    h.editor.connect_route(
+        PortRef::Module {
+            id: 4,
+            port: "out".into(),
+        },
+        VCA,
+        "exponential",
+    );
+    h.frames(2);
+    assert!(h.texts.iter().any(|t| t == "< 1 mod"), "no route badge");
 }

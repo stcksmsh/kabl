@@ -263,3 +263,8 @@ fn the_slider_variant_is_a_view_setting_never_saved() {
     assert_eq!(h.undo_depth(), depth, "switching makes no undo entry");
     assert_eq!(horizontal, h.saved(dir.path(), "b"));
 }
+
+#[test]
+fn a_fresh_ui_state_draws_vertical_sliders() {
+    assert!(UiState::default().vertical_sliders);
+}
