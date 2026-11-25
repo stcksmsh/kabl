@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 45] = [
+const SCENES: [&str; 47] = [
     "rack",
     "perform",
     "sounds",
@@ -60,6 +60,8 @@ const SCENES: [&str; 45] = [
     "about",
     "design-page",
     "design-page-red-drop",
+    "design-page-drag",
+    "design-page-drag-red",
     "settings",
 ];
 
@@ -203,6 +205,15 @@ fn perform_mockup_patch() -> PatchEditor {
 
 impl App {
     fn prepare(&mut self) {
+        // The design page drag scenes end with the button held: let it go.
+        if self.i > 0 && self.jobs[self.i - 1].scene.starts_with("design-page-drag") {
+            self.inject.push(egui::Event::PointerButton {
+                pos: Pos2::ZERO,
+                button: egui::PointerButton::Primary,
+                pressed: false,
+                modifiers: egui::Modifiers::NONE,
+            });
+        }
         let j = &self.jobs[self.i];
         // KABL_CAPTURE_PATCH=DIR (or a .kabl file) captures another patch than the mockup's.
         self.editor = match std::env::var("KABL_CAPTURE_PATCH") {
@@ -1026,15 +1037,46 @@ impl eframe::App for App {
             let page = self.ui.panels.page.as_mut().unwrap();
             let c = &state.composites[&page.id];
             let keys: Vec<u64> = c.controls.keys().chain(c.ports.keys()).copied().collect();
-            for &key in &keys {
+            // The drag scenes leave the last jack in the palette to be dragged.
+            let drag = scene.starts_with("design-page-drag");
+            for &key in &keys[..keys.len() - usize::from(drag)] {
                 page.add(state, key).unwrap();
             }
-            page.selected = Some(keys[0]);
+            page.selected = (!drag).then_some(keys[0]);
             if scene == "design-page-red-drop" {
                 let knob = &page.draft.panel.placements[&keys[0]];
                 let at = [knob.x + 24.0, knob.y + 30.0, 64.0, 58.0];
                 assert!(page.place(state, keys[2], at).is_err());
                 page.selected = Some(keys[2]);
+            }
+        }
+        // The last jack dragged from the palette and held over the face: onto a free spot, or
+        // onto the knob for the red scene. The button stays down through the shot.
+        if (10..=20).contains(&self.f) && scene.starts_with("design-page-drag") {
+            let page = self.ui.panels.page.as_ref().unwrap();
+            let c = &page.draft.base;
+            let keys: Vec<u64> = c.controls.keys().chain(c.ports.keys()).copied().collect();
+            let (knob, jack) = (keys[0], keys[keys.len() - 1]);
+            let from = self.ui.hits[&format!("design:palette:{jack}")].center();
+            let k = &page.draft.panel.placements[&knob];
+            let r = self.ui.hits[&format!("design:el:{knob}")];
+            let z = r.width() / k.width;
+            let at = if scene == "design-page-drag-red" {
+                egui::pos2(k.x + 40.0, k.y + 60.0)
+            } else {
+                egui::pos2(180.0, 220.0)
+            };
+            let to = r.min + (at - egui::pos2(k.x, k.y)) * z;
+            let t = (self.f - 10) as f32 / 10.0;
+            self.inject
+                .push(egui::Event::PointerMoved(from + (to - from) * t));
+            if self.f == 10 {
+                self.inject.push(egui::Event::PointerButton {
+                    pos: from,
+                    button: egui::PointerButton::Primary,
+                    pressed: true,
+                    modifiers: egui::Modifiers::NONE,
+                });
             }
         }
         // The mockup's More controls: the wavetable oscillator's, Controls tab (once the first

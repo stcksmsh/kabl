@@ -183,6 +183,34 @@ impl H {
     fn zoom(&self, key: u64) -> f32 {
         self.hit(&format!("design:el:{key}")).width() / self.placed(key)[2]
     }
+
+    /// The screen point of rack point `at`, measured from placed element `by`.
+    fn screen(&self, by: u64, at: Pos2) -> Pos2 {
+        let [x, y, ..] = self.placed(by);
+        self.hit(&format!("design:el:{by}")).min + (at - egui::pos2(x, y)) * self.zoom(by)
+    }
+
+    /// Presses at `from` and moves to `to` in steps, the button still down.
+    fn hold(&mut self, from: Pos2, to: Pos2) {
+        self.events.push(Event::PointerMoved(from));
+        self.frames(1);
+        self.button(from, true);
+        for i in 1..=8 {
+            self.events
+                .push(Event::PointerMoved(from + (to - from) * (i as f32 / 8.0)));
+            self.frames(1);
+        }
+    }
+
+    /// The plain composite's page with its last jack placed by a click; returns the knob and
+    /// that jack.
+    fn with_jack() -> (Self, u64, u64) {
+        let mut h = H::new();
+        h.open(h.plain);
+        let keys = h.keys(h.plain);
+        h.click(&format!("design:palette:{}", keys[2]));
+        (h, keys[0], keys[2])
+    }
 }
 
 #[test]
@@ -263,6 +291,98 @@ fn an_overlapping_or_off_canvas_drop_is_refused_and_the_draft_kept() {
     let (k, [x, ..]) = h.page().refused.unwrap();
     assert_eq!(k, jack);
     assert!(x < 8.0);
+}
+
+#[test]
+fn a_palette_drag_places_the_element_snapped_where_it_drops() {
+    let (mut h, knob, jack) = H::with_jack();
+    let from = h.hit(&format!("design:palette:{knob}")).center();
+    // The 84 x 110 knob is held by its middle: released over rack point (220.7, 201.9), its
+    // top-left is (178.7, 146.9), which snaps to (180, 144).
+    let to = h.screen(jack, egui::pos2(220.7, 201.9));
+    h.drag(from, to - from);
+    assert_eq!(h.placed(knob), [180.0, 144.0, 84.0, 110.0]);
+    assert_eq!(h.page().selected, Some(knob));
+    assert!(h.page().refused.is_none());
+}
+
+#[test]
+fn a_palette_drop_overlapping_or_off_the_face_is_refused_and_the_draft_kept() {
+    let (mut h, knob, jack) = H::with_jack();
+    let before = h.page().draft.clone();
+    let from = h.hit(&format!("design:palette:{knob}")).center();
+    // Onto the jack at (12, 66).
+    let to = h.screen(jack, egui::pos2(60.0, 130.0));
+    h.drag(from, to - from);
+    assert_eq!(h.page().draft, before);
+    assert_eq!(h.page().refused.map(|(k, _)| k), Some(knob));
+    // Off the face to the left, still over the canvas.
+    let to = h.screen(jack, egui::pos2(-20.0, 200.0));
+    h.drag(from, to - from);
+    assert_eq!(h.page().draft, before);
+    let (k, [x, ..]) = h.page().refused.unwrap();
+    assert_eq!(k, knob);
+    assert!(x < 0.0);
+}
+
+#[test]
+fn esc_during_a_palette_drag_cancels_it() {
+    let (mut h, knob, jack) = H::with_jack();
+    let before = h.page().draft.clone();
+    let from = h.hit(&format!("design:palette:{knob}")).center();
+    let to = h.screen(jack, egui::pos2(220.0, 200.0));
+    h.hold(from, to);
+    h.key(Key::Escape, Modifiers::NONE);
+    h.button(to, false);
+    h.frames(2);
+    assert_eq!(h.page().draft, before);
+    assert!(h.page().refused.is_none());
+    // The Esc went to the drag, not to the page.
+    assert!(h.page().ask.is_none());
+}
+
+#[test]
+fn a_palette_drag_released_over_the_palette_cancels_it() {
+    let (mut h, knob, jack) = H::with_jack();
+    let before = h.page().draft.clone();
+    let from = h.hit(&format!("design:palette:{knob}")).center();
+    let out = h.screen(jack, egui::pos2(220.0, 200.0));
+    h.hold(from, out);
+    let back = from + egui::vec2(20.0, 4.0);
+    for i in 1..=8 {
+        h.events
+            .push(Event::PointerMoved(out + (back - out) * (i as f32 / 8.0)));
+        h.frames(1);
+    }
+    h.button(back, false);
+    h.frames(2);
+    assert_eq!(h.page().draft, before);
+    assert!(h.page().refused.is_none());
+}
+
+#[test]
+fn a_placed_palette_item_does_not_drag() {
+    let (mut h, _, jack) = H::with_jack();
+    let before = h.page().draft.clone();
+    let from = h.hit(&format!("design:palette:{jack}")).center();
+    let to = h.screen(jack, egui::pos2(220.0, 200.0));
+    h.drag(from, to - from);
+    assert_eq!(h.page().draft, before);
+}
+
+#[test]
+fn a_palette_drop_is_one_page_undo_step() {
+    let (mut h, knob, jack) = H::with_jack();
+    let before = h.page().draft.clone();
+    let from = h.hit(&format!("design:palette:{knob}")).center();
+    let to = h.screen(jack, egui::pos2(220.0, 200.0));
+    h.drag(from, to - from);
+    assert_eq!(h.page().draft.panel.placements.len(), 2);
+    h.click("design:undo");
+    assert_eq!(h.page().draft, before);
+    // The step before it is the jack's click-add.
+    h.click("design:undo");
+    assert_eq!(h.page().draft.panel, Panel::default());
 }
 
 #[test]
