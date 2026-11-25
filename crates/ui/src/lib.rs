@@ -23,6 +23,7 @@ pub mod compare;
 pub mod composites;
 pub mod control;
 pub mod cues;
+pub mod design_page;
 pub mod desktop;
 pub mod displays;
 mod drawer;
@@ -1189,6 +1190,8 @@ pub fn show_with(
     if !routing::wants_text_input(ui.ctx())
         && ui_state.browser.dialog.is_none()
         && ui_state.moving.is_none()
+        // The design page walks its own draft history with the same keys.
+        && ui_state.panels.page.is_none()
     {
         let (undo, redo) = ui.input_mut(|i| {
             let redo = i.consume_shortcut(&egui::KeyboardShortcut::new(
@@ -1310,12 +1313,15 @@ pub fn show_with(
 
     let page = ui.available_rect_before_wrap();
     // The wavetable dock spans the rack's width, under the rack.
-    if !ui_state.browser_open && !perform_full {
+    let designing = ui_state.panels.page.is_some();
+    if !ui_state.browser_open && !perform_full && !designing {
         tables::show(editor, ui_state, ui);
     }
-    // Rack, Perform and Sounds fade in over the page on the view token.
+    // Rack, Perform, Sounds and the design page fade in over the page on the view token.
     let scene = if ui_state.browser_open {
         2
+    } else if designing {
+        3
     } else {
         u8::from(perform_full)
     };
@@ -1338,6 +1344,16 @@ pub fn show_with(
                     ui.set_opacity(view_a);
                 }
                 browser::panel(editor, ui_state, ui);
+            });
+    } else if designing {
+        // The design page takes the rack area, as Perform's full view does.
+        egui::CentralPanel::default()
+            .frame(kit::page_frame(&st))
+            .show(ui, |ui| {
+                if view_a < 1.0 {
+                    ui.set_opacity(view_a);
+                }
+                design_page::show(editor, ui_state, ui);
             });
     } else if perform_full {
         // The Perform view's cards sit 16 from the window edges (mockup `performScreen`).
@@ -2586,7 +2602,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         && ui_state.expanded.is_empty()
         && ui_state.panels.fallback.is_none()
         && ui_state.choose.is_none()
-        && ui_state.panels.selected.is_none()
+        && ui_state.panels.page.is_none()
     {
         ui_state.pan_by(bg.drag_delta());
     }
@@ -2595,7 +2611,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
         && ui_state.expanded.is_empty()
         && ui_state.panels.fallback.is_none()
         && ui_state.choose.is_none()
-        && ui_state.panels.selected.is_none()
+        && ui_state.panels.page.is_none()
     {
         ui_state.selected_module = None;
         ui_state.selected_composite = None;
@@ -2868,7 +2884,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             && !wheel::claimed(ui.ctx())
             && ui_state.expanded.is_empty()
             && ui_state.panels.fallback.is_none()
-            && ui_state.panels.selected.is_none()
+            && ui_state.panels.page.is_none()
             && ui_state.choose.is_none()
             && ui_state.moving.is_none()
     }) {
