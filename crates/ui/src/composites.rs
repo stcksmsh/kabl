@@ -1224,7 +1224,10 @@ pub fn panel(editor: &mut PatchEditor, view: &mut crate::UiState, ctx: &egui::Co
             for (&id, c) in &state.composites {
                 let r = ui.push_id(id, |ui| {
                     ui.collapsing(format!("{} · instance #{id}", c.name), |ui| {
-                        if ui.button("Edit face").clicked() { crate::panels::open(view,id,c); }
+                        // A second page would drop the open one's draft without asking.
+                        let r = ui.add_enabled(view.panels.page.is_none(), egui::Button::new("Edit face"));
+                        view.record(format!("composite:{id}:list-design"), r.rect);
+                        if r.clicked() { crate::panels::open(view,id,c); }
                         ui.label(&c.help);
                         ui.label(format!("Embedded definition {} v{}", c.definition.id, c.definition.version));
                         ui.horizontal(|ui| {
