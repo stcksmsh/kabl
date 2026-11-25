@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 47] = [
+const SCENES: [&str; 50] = [
     "rack",
     "perform",
     "sounds",
@@ -62,6 +62,9 @@ const SCENES: [&str; 47] = [
     "design-page-red-drop",
     "design-page-drag",
     "design-page-drag-red",
+    "design-page-slider",
+    "face-slider-h",
+    "face-slider-v",
     "settings",
 ];
 
@@ -489,8 +492,9 @@ impl App {
             ui.lessons.open = true;
         }
         // The design page: a "Voice" composite made from the filter, once, with one control and
-        // two jacks exposed. Only "settings" comes after these scenes in SCENES.
-        if j.scene.starts_with("design-page") {
+        // two jacks exposed; the face-slider scenes give it a face of the cutoff as a slider and
+        // the two jacks. Only "settings" comes after these scenes in SCENES.
+        if j.scene.starts_with("design-page") || j.scene.starts_with("face-slider") {
             use kabl_core::PortRef;
             let svf = self
                 .editor
@@ -520,6 +524,35 @@ impl App {
                 kabl_ui::composites::add_exposure(&mut self.editor, id, port("in"), false).unwrap();
                 kabl_ui::composites::add_exposure(&mut self.editor, id, port("lp"), false).unwrap();
             }
+        }
+        if j.scene.starts_with("face-slider") {
+            use kabl_core::panel::{Kind, Panel, Placement};
+            ui.vertical_sliders = j.scene == "face-slider-v";
+            let (&id, c) = self.editor.state().composites.iter().next().unwrap();
+            let mut c = c.clone();
+            let keys: Vec<u64> = c.controls.keys().chain(c.ports.keys()).copied().collect();
+            let mut panel = Panel::default();
+            for (key, kind, x, w, h) in [
+                (keys[0], Kind::Slider, 12.0, 120.0, 168.0),
+                (keys[1], Kind::Jack, 150.0, 60.0, 60.0),
+                (keys[2], Kind::Jack, 222.0, 60.0, 60.0),
+            ] {
+                panel.placements.insert(
+                    key,
+                    Placement {
+                        kind,
+                        x,
+                        y: 66.0,
+                        width: w,
+                        height: h,
+                        source: None,
+                        label: None,
+                        icons: Vec::new(),
+                    },
+                );
+            }
+            c.panel = Some(Box::new(panel));
+            kabl_ui::composites::set(&mut self.editor, id, c).unwrap();
         }
         {
             use kabl_ui::browser::{Dialog, Pending};
@@ -1039,8 +1072,13 @@ impl eframe::App for App {
             let keys: Vec<u64> = c.controls.keys().chain(c.ports.keys()).copied().collect();
             // The drag scenes leave the last jack in the palette to be dragged.
             let drag = scene.starts_with("design-page-drag");
-            for &key in &keys[..keys.len() - usize::from(drag)] {
+            for (i, &key) in keys[..keys.len() - usize::from(drag)].iter().enumerate() {
                 page.add(state, key).unwrap();
+                // The slider scene turns the cutoff knob into a slider before the jacks go on.
+                if i == 0 && scene == "design-page-slider" {
+                    page.set_kind(state, key, kabl_core::panel::Kind::Slider)
+                        .unwrap();
+                }
             }
             page.selected = (!drag).then_some(keys[0]);
             if scene == "design-page-red-drop" {

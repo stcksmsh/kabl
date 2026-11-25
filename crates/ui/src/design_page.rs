@@ -20,6 +20,9 @@ const HISTORY: usize = 100;
 const BAR_H: f32 = 56.0;
 const PALETTE_W: f32 = 260.0;
 const INSPECTOR_W: f32 = 280.0;
+/// The least footprint a slider gets: wide enough for the horizontal variant and tall enough for
+/// the vertical one, since which draws is a view setting.
+const SLIDER: (f32, f32) = (120.0, 168.0);
 
 /// What the page edits, and the composite it was taken from.
 #[derive(Clone, Debug, PartialEq)]
@@ -120,6 +123,14 @@ fn kind_for(state: &PatchState, c: &Composite, key: u64) -> Result<Kind, String>
             Kind::Knob
         },
     )
+}
+
+/// The kinds exposure `key` may take on the face (FACES.md section 2), its default first.
+fn kinds_for(state: &PatchState, c: &Composite, key: u64) -> Result<Vec<Kind>, String> {
+    Ok(match kind_for(state, c, key)? {
+        Kind::Knob => vec![Kind::Knob, Kind::Slider],
+        k => vec![k],
+    })
 }
 
 impl Page {
@@ -331,6 +342,19 @@ impl Page {
         self.commit(state, panel)?;
         self.selected = Some(key);
         Ok(())
+    }
+
+    /// Draws placed element `key` as `kind`, from the same corner; a slider grows to fit either
+    /// variant.
+    pub fn set_kind(&mut self, state: &PatchState, key: u64, kind: Kind) -> Result<(), String> {
+        let mut panel = self.draft.panel.clone();
+        let p = panel.placements.get_mut(&key).ok_or("Not on the face")?;
+        p.kind = kind;
+        if kind == Kind::Slider {
+            p.width = p.width.max(SLIDER.0);
+            p.height = p.height.max(SLIDER.1);
+        }
+        self.commit(state, panel)
     }
 
     pub fn remove(&mut self, key: u64) {
@@ -744,6 +768,23 @@ fn inspector(
                 Tone::Text,
                 format!("{:?} · {label}", p.kind),
             );
+            let kinds = kinds_for(editor.state(), &page.draft.base, key).unwrap_or_default();
+            if kinds.len() > 1 {
+                let mut pick = None;
+                kit::segmented(ui, st, |ui| {
+                    for k in kinds {
+                        let r = kit::seg(ui, st, &format!("{k:?}"), p.kind == k);
+                        view.record(format!("design:kind:{k:?}"), r.rect);
+                        if r.clicked() && p.kind != k {
+                            pick = Some(k);
+                        }
+                    }
+                });
+                if let Some(k) = pick {
+                    // A refusal keeps the draft and shows its reason in `page.note`.
+                    let _ = page.set_kind(editor.state(), key, k);
+                }
+            }
             let mut r = rect_of(&p);
             let mut commit = false;
             for row in [[0, 1], [2, 3]] {
