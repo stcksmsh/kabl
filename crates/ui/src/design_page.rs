@@ -129,6 +129,15 @@ fn kind_for(state: &PatchState, c: &Composite, key: u64) -> Result<Kind, String>
 fn kinds_for(state: &PatchState, c: &Composite, key: u64) -> Result<Vec<Kind>, String> {
     Ok(match kind_for(state, c, key)? {
         Kind::Knob => vec![Kind::Knob, Kind::Slider],
+        Kind::Selector => {
+            let e = &c.controls[&key];
+            let p = panels::param_info(state, &e.target)?;
+            if p.max - p.min == 1.0 {
+                vec![Kind::Selector, Kind::Toggle]
+            } else {
+                vec![Kind::Selector]
+            }
+        }
         k => vec![k],
     })
 }

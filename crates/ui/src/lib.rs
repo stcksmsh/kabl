@@ -6100,6 +6100,18 @@ fn draw_authored_face(
                     look,
                     vertical,
                 ),
+                Geo::Select { rect } if p.kind == Kind::Toggle => {
+                    panels::face_toggle(
+                        editor,
+                        view,
+                        &mut local,
+                        &painter,
+                        *leaf,
+                        param,
+                        xf.r(rect),
+                    );
+                    Vec::new()
+                }
                 Geo::Select { rect } => routing::stepped_selector(
                     editor,
                     view,

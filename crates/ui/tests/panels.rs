@@ -451,9 +451,58 @@ fn slider_is_accepted_on_a_continuous_param_and_refused_on_a_stepped_one() {
         format!("Binding {stepped}: stepped parameters need selectors; continuous parameters need knobs or sliders")
     );
 }
+/// The fixture's composite with `param` of its `module` exposed and drawn as a toggle;
+/// `panels::validate`'s verdict and the exposure's key.
+fn toggle_on(module: &str, param: &str) -> (Result<(), String>, u64) {
+    let (mut e, id, _) = fixture();
+    let leaf = *e
+        .state()
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == module)
+        .unwrap()
+        .0;
+    composites::add_exposure(
+        &mut e,
+        id,
+        PortRef::Param {
+            id: leaf,
+            param: param.into(),
+        },
+        true,
+    )
+    .unwrap();
+    let mut state = e.state().clone();
+    let c = state.composites.get_mut(&id).unwrap();
+    let key = *c.controls.keys().max().unwrap();
+    let mut p = Panel::default();
+    p.placements.insert(
+        key,
+        Placement {
+            kind: Kind::Toggle,
+            x: 12.,
+            y: 72.,
+            width: 64.,
+            height: 55.,
+            source: None,
+            label: None,
+            icons: Vec::new(),
+        },
+    );
+    c.panel = Some(Box::new(p));
+    kabl_core::composite::validate(&state).unwrap();
+    (panels::validate(&state), key)
+}
 #[test]
-fn toggles_are_not_supported_yet() {
-    assert!(refusal(Kind::Toggle).ends_with("Toggle elements are not supported yet"));
+fn toggle_is_accepted_only_on_a_two_option_stepped_param() {
+    toggle_on("vca", "exponential").0.unwrap();
+    let (three, key) = toggle_on("osc.va", "waveform");
+    let want = |key: u64| {
+        format!("Binding {key}: toggles need a stepped parameter with exactly two options")
+    };
+    assert_eq!(three.unwrap_err(), want(key));
+    let (continuous, key) = toggle_on("filter.svf", "resonance");
+    assert_eq!(continuous.unwrap_err(), want(key));
 }
 #[test]
 fn icon_selectors_are_not_supported_yet() {

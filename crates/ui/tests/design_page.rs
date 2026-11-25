@@ -553,3 +553,32 @@ fn the_kind_chooser_turns_a_continuous_control_into_a_slider() {
     let applied = h.editor.state().composites[&h.plain].panel.clone().unwrap();
     assert_eq!(applied.placements[&key].kind, Kind::Slider);
 }
+
+#[test]
+fn the_kind_chooser_offers_a_toggle_only_for_a_two_option_param() {
+    let mut h = H::new();
+    // A continuous control: knob or slider, no toggle.
+    h.open(h.plain);
+    let key = h.keys(h.plain)[0];
+    h.click(&format!("design:palette:{key}"));
+    assert!(h.ui.hits.contains_key("design:kind:Slider"));
+    assert!(!h.ui.hits.contains_key("design:kind:Toggle"));
+    h.ui.panels.page = None;
+    // The VCA's two-option "exponential" switch.
+    let amp =
+        composites::encapsulate(&mut h.editor, [5].into(), Default::default(), "Amp").unwrap();
+    composites::add_exposure(&mut h.editor, amp, param(5, "exponential"), true).unwrap();
+    h.frames(2);
+    h.open(amp);
+    let key = h.keys(amp)[0];
+    h.click(&format!("design:palette:{key}"));
+    let selector = h.page().draft.panel.placements[&key].clone();
+    assert_eq!(selector.kind, Kind::Selector);
+    h.click("design:kind:Toggle");
+    let toggle = &h.page().draft.panel.placements[&key];
+    assert_eq!(toggle.kind, Kind::Toggle, "{:?}", h.page().note);
+    assert_eq!([toggle.x, toggle.y], [selector.x, selector.y]);
+    h.click("design:apply");
+    let applied = h.editor.state().composites[&amp].panel.clone().unwrap();
+    assert_eq!(applied.placements[&key].kind, Kind::Toggle);
+}
