@@ -625,7 +625,10 @@ fn a_save_keeps_an_answer_given_while_it_waits_on_a_slow_module() {
     .unwrap();
     fast.fill(1).unwrap();
     slow.fill(1).unwrap();
-    let (mut m1, mut m2) = (prepared(fast.voice().unwrap()), prepared(slow.voice().unwrap()));
+    let (mut m1, mut m2) = (
+        prepared(fast.voice().unwrap()),
+        prepared(slow.voice().unwrap()),
+    );
     let scope = CodeScope::new();
     scope.attach(1, "test.capfast", &mut m1);
     scope.attach(2, "test.capslow", &mut m2);
