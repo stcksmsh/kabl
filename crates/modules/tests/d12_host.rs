@@ -602,3 +602,104 @@ fn a_failed_save_through_the_running_module_keeps_the_previous_settings_and_note
     );
     assert!(!g.health().is_crashed());
 }
+
+/// A save must keep every answer the audio side gives while it waits. Module 2 answers slowly
+/// (its `state_save` runs long, so the save waits on it); module 1 answers in that time, from a
+/// thread that runs one block every 20 ms. The save used to look at module 1 before it answered
+/// and then see no request left, and wrote the song without module 1's settings.
+#[test]
+fn a_save_keeps_an_answer_given_while_it_waits_on_a_slow_module() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::Instant;
+    let fast = group(&Fixture::new(meta("test.capfast", 1, "")).wasm());
+    let mut f = Fixture::new(meta("test.capslow", 1, ""));
+    f.save = "(local $i i32) (local.set $i (i32.const 20000000))\
+         (loop $l (local.set $i (i32.sub (local.get $i) (i32.const 1))) (br_if $l (local.get $i)))\
+         (i32.store (i32.const 16512) (i32.load (i32.const 16456))) (i32.const 4)";
+    let slow = CodeGroup::new(
+        engine().compile(&f.wasm()).unwrap(),
+        InstanceConfig::new(SR, N as u32),
+        u64::MAX / 4,
+        Duration::from_secs(1),
+    )
+    .unwrap();
+    fast.fill(1).unwrap();
+    slow.fill(1).unwrap();
+    let (mut m1, mut m2) = (
+        prepared(fast.voice().unwrap()),
+        prepared(slow.voice().unwrap()),
+    );
+    let scope = CodeScope::new();
+    scope.attach(1, "test.capfast", &mut m1);
+    scope.attach(2, "test.capslow", &mut m2);
+
+    let done = Arc::new(AtomicBool::new(false));
+    let saver = {
+        let (scope, done) = (scope.clone(), Arc::clone(&done));
+        std::thread::spawn(move || {
+            let t = Instant::now();
+            scope.capture(Duration::from_secs(20));
+            done.store(true, Ordering::Relaxed);
+            t.elapsed()
+        })
+    };
+    let slow_thread = {
+        let done = Arc::clone(&done);
+        std::thread::spawn(move || {
+            while !done.load(Ordering::Relaxed) {
+                run(&mut m2, &[0.0; N]);
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        })
+    };
+    std::thread::sleep(Duration::from_millis(30));
+    while !done.load(Ordering::Relaxed) {
+        run(&mut m1, &[0.0; N]);
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let took = saver.join().unwrap();
+    slow_thread.join().unwrap();
+    let ids: Vec<u64> = scope.settings().into_iter().map(|(i, _)| i).collect();
+    assert_eq!(ids, [1, 2], "both modules' settings, after {took:?}");
+    let notes = scope.take_notes();
+    assert!(!notes.iter().any(|n| n.contains("in time")), "{notes:?}");
+}
+
+/// An engine that never runs (no audio device) never answers: the save gives up after its
+/// wait, keeps the song's settings and says so. A module whose graph is gone is not waited for.
+#[test]
+fn a_save_the_audio_side_never_answers_keeps_the_settings_and_notes_it() {
+    use std::time::Instant;
+    let g = group(&Fixture::new(meta("test.capidle", 1, "")).wasm());
+    g.fill(1).unwrap();
+    let mut m = prepared(g.voice().unwrap());
+    let scope = CodeScope::new();
+    let previous = SavedState {
+        state_version: 2,
+        bytes: vec![5, 6, 7, 8],
+    };
+    scope.set_kept_state(7, "test.capidle", previous.clone());
+    scope.attach(7, "test.capidle", &mut m);
+
+    let t = Instant::now();
+    scope.capture(Duration::from_millis(50));
+    let took = t.elapsed();
+    assert!(took >= Duration::from_millis(50), "waited {took:?}");
+    assert!(took < Duration::from_secs(2), "bounded, took {took:?}");
+    assert_eq!(scope.settings(), vec![(7, previous.clone())]);
+    let notes = scope.take_notes();
+    assert!(
+        notes
+            .iter()
+            .any(|n| n.contains("module 7") && n.contains("in time")),
+        "{notes:?}"
+    );
+
+    drop(m);
+    let t = Instant::now();
+    scope.capture(Duration::from_secs(10));
+    assert!(t.elapsed() < Duration::from_secs(1), "{:?}", t.elapsed());
+    assert_eq!(scope.settings(), vec![(7, previous)]);
+    let notes = scope.take_notes();
+    assert!(!notes.iter().any(|n| n.contains("in time")), "{notes:?}");
+}
