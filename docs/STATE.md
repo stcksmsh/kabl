@@ -5,19 +5,18 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 
 ## Done
 - 11-24: L1 #209, CI2 #212, W1a #213, CI3 #215, CI4 #216, W2 #217, L2 #218, W3 #219, W4 #220, L4 #221, face labels #223, face design v1 #224, W5a clap-validator #225, R3 rc.2 install #227, Windows test fixes #229 #232 #234 #239 #241 #242, Acid Line #230, Space composite #214, L3a #231, face decisions #228, LF endings #235, golden hashes Linux-only #237, Perform header tools #236, L3b #240, owner config #226, L3c: Sound-check strip #244, Sounds ▶ preview #243, plugin Start card #245.
-- 11-25: state #246, faces slice 1 stored form v10 #247, R3 status-bar layout + REAPER README note #248, faces slice 2 composite design page #249.
+- 11-25: state #246, faces slice 1 stored form v10 #247, R3 status-bar layout + REAPER README note #248, faces slice 2 composite design page #249, LESSON-FORMAT docs #250, state #251, faces palette drag #252.
 
 ## In flight
-- #250 LESSON-FORMAT `sound_check`/`plugin_text` docs + stale "Preview when selected" text (`claude/lesson-format-docs`): review clean at 16d44246f; branch updated with master after #249: re-verify, re-review the merge, CI, merge.
-- #251 this state file: same steps after the update-branch.
+- Faces slice 3 slider, both variants (`claude/faces-slider`, builder): brief FACES.md §9.3; scope adds design_page.rs.
 - #203 promo v2: parked.
 
 ## Next
-1. Faces: drag-from-palette onto the design page canvas (FACES.md §7; Kosta 11-25 "add drag"; no §9 slice covers it). Scope: crates/ui/src/design_page.rs + tests/design_page.rs. Next slice to dispatch.
-2. Faces slice 3+: FACES.md §9 (slider ships vertical + horizontal for Kosta to pick on captures).
+1. Faces slice 3 slider: Kosta picks vertical or horizontal on captures.
+2. Faces slice 4+: FACES.md §9 (toggle, icons, display, ...).
 3. CB2-CB4 (Drum Kit, Sequenced Part, Glue Bus): not built yet; Kosta judges each on screenshots.
 4. Windows: W6 VST3 (clap-wrapper), W7-W10. Kosta tests on a VM later.
-5. Follow-ups: #249 minors (no snapshot list UI yet: slice 9; removed-composite canvas state has no capture; docs/design/redesign/g4/SWEEP.md mentions dev-tools scene); #248 minors (status_bar test copies frame.rs toolbar sizes; geometry asserts not shown failing on master; left side not elided below 1180 px); #247 Icons minimum flat 36x55 until the Icons slice (FACES §5.1: 18/option); L3c minors (strip pick remembered before stream opens; `Choice::Unset` = never chosen and "System default"; plugin first-run claim read-then-write); L3b minors (lessons.rs `satisfy` arms AnyParamMoved/SoundsOpen never run; `any_param_moved.by` untested; tour comments kit/g4.rs:48, keys.rs:215, library.rs:159; `Sev::Info` unused; duplicate Next/Skip with Learn drawer over Start card); `perform_view.rs:671-685` duplicates `kit::icon_menu`; `file_browser.rs:390` `/` vs `C:\`; `first_run.rs:188` cutoff check counts only env cables; CLAP host macro automation never reaches the editor; `code/install.rs:118` rename via `kabl_core::fsutil`; arp/`midi.note` ignore note source; CLAP sound_state v9 signalling; child stderr in `composites_factory.rs:93`.
+5. Follow-ups: #252 minors (Esc cancelling an element move/resize has no test; palette drag clears only when the face draws again); #249 minors (no snapshot list UI yet: slice 9; removed-composite canvas state has no capture; docs/design/redesign/g4/SWEEP.md mentions dev-tools scene); #248 minors (status_bar test copies frame.rs toolbar sizes; geometry asserts not shown failing on master; left side not elided below 1180 px); #247 Icons minimum flat 36x55 until the Icons slice (FACES §5.1: 18/option); L3c minors (strip pick remembered before stream opens; `Choice::Unset` = never chosen and "System default"; plugin first-run claim read-then-write); L3b minors (lessons.rs `satisfy` arms AnyParamMoved/SoundsOpen never run; `any_param_moved.by` untested; tour comments kit/g4.rs:48, keys.rs:215, library.rs:159; `Sev::Info` unused; duplicate Next/Skip with Learn drawer over Start card); `perform_view.rs:671-685` duplicates `kit::icon_menu`; `file_browser.rs:390` `/` vs `C:\`; `first_run.rs:188` cutoff check counts only env cables; CLAP host macro automation never reaches the editor; `code/install.rs:118` rename via `kabl_core::fsutil`; arp/`midi.note` ignore note source; CLAP sound_state v9 signalling; child stderr in `composites_factory.rs:93`.
 
 ## Waiting on owner
 - Nothing pending. Taste later: slider variants, CB2-CB4 screenshots.
