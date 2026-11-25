@@ -421,12 +421,11 @@ pub fn show(editor: &mut PatchEditor, view: &mut UiState, ui: &mut egui::Ui) {
     let Some(mut page) = view.panels.page.take() else {
         return;
     };
-    let Some(current) = editor.state().composites.get(&page.id).cloned() else {
-        return;
-    };
     let st = view.style.clone();
     let st = &*st;
-    let changed = current != page.draft.base;
+    // Removed (an undo, say) counts as changed: the draft stays until Close or Reload asks.
+    let current = editor.state().composites.get(&page.id).cloned();
+    let changed = current.as_ref() != Some(&page.draft.base);
     let area = ui.max_rect();
     let bar = Rect::from_min_max(area.min, pos2(area.right(), area.top() + BAR_H));
     let left = Rect::from_min_max(
@@ -452,7 +451,7 @@ pub fn show(editor: &mut PatchEditor, view: &mut UiState, ui: &mut egui::Ui) {
     }
     top_bar(editor, view, ui, st, &mut page, changed, bar, &mut close);
     palette(editor, view, ui, st, &mut page, left);
-    face(editor, view, ui, st, &mut page, &current, canvas);
+    face(editor, view, ui, st, &mut page, current.as_ref(), canvas);
     inspector(editor, view, ui, st, &mut page, right);
     if changed {
         let strip = Rect::from_min_size(
@@ -466,7 +465,11 @@ pub fn show(editor: &mut PatchEditor, view: &mut UiState, ui: &mut egui::Ui) {
                 st,
                 Sev::Warn,
                 "The composite changed",
-                Some("Reload to edit the current composite; Apply is off until then."),
+                Some(if current.is_some() {
+                    "Reload to edit the current composite; Apply is off until then."
+                } else {
+                    "It was removed: Apply is off, and Reload closes the page."
+                }),
             );
         });
     }
@@ -527,9 +530,11 @@ fn close_or_ask(page: &mut Page, close: &mut bool) {
     }
 }
 
-fn reload(editor: &PatchEditor, page: &mut Page) {
-    if let Some(c) = editor.state().composites.get(&page.id) {
-        *page = Page::new(page.id, c);
+/// Starts over from the current composite, or closes the page when it was removed.
+fn reload(editor: &PatchEditor, page: &mut Page, close: &mut bool) {
+    match editor.state().composites.get(&page.id) {
+        Some(c) => *page = Page::new(page.id, c),
+        None => *close = true,
     }
 }
 
@@ -602,7 +607,7 @@ fn top_bar(
                 if page.dirty() {
                     page.ask = Some(Ask::Reload);
                 } else {
-                    reload(editor, page);
+                    reload(editor, page, close);
                 }
             }
             if button(ui, view, st, "default", "Default face", true) {
@@ -797,7 +802,7 @@ fn face(
     ui: &mut egui::Ui,
     st: &Style,
     page: &mut Page,
-    current: &Composite,
+    current: Option<&Composite>,
     rect: Rect,
 ) {
     let mut panel = page.draft.panel.clone();
@@ -824,24 +829,38 @@ fn face(
         }
     }
     let world = Rect::from_min_size(Pos2::ZERO, vec2(panel.width, HEIGHT));
-    let mut shown = current.clone();
-    shown.panel = Some(Box::new(panel.clone()));
-    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect));
-    child.set_clip_rect(rect.intersect(ui.clip_rect()));
-    // The face's own hit rects would point the rack's keys at the page.
-    let hits = std::mem::take(&mut view.frame_hits);
-    crate::draw_authored_face(
-        editor,
-        view,
-        &mut child,
-        xf,
-        &mut crate::Drawn::default(),
-        page.id,
-        &shown,
-        world,
-    );
-    view.frame_hits = hits;
     let painter = ui.painter_at(rect);
+    if let Some(current) = current {
+        let mut shown = current.clone();
+        shown.panel = Some(Box::new(panel.clone()));
+        let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect));
+        child.set_clip_rect(rect.intersect(ui.clip_rect()));
+        // The face's own hit rects would point the rack's keys at the page.
+        let hits = std::mem::take(&mut view.frame_hits);
+        crate::draw_authored_face(
+            editor,
+            view,
+            &mut child,
+            xf,
+            &mut crate::Drawn::default(),
+            page.id,
+            &shown,
+            world,
+        );
+        view.frame_hits = hits;
+    } else {
+        // The composite is gone, and its modules may be too: footprints only.
+        painter.rect_filled(xf.r(world), 2.0, st.roles.rack);
+        for p in panel.placements.values() {
+            let r = xf.r(Rect::from_min_size(pos2(p.x, p.y), vec2(p.width, p.height)));
+            painter.rect_stroke(
+                r,
+                2.0,
+                Stroke::new(1.0, st.roles.line2),
+                egui::StrokeKind::Inside,
+            );
+        }
+    }
     let band = st.roles.accent.gamma_multiply(0.12);
     for (y, h) in [(0.0, 64.0), (HEIGHT - 32.0, 32.0)] {
         let r = xf.r(Rect::from_min_size(pos2(0.0, y), vec2(panel.width, h)));
@@ -1005,7 +1024,7 @@ fn ask(
                 page.ask = None;
                 match q {
                     Ask::Close => *close = true,
-                    Ask::Reload => reload(editor, page),
+                    Ask::Reload => reload(editor, page, close),
                 }
             }
             if button(ui, view, st, "ask:keep", "Keep editing", true) {

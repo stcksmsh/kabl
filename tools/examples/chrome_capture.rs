@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 46] = [
+const SCENES: [&str; 45] = [
     "rack",
     "perform",
     "sounds",
@@ -58,7 +58,6 @@ const SCENES: [&str; 46] = [
     "dlg-rename",
     "dlg-restore",
     "about",
-    "dev-tools",
     "design-page",
     "design-page-red-drop",
     "settings",
@@ -478,9 +477,9 @@ impl App {
         if j.scene.starts_with("learn") {
             ui.lessons.open = true;
         }
-        // Panel authoring (advanced): a "Voice" composite made from the filter, once, with one
-        // control and two jacks exposed. Last in SCENES, so no other scene sees the composite.
-        if j.scene == "dev-tools" || j.scene.starts_with("design-page") {
+        // The design page: a "Voice" composite made from the filter, once, with one control and
+        // two jacks exposed. Only "settings" comes after these scenes in SCENES.
+        if j.scene.starts_with("design-page") {
             use kabl_core::PortRef;
             let svf = self
                 .editor
@@ -1014,9 +1013,9 @@ impl eframe::App for App {
                 a.step = kabl_ui::lessons::all()[a.lesson].steps.len();
             }
         }
-        // Panel authoring opens once the first frames, which reset its state, are past.
+        // The design page opens once the first frames, which reset its state, are past.
         let scene = self.jobs[self.i].scene;
-        if self.f == 6 && (scene == "dev-tools" || scene.starts_with("design-page")) {
+        if self.f == 6 && scene.starts_with("design-page") {
             let (&id, c) = self.editor.state().composites.iter().next().unwrap();
             kabl_ui::panels::open(&mut self.ui, id, c);
         }
@@ -1199,7 +1198,6 @@ impl eframe::App for App {
         } else if self.jobs[self.i].scene.starts_with("cable-routes")
             || self.jobs[self.i].scene.starts_with("menu-")
             || self.jobs[self.i].scene.starts_with("more-controls")
-            || self.jobs[self.i].scene == "dev-tools"
             || self.jobs[self.i].scene.starts_with("design-page")
             || self.jobs[self.i].scene == "settings"
             || self.jobs[self.i].scene.starts_with("learn-")

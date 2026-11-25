@@ -382,3 +382,29 @@ fn a_composite_changed_under_the_page_blocks_apply_until_reload() {
     assert!(!h.page().dirty());
     assert!(!h.ui.hits.contains_key("design:changed"));
 }
+
+#[test]
+fn a_composite_removed_under_the_page_keeps_the_draft_and_blocks_apply() {
+    let mut h = H::new();
+    h.open(h.authored);
+    h.click("design:width-up");
+    let draft = h.page().draft.clone();
+    assert!(h.page().dirty());
+    // Project undo (the toolbar's Undo stays live) back past the encapsulation.
+    while h.editor.state().composites.contains_key(&h.authored) {
+        assert!(h.editor.undo());
+    }
+    h.frames(2);
+    assert_eq!(h.page().draft, draft);
+    h.hit("design:changed");
+    h.click("design:apply");
+    assert_eq!(h.page().draft, draft);
+    assert!(!h.editor.state().composites.contains_key(&h.authored));
+    h.click("design:close");
+    assert_eq!(h.page().ask, Some(kabl_ui::design_page::Ask::Close));
+    h.click("design:ask:keep");
+    h.click("design:reload");
+    assert_eq!(h.page().ask, Some(kabl_ui::design_page::Ask::Reload));
+    h.click("design:ask:discard");
+    assert!(h.ui.panels.page.is_none());
+}

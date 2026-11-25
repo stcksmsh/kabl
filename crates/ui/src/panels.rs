@@ -137,15 +137,6 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
             ..View::default()
         };
     }
-    // A removed composite has no face left to design.
-    if view
-        .panels
-        .page
-        .as_ref()
-        .is_some_and(|p| !editor.state().composites.contains_key(&p.id))
-    {
-        view.panels.page = None;
-    }
     let page = view.panels.page.as_ref();
     view.panels.textures.retain(|(id, dark), (old, _, _)| {
         let art = |p: &Panel| {
