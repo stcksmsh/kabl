@@ -49,15 +49,17 @@ The plugin never starts it. `lessons/00-start-here.toml` is lesson 00.
 
 ## Step fields
 
-Only `text` is required. Each optional field adds one button to the step, shown in this order.
+Only `text` is required. Each optional field changes what the step shows (a button, a ring, a strip or other text), in the order listed.
 
 | field | button / effect |
 |---|---|
 | `title` | A short heading above the text (the Start card shows it). |
+| `plugin_text` | Optional string. In a plugin the Start card shows it instead of `text` (the host's transport decides whether the sound plays, and the host owns the devices). Absent: `text` is shown. Must not be empty or blank when present. |
 | `show` | **Show** brings the target into view (and **Back** returns). Target is one of `{ control = { id, kind, param } }`, `{ route = { from, port, to, kind, param } }`, `{ module = { id, kind } }`. |
 | `inspect` | **Inspect #id port** selects that output in the signal inspector. |
 | `play_note` | **Play test note** plays middle C for this many seconds at a fixed velocity. |
 | `compare` | **Open Compare**. |
+| `sound_check` | Optional bool, default `false`. `true` shows the Sound-check strip on the Start card: output device, MIDI input and an output meter, remembered for the next launch. Standalone only: a plugin uses the host's devices. The parser does not reject it in a plugin lesson; it is only meaningful standalone. |
 | `anchor` | A `UiState::hits` key (`knob:4.cutoff_hz`, `module:6`, `pcard:…`). While the step shows, it gets an accent ring with a slow pulse. The ring takes no input. A trailing `*` matches the first key with that prefix. |
 | `done` | Completion conditions. Once all of them hold, the step advances by itself and the panel shows "Step n done." for a moment. If they already all hold when the step is reached, the step counts as done at once: the panel says so and **Next** moves on, nothing has to be undone and redone. A step completed earlier in the session stays done when **Previous** goes back to it. If `done` is empty, the step only advances on **Next**. **Next** and **Previous** always work: every step can be skipped. A later step whose conditions come to hold, compared with the patch as the lesson started, is marked done before it is reached. |
 
@@ -84,7 +86,7 @@ New conditions are new variants of `lessons::Cond`. They are not an expression l
 
 ## Validation
 
-Unknown fields, unknown conditions, a missing `id`/`title`/`start`/`end`, no steps, empty `text`,
+Unknown fields, unknown conditions, a missing `id`/`title`/`start`/`end`, no steps, empty `text`, an empty (or blank) `plugin_text`,
 an empty `anchor`, a `play_note` out of range, a `param_moved.by` or `any_param_moved.by` that is not above 0, an empty `any_param_moved.params`, and a
 `route.amount_below` that is not a number are all
 rejected. The error names the file and the reason. The unit tests parse every embedded file, so

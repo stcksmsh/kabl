@@ -8,7 +8,7 @@ Screenshots of a true first run (fresh `HOME`/`XDG_*` under scratch, release bui
 ### 1.1 Standalone, first launch (what actually happens)
 1. `kabl-ui` with no `--patch` builds the code-defined start patch **Pluck line** (`crates/ui/src/first_run.rs:46-183`: clock → seq → VA osc → SVF → VCA ← ADSR, delay, reverb, out; the ADSR also opens the cutoff by +55 %) and **opens the Sounds page on top of it** (`crates/ui/src/app/startup.rs:234-246`). Its clock runs from creation (`crates/modules/src/builtins/clock.rs:136`), so a sequence plays at once, but the user is looking at a 129-sound list and cannot see what is playing (`01-launch.png`).
 2. The tour starts unless `first_run_done` is set (`startup.rs:238`, `tour.rs:52-55`; flag in `library.json` under `$XDG_DATA_HOME/kabl`, `library.rs:144-157`, `library.rs:285-296`). Step 1 is a toast "Press play on any sound to hear it." The toast sits over the detail column and hides its first lines ("In the rack: Pluck line", `01-launch.png`).
-3. Pressing a row's ▶ previews it: the clip is rendered offline and mixed **on top of the still-running Pluck line** (`sound_preview.rs:1-12`; `02-preview-acid-line.png`: "sequence running", output peak −2.8 dB). Preview does **not** advance the tour; only opening a sound does (`tour.rs:168-173`). "Preview when selected" is off by default (`library.rs:153`).
+3. Pressing a row's ▶ previews it: the clip is rendered offline and mixed **on top of the still-running Pluck line** (`sound_preview.rs:1-12`; `02-preview-acid-line.png`: "sequence running", output peak −2.8 dB). Preview does **not** advance the tour; only opening a sound does (`tour.rs:168-173`). The old "Preview when selected" switch was replaced by the ▶ button on each row (#243); clicking a row is silent.
 4. Load sound (Acid Line): the view jumps to the rack and **three toasts stack**: the tour's "Sound flows along the glowing cables", the browser's "opened 'Acid Line' (stopped, press Start)" while the tour has just started its clocks (`tour.rs:176-185`), and "file operation in progress" (`03-loaded-acid-line.png`). The rack is a flat 62-cable patch at 50 % zoom; the routing drawer lists all cables. Peak −0.3 dB.
 5. After 4 s, step 3 dims the rack and spotlights the first `filter.*` it finds (`tour.rs:198-218`, `first_run.rs:186-192`): one of Acid Line's three ladders, with generic text "the teal arc is the envelope opening the filter on every note", written for Pluck line (`04-tour-step3.png`). The scrim blocks every other click (`tour.rs:345-364`).
 6. Step 4 "Make it yours: drag a cable end out of its jack … or browse more sounds" (`05-tour-step4.png`), then the tour ends for good (`tour.rs:118-126`). Confirmed: `first_run_done: true` was written and the second launch shows no tour (`08-second-launch.png`).
@@ -72,7 +72,7 @@ Targets: sound within 2 s of launch; a note the user plays within 30 s, without 
 - Done when: notes played (`status_voices` > 0, `lib.rs:416`, or a key event from the new input).
 
 ### Step "Find other sounds"
-- Opens Sounds (scene tabs, `lib.rs:1712-1726`) on a shelf (`library.rs:33-35`), with **Preview when selected** on (pref `preview_on_select`, `library.rs:153`, off by default; decision D3). Selecting previews (`sound_preview.rs:1-12`), Open loads.
+- Opens Sounds (scene tabs, `lib.rs:1712-1726`) on a shelf (`library.rs:33-35`), where each row has a ▶ button that previews it (`sound_preview.rs:1-12`); clicking a row is silent. The earlier "Preview when selected" switch (pref `preview_on_select`, decision D3) was replaced by this in #243. Open loads.
 - Done when: a library sound is opened (`doc.origin` changed, as `tour.rs:168-173` checks) and a note is played on it. One line after loading: "Keyboard sounds play from your keys; pieces have Start" (rule from `browser.rs:9-10`).
 
 ### Step "Change it" (the first meaningful change is a macro)
@@ -236,7 +236,7 @@ Every slice: own worktree, tests, a **real walkthrough capture** (xvfb video or 
 - Evidence: the plugin uses the same UI (`crates/clap/src/lib.rs:776`); a DAW user cannot load the standalone if they only installed the VST3 on Windows.
 - Recommend A (card is small and dismissible; plugin never makes sound by itself).
 
-**D3. Preview when selected: on by default?**
+**D3. (Replaced by the per-row ▶ button, #243.) Was: "Preview when selected" on by default?**
 - A: on for everyone. B: on only during lesson steps (proposed). C: off (today, `library.rs:153`).
 - Evidence: "Browsing never makes sound" is an explicit rule (`browser.rs:9`); newcomers expect click-to-hear.
 - Recommend B now; revisit A after a hands-on session.
