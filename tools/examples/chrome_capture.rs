@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 43] = [
+const SCENES: [&str; 44] = [
     "rack",
     "perform",
     "sounds",
@@ -26,6 +26,7 @@ const SCENES: [&str; 43] = [
     "first-run-sounds",
     "first-run-stopped",
     "first-run-no-output",
+    "first-run-plugin",
     "drawer",
     "wavetable-editor",
     "seq-pattern-editor",
@@ -353,6 +354,18 @@ impl App {
                     }
                 }
             }
+        }
+        if j.scene == "first-run-plugin" {
+            // A plugin's first editor on a fresh profile: lesson 00 over its own factory patch,
+            // no document, the host owning the devices (no Sound-check strip).
+            self.editor = PatchEditor::seed_from(&kabl_standalone::default_patch());
+            ui.doc = None;
+            ui.midi_input = None;
+            let lib = ui.library.as_mut().unwrap();
+            lib.prefs.first_run_done = false;
+            assert_eq!(lib.save_prefs(), None);
+            assert!(kabl_ui::first_run::plugin(&self.editor, &mut ui));
+            ui.inspect.audio = true;
         }
         ui.drawer_open = matches!(
             j.scene,

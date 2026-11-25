@@ -66,6 +66,10 @@ pub struct Step {
     #[serde(default)]
     pub title: Option<String>,
     pub text: String,
+    /// `text` on the Start card in a plugin, where the host's transport decides whether the
+    /// sound plays and the host owns the devices. Absent: `text`.
+    #[serde(default)]
+    pub plugin_text: Option<String>,
     /// "Show" brings this into view (`explain::go`).
     #[serde(default)]
     pub show: Option<Target>,
@@ -188,6 +192,12 @@ pub fn parse(name: &str, text: &str) -> Result<Lesson, String> {
         let n = i + 1;
         if s.text.trim().is_empty() {
             return bad(&format!("step {n}: `text` is empty"));
+        }
+        if s.plugin_text
+            .as_deref()
+            .is_some_and(|t| t.trim().is_empty())
+        {
+            return bad(&format!("step {n}: `plugin_text` is empty"));
         }
         if s.play_note
             .is_some_and(|t| !(t.is_finite() && t > 0.0 && t <= 30.0))

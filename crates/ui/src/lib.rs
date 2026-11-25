@@ -943,6 +943,9 @@ impl UiState {
         self.folders.retain(|_, d| d.is_dir());
         self.prefs_saved = Some(p);
         self.prefs_dir = Some(dir);
+        // A plugin loads the user's prefs and never takes over the devices: its first frame with
+        // a library may show lesson 00 (`lessons::frame`).
+        self.lessons.plugin_check = true;
     }
 
     /// Whether motion is reduced: the setting, else what the desktop asked for.

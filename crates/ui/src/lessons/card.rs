@@ -116,7 +116,12 @@ pub fn card(
                         if let Some(t) = &s.title {
                             kit::label(ui, st, Role::H3, Tone::Text, t);
                         }
-                        kit::paragraph(ui, st, Role::Body, Tone::Text2, &s.text);
+                        // `devices` is `None` only in a plugin.
+                        let text = match (&ui_state.devices, &s.plugin_text) {
+                            (None, Some(t)) => t,
+                            _ => &s.text,
+                        };
+                        kit::paragraph(ui, st, Role::Body, Tone::Text2, text);
                         if s.sound_check && ui_state.devices.is_some() {
                             sound_check(ui, st, ui_state);
                         }
@@ -157,17 +162,20 @@ pub fn card(
                                 ui_state.record("start-next".into(), b.rect);
                                 next = b.clicked();
                             }
-                            let b = ui.add(
-                                kit::Button::new(st, if running { "Stop" } else { "Play" })
-                                    .icon(if running {
-                                        kit::Ic::Stop
-                                    } else {
-                                        kit::Ic::Play
-                                    })
-                                    .enabled(!clocks.is_empty()),
-                            );
-                            ui_state.record("start-stop".into(), b.rect);
-                            stop = b.clicked();
+                            // In a plugin (`devices` is `None`) the host's transport decides.
+                            if ui_state.devices.is_some() {
+                                let b = ui.add(
+                                    kit::Button::new(st, if running { "Stop" } else { "Play" })
+                                        .icon(if running {
+                                            kit::Ic::Stop
+                                        } else {
+                                            kit::Ic::Play
+                                        })
+                                        .enabled(!clocks.is_empty()),
+                                );
+                                ui_state.record("start-stop".into(), b.rect);
+                                stop = b.clicked();
+                            }
                         });
                     });
                 });
