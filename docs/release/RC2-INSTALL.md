@@ -19,8 +19,9 @@ Date 2026-11-24. Result: **R3 passed**, no step failed. Tarball downloaded with 
 
 ## Notes for the release text
 
-- README.txt does not say that REAPER needs a rescan or that `~/.clap` is searched by default; it worked here with no extra step.
-- At `--size 1280x800` the bottom status bar is clipped at the window edge and its text overlaps (see screenshot). Not fixed here.
+- README.txt does not say that REAPER needs a rescan or that `~/.clap` is searched by default; it worked here with no extra step. Since added to README.txt (`packaging/linux/package.sh`).
+- At `--size 1280x800` the bottom status bar is clipped at the window edge and its text overlaps (see screenshot). Since fixed: the bar keeps its row inside the window and elides the left-side text; `crates/ui/tests/status_bar.rs` checks 1280x800 and 1180x680.
+- The screenshot's hint card over the top-right text ("Press play on any sound to hear it.") was a step of the first-run tour, retired in `aabee983` after the build checked here (`cd9578b6`); master no longer shows it.
 - The standalone only proves sound through the patch's own sequence; no MIDI device was available.
 
 ## Captures (scratch, not committed)

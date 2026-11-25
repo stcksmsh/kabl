@@ -439,7 +439,7 @@ impl App {
             .map_or("System default".to_string(), |(i, name)| {
                 format!("{i}: {name}")
             });
-        kit::dropdown(ui, st, "audio-output", &chosen, 190.0, |ui| {
+        let out = kit::dropdown(ui, st, "audio-output", &chosen, 190.0, |ui| {
             if kit::menu_item(ui, st, "System default", self.request.device.is_none()).clicked() {
                 self.request.device = None;
                 kabl_ui::first_run::devices::remember_output(ui_state, None);
@@ -454,6 +454,7 @@ impl App {
                 }
             }
         });
+        ui_state.record("audio-output".into(), out.rect);
         retry_clicked
     }
 
