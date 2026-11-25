@@ -49,7 +49,7 @@ The plugin never starts it. `lessons/00-start-here.toml` is lesson 00.
 
 ## Step fields
 
-Only `text` is required. Each optional field adds one button to the step, shown in this order.
+Only `text` is required. Each optional field changes what the step shows (a button, a ring, a strip or other text), in the order listed.
 
 | field | button / effect |
 |---|---|
