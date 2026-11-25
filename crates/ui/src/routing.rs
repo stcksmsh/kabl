@@ -1539,6 +1539,161 @@ pub(crate) fn stepped_selector(
     selector_plug(ui_state, painter, look, &routes, rect)
 }
 
+/// A composite face slider for continuous `param` in `rect` (screen): the horizontal kit look,
+/// or a vertical fader. The pointer sets the value along the track through the param's taper;
+/// each press or drag is one undo step. Returns the plug points of its routes, as a selector.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn face_slider(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    painter: &egui::Painter,
+    id: ModuleId,
+    param: &'static ParamInfo,
+    rect: Rect,
+    look: Look,
+    vertical: bool,
+) -> Vec<(CableId, Pos2)> {
+    debug_assert_ne!(param.taper, Taper::Stepped);
+    let th = theme(&ui_state.style);
+    let z = look.z;
+    let key = format!("{id}.{}", param.name);
+    let routes = routes_into(editor.state(), id, param.name);
+    // The bottom strip holds the readout; the track is where the handle's centre travels.
+    let body = Rect::from_min_max(rect.min, Pos2::new(rect.max.x, rect.max.y - 16.0 * z));
+    let track = if vertical {
+        Rect::from_min_max(
+            Pos2::new(body.center().x, body.top() + 9.0 * z),
+            Pos2::new(body.center().x, body.bottom() - 9.0 * z),
+        )
+    } else {
+        Rect::from_min_max(
+            Pos2::new(body.left() + 10.0 * z, body.center().y),
+            Pos2::new(body.right() - 10.0 * z, body.center().y),
+        )
+    };
+    ui_state.record(format!("knob:{key}"), rect);
+    ui_state.record(format!("slider:{key}"), track);
+    let resp = ui.interact(
+        rect,
+        Id::new(("kabl-slider", id, param.name)),
+        Sense::click_and_drag(),
+    );
+    if resp.clicked() || resp.drag_started() {
+        inspect(ui_state, &routes, id, param.name);
+    }
+    let first = if resp.dragged() {
+        Some(resp.drag_started())
+    } else {
+        resp.clicked().then_some(true)
+    };
+    if let (Some(first), Some(p)) = (first, resp.interact_pointer_pos()) {
+        let t = if vertical {
+            (track.bottom() - p.y) / track.height()
+        } else {
+            (p.x - track.left()) / track.width()
+        };
+        editor.set_param_gesture(
+            ParamTarget::Module {
+                id,
+                param: param.name.into(),
+            },
+            param.from_norm(t.clamp(0.0, 1.0)),
+            first,
+        );
+    }
+    let base = base_value(editor.state(), id, param);
+    let t = param.to_norm(base).clamp(0.0, 1.0);
+    let hot = resp.hovered() || resp.dragged();
+    if vertical {
+        let groove = Rect::from_center_size(
+            track.center(),
+            EguiVec2::new(4.0 * z, track.height() + 8.0 * z),
+        );
+        for k in 0..=4 {
+            let y = track.bottom() - track.height() * k as f32 / 4.0;
+            let len = if k % 2 == 0 { 7.0 } else { 4.0 } * z;
+            for side in [-1.0, 1.0] {
+                let x = track.center().x + side * 9.0 * z;
+                painter.line_segment(
+                    [Pos2::new(x, y), Pos2::new(x + side * len, y)],
+                    Stroke::new(1.0 * z, look.ink2),
+                );
+            }
+        }
+        painter.rect_filled(groove, 2.0 * z, th.hole_c);
+        let y = track.bottom() - track.height() * t;
+        painter.rect_filled(
+            Rect::from_min_max(Pos2::new(groove.left(), y), groove.max),
+            2.0 * z,
+            th.sel,
+        );
+        let cap = Rect::from_center_size(
+            Pos2::new(track.center().x, y),
+            EguiVec2::new((30.0 * z).min(rect.width() - 4.0 * z), 14.0 * z),
+        );
+        painter.rect_filled(cap.translate(EguiVec2::new(0.0, 1.5 * z)), 3.0 * z, th.nut);
+        painter.rect_filled(cap, 3.0 * z, th.knob);
+        painter.rect_stroke(
+            cap,
+            3.0 * z,
+            Stroke::new(1.0 * z, if hot { th.sel } else { th.nut_edge }),
+            egui::StrokeKind::Inside,
+        );
+        painter.line_segment(
+            [
+                Pos2::new(cap.left() + 4.0 * z, y),
+                Pos2::new(cap.right() - 4.0 * z, y),
+            ],
+            Stroke::new(2.0 * z, th.pointer),
+        );
+    } else {
+        let roles = &ui_state.style.roles;
+        let groove = Rect::from_center_size(
+            track.center(),
+            EguiVec2::new(track.width() + 8.0 * z, 5.0 * z),
+        );
+        painter.rect_filled(groove, 2.5 * z, roles.inset);
+        painter.rect_stroke(
+            groove,
+            2.5 * z,
+            Stroke::new(1.0, roles.line),
+            egui::StrokeKind::Inside,
+        );
+        let x = track.left() + track.width() * t;
+        painter.rect_filled(
+            Rect::from_min_max(groove.min, Pos2::new(x, groove.max.y)),
+            2.5 * z,
+            roles.accent,
+        );
+        let r = (7.0 + if hot { 1.0 } else { 0.0 }) * z;
+        let h = Pos2::new(x, track.center().y);
+        painter.circle_filled(h, r, roles.raised);
+        painter.circle_stroke(h, r, Stroke::new(1.5 * z, roles.accent));
+    }
+    painter.text(
+        Pos2::new(rect.center().x, rect.max.y - 8.0 * z),
+        egui::Align2::CENTER_CENTER,
+        fmt_value(param, base),
+        egui::FontId::proportional(11.0 * z),
+        look.ink,
+    );
+    let module = editor
+        .state()
+        .modules
+        .get(&id)
+        .and_then(|m| registry::info_for(&m.kind))
+        .map_or("", |i| i.name);
+    resp.widget_info(|| {
+        egui::WidgetInfo::slider(
+            true,
+            f64::from(base),
+            format!("{module} {}", param_label(param)),
+        )
+    });
+    selector_plug(ui_state, painter, look, &routes, rect)
+}
+
 /// A selector's route plug and "< N mods" badge, below its rect.
 fn selector_plug(
     ui_state: &mut UiState,

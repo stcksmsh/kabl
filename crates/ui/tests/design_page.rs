@@ -528,3 +528,28 @@ fn a_composite_removed_under_the_page_keeps_the_draft_and_blocks_apply() {
     h.click("design:ask:discard");
     assert!(h.ui.panels.page.is_none());
 }
+
+#[test]
+fn the_kind_chooser_turns_a_continuous_control_into_a_slider() {
+    let mut h = H::new();
+    h.open(h.plain);
+    let key = h.keys(h.plain)[0];
+    h.click(&format!("design:palette:{key}"));
+    assert_eq!(h.page().selected, Some(key));
+    let knob = h.page().draft.panel.placements[&key].clone();
+    assert_eq!(knob.kind, Kind::Knob);
+    h.click("design:kind:Slider");
+    let slider = &h.page().draft.panel.placements[&key];
+    assert_eq!(slider.kind, Kind::Slider, "{:?}", h.page().note);
+    // Same corner, grown to fit either slider variant.
+    assert_eq!(
+        [slider.x, slider.y, slider.width, slider.height],
+        [knob.x, knob.y, 120.0, 168.0]
+    );
+    h.click("design:undo");
+    assert_eq!(h.page().draft.panel.placements[&key].kind, Kind::Knob);
+    h.click("design:redo");
+    h.click("design:apply");
+    let applied = h.editor.state().composites[&h.plain].panel.clone().unwrap();
+    assert_eq!(applied.placements[&key].kind, Kind::Slider);
+}

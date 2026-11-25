@@ -406,8 +406,50 @@ fn knob_selector_and_jack_are_accepted_as_before() {
     );
 }
 #[test]
-fn sliders_are_not_supported_yet() {
-    assert!(refusal(Kind::Slider).ends_with("Slider elements are not supported yet"));
+fn slider_is_accepted_on_a_continuous_param_and_refused_on_a_stepped_one() {
+    face_with(Kind::Slider).unwrap();
+    let (mut e, id, _) = fixture();
+    let osc = *e
+        .state()
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "osc.va")
+        .unwrap()
+        .0;
+    composites::add_exposure(
+        &mut e,
+        id,
+        PortRef::Param {
+            id: osc,
+            param: "waveform".into(),
+        },
+        true,
+    )
+    .unwrap();
+    let mut state = e.state().clone();
+    let c = state.composites.get_mut(&id).unwrap();
+    let stepped = *c.controls.keys().max().unwrap();
+    let mut p = Panel::default();
+    p.placements.insert(
+        stepped,
+        Placement {
+            kind: Kind::Slider,
+            x: 12.,
+            y: 72.,
+            width: 120.,
+            height: 110.,
+            source: None,
+            label: None,
+            icons: Vec::new(),
+        },
+    );
+    c.panel = Some(Box::new(p));
+    kabl_core::composite::validate(&state).unwrap();
+    let err = panels::validate(&state).unwrap_err();
+    assert_eq!(
+        err,
+        format!("Binding {stepped}: stepped parameters need selectors; continuous parameters need knobs or sliders")
+    );
 }
 #[test]
 fn toggles_are_not_supported_yet() {

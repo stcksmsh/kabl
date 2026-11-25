@@ -302,6 +302,9 @@ pub struct UiState {
     /// Settings "Cable life" and "Intensity"; remembered with the theme.
     pub cable_life: cable_life::CableLife,
     pub cable_intensity: cable_life::Intensity,
+    /// Settings "Face sliders": composite face sliders draw as vertical faders instead of the
+    /// horizontal kit slider. A view choice only, never written into the patch.
+    pub vertical_sliders: bool,
     /// Settings "Theme" and "Reduce motion", and what the desktop said at start.
     pub theme_mode: desktop::ThemeMode,
     pub reduce_motion: desktop::ReduceMotion,
@@ -530,6 +533,7 @@ impl Default for UiState {
             prefs_saved: None,
             cable_life: Default::default(),
             cable_intensity: Default::default(),
+            vertical_sliders: false,
             theme_mode: Default::default(),
             reduce_motion: Default::default(),
             desktop: Default::default(),
@@ -2141,6 +2145,25 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
                         if r.clicked() {
                             ui_state.reduce_motion = v;
                             changed = true;
+                        }
+                    }
+                });
+                kit::paragraph(
+                    ui,
+                    st,
+                    style::Role::Caption,
+                    kit::Tone::Text2,
+                    "Face sliders",
+                );
+                kit::segmented(ui, st, |ui| {
+                    for (v, label, key) in [
+                        (false, "Horizontal", "face-sliders:horizontal"),
+                        (true, "Vertical", "face-sliders:vertical"),
+                    ] {
+                        let r = kit::seg(ui, st, label, ui_state.vertical_sliders == v);
+                        ui_state.record(key.into(), r.rect);
+                        if r.clicked() {
+                            ui_state.vertical_sliders = v;
                         }
                     }
                 });
@@ -6039,7 +6062,13 @@ fn draw_authored_face(
                 ink2: th.ink2,
                 slot: 76.0,
             };
+            let vertical = view.vertical_sliders;
             // Contrast plates guarantee labels and values remain usable over any supplied image.
+            if p.kind == Kind::Slider {
+                if let Geo::Select { rect } = panel_control_geo(face, p) {
+                    painter.rect_filled(xf.r(rect), 2.0, th.panel);
+                }
+            }
             if p.kind == Kind::Knob {
                 let value = Rect::from_min_size(
                     screen.min + vec2(0.0, 83.0) * z,
@@ -6059,6 +6088,17 @@ fn draw_authored_face(
                     r,
                     look,
                     false,
+                ),
+                Geo::Select { rect } if p.kind == Kind::Slider => routing::face_slider(
+                    editor,
+                    view,
+                    &mut local,
+                    &painter,
+                    *leaf,
+                    param,
+                    xf.r(rect),
+                    look,
+                    vertical,
                 ),
                 Geo::Select { rect } => routing::stepped_selector(
                     editor,

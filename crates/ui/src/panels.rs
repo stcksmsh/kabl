@@ -31,7 +31,10 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
     panel.validate(c)?;
     for (&id, p) in &panel.placements {
         // Stored and checked by `Panel::validate`; each kind is lifted here once it draws.
-        if !matches!(p.kind, Kind::Knob | Kind::Selector | Kind::Jack) {
+        if !matches!(
+            p.kind,
+            Kind::Knob | Kind::Selector | Kind::Jack | Kind::Slider
+        ) {
             return Err(format!(
                 "Binding {id}: {:?} elements are not supported yet",
                 p.kind
@@ -40,7 +43,7 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
         if let Some(e) = c.controls.get(&id) {
             let target = param_info(state, &e.target)?;
             if (p.kind == Kind::Selector) != (target.taper == Taper::Stepped) {
-                return Err(format!("Binding {id}: stepped parameters need selectors; continuous parameters need knobs"));
+                return Err(format!("Binding {id}: stepped parameters need selectors; continuous parameters need knobs or sliders"));
             }
             if p.kind == Kind::Selector && p.width < (target.max - target.min + 1.0) * 18.0 {
                 return Err(format!(
