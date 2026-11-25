@@ -350,9 +350,8 @@ fn face_with(kind: Kind) -> Result<(), String> {
     kabl_core::composite::validate(&state).unwrap();
     panels::validate(&state)
 }
-fn refused_as_unsupported(kind: Kind) {
-    let e = face_with(kind).unwrap_err();
-    assert!(e.contains("not supported yet"), "{kind:?}: {e}");
+fn refusal(kind: Kind) -> String {
+    face_with(kind).unwrap_err()
 }
 #[test]
 fn knob_selector_and_jack_are_accepted_as_before() {
@@ -408,37 +407,37 @@ fn knob_selector_and_jack_are_accepted_as_before() {
 }
 #[test]
 fn sliders_are_not_supported_yet() {
-    refused_as_unsupported(Kind::Slider);
+    assert!(refusal(Kind::Slider).ends_with("Slider elements are not supported yet"));
 }
 #[test]
 fn toggles_are_not_supported_yet() {
-    refused_as_unsupported(Kind::Toggle);
+    assert!(refusal(Kind::Toggle).ends_with("Toggle elements are not supported yet"));
 }
 #[test]
 fn icon_selectors_are_not_supported_yet() {
-    refused_as_unsupported(Kind::Icons);
+    assert!(refusal(Kind::Icons).ends_with("Icons elements are not supported yet"));
 }
 #[test]
 fn displays_are_not_supported_yet() {
-    refused_as_unsupported(Kind::Display);
+    assert!(refusal(Kind::Display).ends_with("Display elements are not supported yet"));
 }
 #[test]
 fn buttons_are_not_supported_yet() {
-    refused_as_unsupported(Kind::Button);
+    assert!(refusal(Kind::Button).ends_with("Button elements are not supported yet"));
 }
 #[test]
 fn cue_pads_are_not_supported_yet() {
-    refused_as_unsupported(Kind::CuePads);
+    assert!(refusal(Kind::CuePads).ends_with("CuePads elements are not supported yet"));
 }
 #[test]
 fn banks_are_not_supported_yet() {
-    refused_as_unsupported(Kind::Banks);
+    assert!(refusal(Kind::Banks).ends_with("Banks elements are not supported yet"));
 }
 #[test]
 fn transport_is_not_supported_yet() {
-    refused_as_unsupported(Kind::Transport);
+    assert!(refusal(Kind::Transport).ends_with("Transport elements are not supported yet"));
 }
 #[test]
 fn snapshot_strips_are_not_supported_yet() {
-    refused_as_unsupported(Kind::Snapshots);
+    assert!(refusal(Kind::Snapshots).ends_with("Snapshots elements are not supported yet"));
 }

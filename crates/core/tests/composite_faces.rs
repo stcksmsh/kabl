@@ -241,7 +241,7 @@ fn plain() -> Composite {
 }
 
 #[test]
-fn a_log_with_a_snapshot_is_written_as_v10() {
+fn a_log_with_a_snapshot_uses_the_faces_schema() {
     let mut c = plain();
     c.snapshots = vec![Snapshot {
         id: 2,
@@ -256,7 +256,7 @@ fn a_log_with_a_snapshot_is_written_as_v10() {
 }
 
 #[test]
-fn a_log_with_a_new_element_kind_is_written_as_v10() {
+fn a_log_with_a_new_element_kind_uses_the_faces_schema() {
     let mut c = plain();
     let p = placements(&mut c).get_mut(&1).unwrap();
     p.kind = Kind::Slider;
@@ -267,7 +267,7 @@ fn a_log_with_a_new_element_kind_is_written_as_v10() {
 }
 
 #[test]
-fn a_log_with_only_a_fan_in_port_is_written_as_v9_and_otherwise_v8() {
+fn a_log_with_only_a_fan_in_port_uses_the_fan_in_schema_and_otherwise_the_base_one() {
     assert_eq!(schema_for(&log_with(plain())), 8);
     let mut c = plain();
     c.ports = BTreeMap::from([(
