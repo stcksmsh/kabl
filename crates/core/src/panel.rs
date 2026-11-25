@@ -202,6 +202,8 @@ impl Panel {
                 Kind::Slider if p.height >= 160.0 => (40.0, 160.0),
                 Kind::Slider => (120.0, 55.0),
                 Kind::Toggle => (64.0, 55.0),
+                // FACES.md asks 18 points per option; core has no option count, so the Icons
+                // slice replaces this flat minimum when it draws.
                 Kind::Icons => (36.0, 55.0),
                 Kind::Display => (120.0, 60.0),
                 Kind::Button | Kind::Snapshots => (54.0, 40.0),

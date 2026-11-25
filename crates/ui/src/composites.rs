@@ -1383,11 +1383,11 @@ mod tests {
         }
     }
 
-    /// Insert and duplicate give the copy's face elements and snapshots the copy's own ids:
-    /// a module source, a nested face target and a snapshot clock inside the copy follow it; a
-    /// clock outside stays on a duplicate and is dropped on an insert.
-    #[test]
-    fn insert_and_duplicate_remap_sources_face_targets_and_snapshot_clocks() {
+    /// Composite 1 (an inner clock) with a display on the filter and a button pressing
+    /// nested composite 2's button 2; composite 2 (osc, filter) with snapshot 3 on the inner
+    /// clock and snapshot 4 on a clock outside both. Returns the editor and the inner clock,
+    /// outer clock and filter.
+    fn faces() -> (PatchEditor, ModuleId, ModuleId, ModuleId) {
         let mut e = PatchEditor::seed_from(&PatchState::new());
         let pos = kabl_core::Vec2::default();
         let inner_clock = e.add_module("clock", pos);
@@ -1465,6 +1465,15 @@ mod tests {
             },
         ]);
         kabl_core::composite::validate(e.state()).unwrap();
+        (e, inner_clock, outer_clock, filter)
+    }
+
+    /// Insert and duplicate give the copy's face elements and snapshots the copy's own ids:
+    /// a module source, a nested face target and a snapshot clock inside the copy follow it; a
+    /// clock outside stays on a duplicate and is dropped on an insert.
+    #[test]
+    fn insert_and_duplicate_remap_sources_face_targets_and_snapshot_clocks() {
+        let (e, inner_clock, outer_clock, filter) = faces();
         let pkg = snapshot(e.state(), 1).unwrap();
         for external in [true, false] {
             let (p, root) = inserted(&e, &pkg, external).unwrap();
@@ -1501,5 +1510,80 @@ mod tests {
             let outside = external.then_some(outer_clock);
             assert_eq!(clocks, [(3, Some(copy_clock)), (4, outside)], "{external}");
         }
+    }
+
+    fn exported(p: &PatchState) -> u32 {
+        let pkg = package(p, 1).unwrap();
+        let bytes = serde_json::to_vec(&pkg).unwrap();
+        assert_eq!(decode(&bytes).unwrap().schema, pkg.schema);
+        pkg.schema
+    }
+
+    /// `faces()` without its faces: export runs `panels::validate`, which refuses the new
+    /// kinds until they draw. Snapshots stay. Also returns the inner clock.
+    fn faceless() -> (PatchState, ModuleId) {
+        let (e, inner_clock, ..) = faces();
+        let mut p = e.state().clone();
+        for c in p.composites.values_mut() {
+            c.panel = None;
+        }
+        (p, inner_clock)
+    }
+
+    /// Like the patch format, a package moves to schema 3 only when it uses a face field.
+    #[test]
+    fn a_package_using_faces_is_schema_3_and_a_plain_one_is_not() {
+        let (snapshots, _) = faceless();
+        assert_eq!(exported(&snapshots), 3);
+        let mut plain = snapshots.clone();
+        plain.composites.get_mut(&2).unwrap().snapshots.clear();
+        assert_eq!(exported(&plain), 1);
+        let mut labelled = plain.clone();
+        labelled.composites.get_mut(&2).unwrap().panel = Some(Box::new(Panel {
+            placements: BTreeMap::from([(
+                1,
+                Placement {
+                    kind: Kind::Knob,
+                    width: 84.0,
+                    height: 110.0,
+                    label: Some("Tone".into()),
+                    ..placement(Kind::Knob, 12.0, None)
+                },
+            )]),
+            ..Panel::default()
+        }));
+        assert_eq!(exported(&labelled), 3);
+        let mut compact = plain;
+        compact.composites.get_mut(&1).unwrap().panel = Some(Box::new(Panel {
+            width: 300.0,
+            compact_width: Some(180.0),
+            ..Panel::default()
+        }));
+        assert_eq!(exported(&compact), 3);
+    }
+
+    #[test]
+    fn decode_accepts_package_schema_3_and_refuses_4() {
+        let (p, _) = faceless();
+        let mut pkg = package(&p, 1).unwrap();
+        assert_eq!(pkg.schema, 3);
+        let back = decode(&serde_json::to_vec(&pkg).unwrap()).unwrap();
+        assert_eq!((back.schema, back.patch), (3, pkg.patch.clone()));
+        pkg.schema = 4;
+        let err = decode(&serde_json::to_vec(&pkg).unwrap()).unwrap_err();
+        assert!(err.contains("Unsupported"), "{err}");
+    }
+
+    /// The exported package keeps a snapshot clock inside the composite and drops one outside.
+    #[test]
+    fn export_drops_a_snapshot_clock_outside_the_composite() {
+        let (p, inner_clock) = faceless();
+        let pkg = package(&p, 1).unwrap();
+        let clocks: Vec<_> = pkg.patch.composites[&2]
+            .snapshots
+            .iter()
+            .map(|s| (s.id, s.clock))
+            .collect();
+        assert_eq!(clocks, [(3, Some(inner_clock)), (4, None)]);
     }
 }

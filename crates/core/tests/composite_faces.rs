@@ -507,12 +507,12 @@ fn a_module_source_is_a_leaf_at_any_depth() {
 
 #[test]
 fn a_face_target_on_a_non_descendant_is_refused() {
-    // The child cannot press its parent's button, nor itself.
-    for target in [PARENT, CHILD] {
+    // The child cannot press its parent's button 2, nor its own button 3.
+    for (target, key) in [(PARENT, 2), (CHILD, 3)] {
         let e = refused(CHILD, |c| {
             placements(c).get_mut(&3).unwrap().source = Some(Source::Face {
                 composite: target,
-                key: 2,
+                key,
             })
         });
         assert!(e.contains("missing source"), "{target}: {e}");
