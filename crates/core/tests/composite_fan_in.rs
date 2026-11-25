@@ -68,6 +68,7 @@ fn set(log: &mut PatchLog, ports: Vec<Exposure>, controls: Vec<Exposure>) {
         controls: (next - controls.len() as u64..).zip(controls).collect(),
         next_interface: next,
         panel: None,
+        snapshots: Vec::new(),
     };
     log.append(
         Op::SetComposite {

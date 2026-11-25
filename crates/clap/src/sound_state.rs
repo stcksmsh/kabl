@@ -294,6 +294,9 @@ mod panel_tests {
                 y: 72.,
                 width: 84.,
                 height: 110.,
+                source: None,
+                label: None,
+                icons: Vec::new(),
             },
         );
         c.panel = Some(Box::new(panel));

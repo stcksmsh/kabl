@@ -1,0 +1,181 @@
+{
+  "composites": {
+    "1": {
+      "name": "Voice",
+      "help": "Two oscillators into a filter.",
+      "definition": {
+        "id": "fixture.voice",
+        "version": 1
+      },
+      "parent": null,
+      "members": [
+        2,
+        3,
+        4
+      ],
+      "pos": {
+        "x": 200.0,
+        "y": 40.0
+      },
+      "ports": {
+        "1": {
+          "label": "Pitch",
+          "target": {
+            "Module": {
+              "id": 2,
+              "port": "pitch"
+            }
+          },
+          "also": [
+            {
+              "Module": {
+                "id": 3,
+                "port": "pitch"
+              }
+            }
+          ]
+        }
+      },
+      "controls": {
+        "2": {
+          "label": "Cutoff",
+          "target": {
+            "Param": {
+              "id": 4,
+              "param": "cutoff"
+            }
+          }
+        },
+        "3": {
+          "label": "Wave",
+          "target": {
+            "Param": {
+              "id": 2,
+              "param": "waveform"
+            }
+          }
+        }
+      },
+      "next_interface": 4,
+      "panel": {
+        "width": 300.0,
+        "placements": {
+          "1": {
+            "kind": "jack",
+            "x": 12.0,
+            "y": 232.0,
+            "width": 64.0,
+            "height": 58.0
+          },
+          "2": {
+            "kind": "knob",
+            "x": 12.0,
+            "y": 72.0,
+            "width": 84.0,
+            "height": 110.0
+          },
+          "3": {
+            "kind": "selector",
+            "x": 104.0,
+            "y": 72.0,
+            "width": 180.0,
+            "height": 55.0
+          }
+        },
+        "light": null,
+        "dark": null
+      }
+    }
+  },
+  "modules": {
+    "1": {
+      "kind": "macro",
+      "pos": {
+        "x": 0.0,
+        "y": 40.0
+      },
+      "params": {}
+    },
+    "2": {
+      "kind": "osc.va",
+      "pos": {
+        "x": 200.0,
+        "y": 40.0
+      },
+      "params": {}
+    },
+    "3": {
+      "kind": "osc.va",
+      "pos": {
+        "x": 400.0,
+        "y": 40.0
+      },
+      "params": {}
+    },
+    "4": {
+      "kind": "filter.svf",
+      "pos": {
+        "x": 600.0,
+        "y": 40.0
+      },
+      "params": {
+        "cutoff": 1200.0
+      }
+    }
+  },
+  "cables": {
+    "10": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m1"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 2,
+          "port": "pitch"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "11": {
+      "from": {
+        "Module": {
+          "id": 1,
+          "port": "m1"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 3,
+          "port": "pitch"
+        }
+      },
+      "params": {},
+      "steps": []
+    },
+    "12": {
+      "from": {
+        "Module": {
+          "id": 2,
+          "port": "out"
+        }
+      },
+      "to": {
+        "Module": {
+          "id": 4,
+          "port": "in"
+        }
+      },
+      "params": {},
+      "steps": []
+    }
+  },
+  "labels": {
+    "2": {
+      "name": "Lead"
+    }
+  }
+}

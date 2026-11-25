@@ -240,7 +240,32 @@ impl PatchEditor {
         std::mem::take(&mut self.dirty)
     }
 
+    /// Every edit reaches the log here. One that removes a module or changes a composite is
+    /// logged together with the prune of the face references it leaves dangling
+    /// (`composite::prune`), as one undo step; `apply` itself never prunes, so each inverse
+    /// restores exactly in any order.
     fn append(&mut self, op: Op) {
+        fn touches(op: &Op) -> bool {
+            match op {
+                Op::RemoveModule { .. } | Op::SetComposite { .. } => true,
+                Op::Group { ops } => ops.iter().any(touches),
+                _ => false,
+            }
+        }
+        let op = if touches(&op) {
+            let mut after = self.log.state().clone();
+            after.apply(&op);
+            let pruned = kabl_core::composite::prune(&after);
+            if pruned.is_empty() {
+                op
+            } else {
+                Op::Group {
+                    ops: std::iter::once(op).chain(pruned).collect(),
+                }
+            }
+        } else {
+            op
+        };
         self.dirty |= affects_audio(&op);
         self.log.append(op, now_ms(), Source::User);
     }

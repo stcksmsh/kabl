@@ -67,7 +67,8 @@ fn placement(kind: Kind, x: f32, y: f32) -> Placement {
     let (width, height) = match kind {
         Kind::Knob => (70.0, 110.0),
         Kind::Selector => (110.0, 110.0),
-        Kind::Jack => (128.0, 58.0),
+        // The Space face places only knobs, selectors and jacks.
+        _ => (128.0, 58.0),
     };
     Placement {
         kind,
@@ -75,6 +76,9 @@ fn placement(kind: Kind, x: f32, y: f32) -> Placement {
         y,
         width,
         height,
+        source: None,
+        label: None,
+        icons: Vec::new(),
     }
 }
 

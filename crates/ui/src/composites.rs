@@ -213,7 +213,7 @@ pub fn encapsulate(
         .find_map(|m| p.modules.get(m))
         .map(|m| m.pos)
         .ok_or("Missing selected module")?;
-    let mut c=Composite{name:name.trim().into(),help:"Open internals to inspect the real modules and routes. Editing affects this instance only.".into(),definition:definition(id),parent:None,members,pos,ports:BTreeMap::new(),controls:BTreeMap::new(),next_interface:1,panel:None};
+    let mut c=Composite{name:name.trim().into(),help:"Open internals to inspect the real modules and routes. Editing affects this instance only.".into(),definition:definition(id),parent:None,members,pos,ports:BTreeMap::new(),controls:BTreeMap::new(),next_interface:1,panel:None,snapshots:Vec::new()};
     // One port per outside source (fan-in), and one per inside output, in cable order.
     let mut groups: Vec<(Option<PortRef>, Vec<PortRef>)> = Vec::new();
     for (cid, inside) in crossings(&p, &all) {
@@ -398,6 +398,7 @@ pub fn encapsulate_with(
         controls: BTreeMap::new(),
         next_interface: 1,
         panel: panel.map(Box::new),
+        snapshots: Vec::new(),
     };
     for (list, control) in [(ports, false), (controls, true)] {
         for e in list {
@@ -487,6 +488,9 @@ pub fn remove_exposure(
     if let Some(panel) = &mut c.panel {
         panel.placements.remove(&key);
     }
+    for s in &mut c.snapshots {
+        s.values.remove(&key);
+    }
     set(editor, id, c)
 }
 /// The composite `root` with its members and the cables between them. A port bound to the
@@ -544,11 +548,12 @@ fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
     snapshot.composites.get_mut(&root).unwrap().parent = None;
     // Like the patch format, a package moves to its next schema only when it uses what an older
     // reader refuses, so that reader says "unsupported" rather than "invalid public binding".
-    let schema = if snapshot
-        .composites
-        .values()
-        .any(|c| kabl_core::composite::binds_cable_param(c) || kabl_core::composite::fans_in(c))
-    {
+    let uses = |f: fn(&Composite) -> bool| snapshot.composites.values().any(f);
+    let schema = if uses(kabl_core::composite::needs_faces) {
+        3
+    } else if uses(|c| {
+        kabl_core::composite::binds_cable_param(c) || kabl_core::composite::fans_in(c)
+    }) {
         2
     } else {
         1
@@ -560,7 +565,15 @@ fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
     })
 }
 pub fn package(p: &PatchState, root: CompositeId) -> Result<Package, String> {
-    let pkg = snapshot(p, root)?;
+    let mut pkg = snapshot(p, root)?;
+    // A snapshot clock outside the composite stays behind; the snapshot jumps until the
+    // author picks a clock after insert.
+    let modules = &pkg.patch.modules;
+    for c in pkg.patch.composites.values_mut() {
+        for s in &mut c.snapshots {
+            s.clock = s.clock.filter(|m| modules.contains_key(m));
+        }
+    }
     compile(&pkg.patch)?;
     Ok(pkg)
 }
@@ -569,7 +582,7 @@ pub fn decode(bytes: &[u8]) -> Result<Package, String> {
         return Err("Composite package size limit".into());
     }
     let pkg: Package = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
-    if !(1..=2).contains(&pkg.schema)
+    if !(1..=3).contains(&pkg.schema)
         || !pkg.patch.composites.contains_key(&pkg.root)
         || pkg.patch.composites[&pkg.root].parent.is_some()
         || kabl_core::composite::descendants(&pkg.patch, pkg.root).len()
@@ -590,7 +603,25 @@ fn insert_inner(
     pkg: &Package,
     external: bool,
 ) -> Result<CompositeId, String> {
-    kabl_engine::compile::validate_composites(&pkg.patch)?;
+    let (p, id) = inserted(editor, pkg, external)?;
+    commit(editor, p)?;
+    Ok(id)
+}
+/// The patch with a fresh-id copy of `pkg` added, and the copy's root.
+fn inserted(
+    editor: &PatchEditor,
+    pkg: &Package,
+    external: bool,
+) -> Result<(PatchState, CompositeId), String> {
+    // A duplicate's snapshot clocks may sit outside the copy, where the package alone cannot
+    // resolve them; the patch they land in is validated on commit.
+    let mut own = pkg.patch.clone();
+    for c in own.composites.values_mut() {
+        for s in &mut c.snapshots {
+            s.clock = s.clock.filter(|m| own.modules.contains_key(m));
+        }
+    }
+    kabl_engine::compile::validate_composites(&own)?;
     let (mut next_module, mut next_cable) = editor.reserved_ids();
     let mut next_group = next_group(editor.log())?;
     let mut modules = BTreeMap::new();
@@ -734,10 +765,26 @@ fn insert_inner(
                 e.label = binding_label(&e.target);
             }
         }
+        for s in &mut c.snapshots {
+            // Duplicate keeps a clock outside the copy; an insert has none (export drops it).
+            s.clock = s
+                .clock
+                .and_then(|m| modules.get(&m).copied().or(external.then_some(m)));
+        }
+        if let Some(panel) = &mut c.panel {
+            for pl in panel.placements.values_mut() {
+                match &mut pl.source {
+                    Some(kabl_core::panel::Source::Module { id, .. }) => *id = modules[id],
+                    Some(kabl_core::panel::Source::Face { composite, .. }) => {
+                        *composite = groups[composite]
+                    }
+                    _ => {}
+                }
+            }
+        }
         p.composites.insert(groups[&id], c);
     }
-    commit(editor, p)?;
-    Ok(groups[&pkg.root])
+    Ok((p, groups[&pkg.root]))
 }
 pub fn duplicate(editor: &mut PatchEditor, id: CompositeId) -> Result<CompositeId, String> {
     insert_inner(editor, &snapshot(editor.state(), id)?, true)
@@ -1299,4 +1346,160 @@ pub fn panel(editor: &mut PatchEditor, view: &mut crate::UiState, ctx: &egui::Co
             }
         });
     view.composites.panel = open;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kabl_core::composite::Snapshot;
+    use kabl_core::panel::{Kind, Panel, Placement, Source};
+
+    fn placement(kind: Kind, x: f32, source: Option<Source>) -> Placement {
+        Placement {
+            kind,
+            x,
+            y: 72.0,
+            width: 120.0,
+            height: 120.0,
+            source,
+            label: None,
+            icons: Vec::new(),
+        }
+    }
+
+    fn composite(parent: Option<CompositeId>, members: &[ModuleId]) -> Composite {
+        Composite {
+            name: "Face".into(),
+            help: String::new(),
+            definition: definition(parent.map_or(1, |_| 2)),
+            parent,
+            members: members.iter().copied().collect(),
+            pos: kabl_core::Vec2::default(),
+            ports: BTreeMap::new(),
+            controls: BTreeMap::new(),
+            next_interface: 1,
+            panel: None,
+            snapshots: Vec::new(),
+        }
+    }
+
+    /// Insert and duplicate give the copy's face elements and snapshots the copy's own ids:
+    /// a module source, a nested face target and a snapshot clock inside the copy follow it; a
+    /// clock outside stays on a duplicate and is dropped on an insert.
+    #[test]
+    fn insert_and_duplicate_remap_sources_face_targets_and_snapshot_clocks() {
+        let mut e = PatchEditor::seed_from(&PatchState::new());
+        let pos = kabl_core::Vec2::default();
+        let inner_clock = e.add_module("clock", pos);
+        let outer_clock = e.add_module("clock", pos);
+        let osc = e.add_module("osc.va", pos);
+        let filter = e.add_module("filter.svf", pos);
+        let mut parent = composite(None, &[inner_clock]);
+        parent.next_interface = 3;
+        parent.panel = Some(Box::new(Panel {
+            width: 600.0,
+            placements: BTreeMap::from([
+                (
+                    1,
+                    placement(
+                        Kind::Display,
+                        12.0,
+                        Some(Source::Module {
+                            id: filter,
+                            action: None,
+                        }),
+                    ),
+                ),
+                (
+                    2,
+                    placement(
+                        Kind::Button,
+                        140.0,
+                        Some(Source::Face {
+                            composite: 2,
+                            key: 2,
+                        }),
+                    ),
+                ),
+            ]),
+            ..Panel::default()
+        }));
+        let mut child = composite(Some(1), &[osc, filter]);
+        child.controls.insert(
+            1,
+            Exposure {
+                label: "Cutoff".into(),
+                target: PortRef::Param {
+                    id: filter,
+                    param: "cutoff_hz".into(),
+                },
+                also: Vec::new(),
+            },
+        );
+        child.next_interface = 5;
+        child.snapshots = [(3, inner_clock), (4, outer_clock)]
+            .into_iter()
+            .map(|(id, clock)| Snapshot {
+                id,
+                name: format!("S{id}"),
+                values: BTreeMap::from([(1, 900.0)]),
+                morph_beats: 2.0,
+                clock: Some(clock),
+            })
+            .collect();
+        child.panel = Some(Box::new(Panel {
+            placements: BTreeMap::from([(
+                2,
+                placement(Kind::Button, 12.0, Some(Source::Snapshot { id: 3 })),
+            )]),
+            ..Panel::default()
+        }));
+        e.edit(vec![
+            Op::SetComposite {
+                id: 1,
+                value: Some(parent),
+            },
+            Op::SetComposite {
+                id: 2,
+                value: Some(child),
+            },
+        ]);
+        kabl_core::composite::validate(e.state()).unwrap();
+        let pkg = snapshot(e.state(), 1).unwrap();
+        for external in [true, false] {
+            let (p, root) = inserted(&e, &pkg, external).unwrap();
+            kabl_core::composite::validate(&p).unwrap();
+            let (&copy_child, c) = p
+                .composites
+                .iter()
+                .find(|(_, c)| c.parent == Some(root))
+                .unwrap();
+            assert!(root > 2 && copy_child > 2);
+            let copy_filter = *c
+                .members
+                .iter()
+                .find(|m| p.modules[m].kind == "filter.svf")
+                .unwrap();
+            let copy_clock = *p.composites[&root].members.first().unwrap();
+            assert!(copy_filter != filter && copy_clock != inner_clock);
+            let face = &p.composites[&root].panel.as_ref().unwrap().placements;
+            assert_eq!(
+                face[&1].source,
+                Some(Source::Module {
+                    id: copy_filter,
+                    action: None
+                })
+            );
+            assert_eq!(
+                face[&2].source,
+                Some(Source::Face {
+                    composite: copy_child,
+                    key: 2
+                })
+            );
+            let clocks: Vec<_> = c.snapshots.iter().map(|s| (s.id, s.clock)).collect();
+            let outside = external.then_some(outer_clock);
+            assert_eq!(clocks, [(3, Some(copy_clock)), (4, outside)], "{external}");
+        }
+    }
 }

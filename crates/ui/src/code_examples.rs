@@ -219,7 +219,8 @@ pub fn composite_for(
         let (w, h) = match item.kind {
             Kind::Knob => KNOB,
             Kind::Selector => SELECTOR,
-            Kind::Jack => JACK,
+            // Code module faces place only knobs, selectors and jacks.
+            _ => JACK,
         };
         panel.placements.insert(
             key,
@@ -229,6 +230,9 @@ pub fn composite_for(
                 y: item.at.1,
                 width: w,
                 height: h,
+                source: None,
+                label: None,
+                icons: Vec::new(),
             },
         );
     }

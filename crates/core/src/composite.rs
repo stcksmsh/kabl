@@ -1,4 +1,5 @@
 //! Composite ownership and public bindings. DSP remains the document's flat leaf graph.
+use crate::panel::{Kind, Source};
 use crate::{ModuleId, PatchState, PortRef, Vec2};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -56,7 +57,31 @@ pub struct Composite {
     pub next_interface: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub panel: Option<Box<crate::panel::Panel>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub snapshots: Vec<Snapshot>,
 }
+
+/// A named set of values for the composite's exposed controls.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Snapshot {
+    /// From `next_interface`; never reused, so a deletion shifts nothing.
+    pub id: u64,
+    pub name: String,
+    /// Control exposure ID -> value in the param's own units.
+    #[serde(deserialize_with = "unique_map")]
+    pub values: BTreeMap<u64, f32>,
+    /// 0 = jump.
+    #[serde(default)]
+    pub morph_beats: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clock: Option<ModuleId>,
+}
+
+/// The most snapshots one composite holds.
+pub const MAX_SNAPSHOTS: usize = 16;
+/// The longest snapshot morph, in beats (`cues::MAX_MORPH_BEATS` in the UI crate).
+pub const MAX_MORPH_BEATS: f32 = 16.0;
 
 /// Reject repeated semantic keys, including differently spelled numeric IDs.
 pub fn unique_map<'de, D, K, V>(d: D) -> Result<BTreeMap<K, V>, D::Error>
@@ -134,6 +159,85 @@ pub const MAX_ALSO: usize = 32;
 /// Whether a port of the composite feeds several targets, which only schema v9 readers accept.
 pub fn fans_in(c: &Composite) -> bool {
     c.ports.values().any(|e| !e.also.is_empty())
+}
+
+fn is_clock(p: &PatchState, m: ModuleId) -> bool {
+    p.modules.get(&m).is_some_and(|m| m.kind == "clock")
+}
+
+/// Whether `(d, key)` is a `button` on the face of a strict descendant of `c`: the only
+/// target a face button may press, so every press chain goes strictly deeper and ends.
+fn is_face_button(p: &PatchState, c: CompositeId, d: CompositeId, key: u64) -> bool {
+    d != c
+        && descendants(p, c).contains(&d)
+        && p.composites[&d]
+            .panel
+            .as_ref()
+            .and_then(|panel| panel.placements.get(&key))
+            .is_some_and(|pl| pl.kind == Kind::Button)
+}
+
+/// The edits that drop every reference left dangling in `p`, one `SetComposite` per changed
+/// composite, innermost first (dropping a nested button can orphan a parent's face target).
+/// `PatchEditor` logs them in the same step as the edit that caused them.
+pub fn prune(p: &PatchState) -> Vec<crate::Op> {
+    let depth = |mut id: CompositeId| {
+        let mut n = 0;
+        while let Some(parent) = p.composites.get(&id).and_then(|c| c.parent) {
+            n += 1;
+            id = parent;
+            if n > 8 {
+                break;
+            }
+        }
+        n
+    };
+    let mut order: Vec<CompositeId> = p.composites.keys().copied().collect();
+    order.sort_by_key(|&id| std::cmp::Reverse(depth(id)));
+    let mut state = p.clone();
+    let mut ops = Vec::new();
+    for id in order {
+        let mut c = state.composites[&id].clone();
+        let leaves = leaves(&state, id);
+        let snapshot_ids: BTreeSet<u64> = c.snapshots.iter().map(|s| s.id).collect();
+        for s in &mut c.snapshots {
+            s.values.retain(|k, _| c.controls.contains_key(k));
+            if s.clock.is_some_and(|m| !is_clock(&state, m)) {
+                s.clock = None;
+            }
+        }
+        if let Some(panel) = &mut c.panel {
+            panel.placements.retain(|key, pl| match &pl.source {
+                _ if pl.kind == Kind::Jack => c.ports.contains_key(key),
+                _ if pl.kind.binds_control() => c.controls.contains_key(key),
+                None => true,
+                Some(Source::Module { id: m, .. }) => leaves.contains(m),
+                Some(Source::Face { composite, key }) => {
+                    is_face_button(&state, id, *composite, *key)
+                }
+                Some(Source::Snapshot { id: s }) => snapshot_ids.contains(s),
+            });
+        }
+        if c != state.composites[&id] {
+            state.composites.insert(id, c.clone());
+            ops.push(crate::Op::SetComposite { id, value: Some(c) });
+        }
+    }
+    ops
+}
+
+/// Whether the composite uses a face element or field that only schema v10 readers accept.
+pub fn needs_faces(c: &Composite) -> bool {
+    !c.snapshots.is_empty()
+        || c.panel.as_ref().is_some_and(|panel| {
+            panel.compact_width.is_some()
+                || panel.placements.values().any(|pl| {
+                    !matches!(pl.kind, Kind::Knob | Kind::Selector | Kind::Jack)
+                        || pl.source.is_some()
+                        || pl.label.is_some()
+                        || !pl.icons.is_empty()
+                })
+        })
 }
 
 pub fn validate(p: &PatchState) -> Result<(), String> {
@@ -219,9 +323,67 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
                 return Err(format!("Composite {id}: invalid public binding {key}"));
             }
         }
+        if c.snapshots.len() > MAX_SNAPSHOTS {
+            return Err(format!("Composite {id}: at most {MAX_SNAPSHOTS} snapshots"));
+        }
+        let mut snapshot_ids = BTreeSet::new();
+        for s in &c.snapshots {
+            if !snapshot_ids.insert(s.id) || s.id >= c.next_interface {
+                return Err(format!(
+                    "Composite {id}: snapshot {} reuses an id or is not from next_interface",
+                    s.id
+                ));
+            }
+            if s.name.is_empty() || s.name.chars().count() > 40 {
+                return Err(format!(
+                    "Composite {id}: snapshot {} name must be 1-40 characters",
+                    s.id
+                ));
+            }
+            if let Some(key) = s.values.keys().find(|k| !c.controls.contains_key(k)) {
+                return Err(format!(
+                    "Composite {id}: snapshot {} holds {key}, which is not a control",
+                    s.id
+                ));
+            }
+            if s.values.values().any(|v| !v.is_finite())
+                || !(0.0..=MAX_MORPH_BEATS).contains(&s.morph_beats)
+            {
+                return Err(format!(
+                    "Composite {id}: snapshot {} value or morph length out of range",
+                    s.id
+                ));
+            }
+            if s.clock.is_some_and(|m| !is_clock(p, m)) {
+                return Err(format!(
+                    "Composite {id}: snapshot {} clock is not a clock module",
+                    s.id
+                ));
+            }
+        }
         if let Some(panel) = &c.panel {
             panel.validate(c)?;
-            for art in [&panel.light, &panel.dark].into_iter().flatten() {
+            for (&key, pl) in &panel.placements {
+                let valid = match &pl.source {
+                    None => true,
+                    Some(Source::Module { id: m, .. }) => members.contains(m),
+                    Some(Source::Face { composite, key }) => {
+                        is_face_button(p, id, *composite, *key)
+                    }
+                    Some(Source::Snapshot { id: s }) => snapshot_ids.contains(s),
+                };
+                if !valid {
+                    return Err(format!(
+                        "Composite {id}: panel element {key} names a missing source"
+                    ));
+                }
+            }
+            let icons = panel.placements.values().flat_map(|pl| &pl.icons);
+            for art in [&panel.light, &panel.dark]
+                .into_iter()
+                .flatten()
+                .chain(icons)
+            {
                 artwork_pixels +=
                     u64::from(u32::from_be_bytes(art.png[16..20].try_into().unwrap()))
                         * u64::from(u32::from_be_bytes(art.png[20..24].try_into().unwrap()));

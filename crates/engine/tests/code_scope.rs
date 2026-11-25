@@ -209,6 +209,7 @@ fn a_composite_validates_against_its_own_blobs_interface() {
         controls: Default::default(),
         next_interface: 1,
         panel: None,
+        snapshots: Vec::new(),
     };
     st.composites.insert(1, wrap);
     assert!(validate_composites_scoped(&st, &scope_a).is_ok());

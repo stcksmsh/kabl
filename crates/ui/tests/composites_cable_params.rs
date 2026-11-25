@@ -371,7 +371,7 @@ fn a_package_binding_a_cable_param_is_schema_2() {
 
     // A package from a newer build is refused as unsupported, not opened.
     let mut newer = pkg.clone();
-    newer.schema = 3;
+    newer.schema = 4;
     let err = composites::decode(&serde_json::to_vec(&newer).unwrap()).unwrap_err();
     assert!(err.contains("Unsupported"), "{err}");
 }
