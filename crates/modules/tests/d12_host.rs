@@ -703,3 +703,38 @@ fn a_save_the_audio_side_never_answers_keeps_the_settings_and_notes_it() {
     let notes = scope.take_notes();
     assert!(!notes.iter().any(|n| n.contains("in time")), "{notes:?}");
 }
+
+/// With no audio running nothing will answer: the save returns at once, keeps the song's
+/// settings and says nothing. When audio comes back the next save waits as before.
+#[test]
+fn a_save_with_no_audio_running_keeps_the_settings_quietly_and_at_once() {
+    use std::time::Instant;
+    let g = group(&Fixture::new(meta("test.capoff", 1, "")).wasm());
+    g.fill(1).unwrap();
+    let mut m = prepared(g.voice().unwrap());
+    let scope = CodeScope::new();
+    let previous = SavedState {
+        state_version: 2,
+        bytes: vec![1, 2, 3, 4],
+    };
+    scope.set_kept_state(3, "test.capoff", previous.clone());
+    scope.attach(3, "test.capoff", &mut m);
+
+    scope.set_audio_running(false);
+    let t = Instant::now();
+    scope.capture(Duration::from_secs(10));
+    assert!(t.elapsed() < Duration::from_secs(1), "{:?}", t.elapsed());
+    assert_eq!(scope.settings(), vec![(3, previous.clone())]);
+    let notes = scope.take_notes();
+    assert!(!notes.iter().any(|n| n.contains("in time")), "{notes:?}");
+
+    scope.set_audio_running(true);
+    let t = Instant::now();
+    scope.capture(Duration::from_millis(50));
+    assert!(
+        t.elapsed() >= Duration::from_millis(50),
+        "{:?}",
+        t.elapsed()
+    );
+    assert!(scope.take_notes().iter().any(|n| n.contains("in time")));
+}

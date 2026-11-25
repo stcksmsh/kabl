@@ -15,6 +15,7 @@ use super::module::CodeModule;
 use super::state::{SavedState, StateCell};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -53,6 +54,8 @@ struct Session {
     last: Mutex<BTreeMap<u64, (String, SavedState)>>,
     /// Things the user should hear about, once each.
     notes: Mutex<Vec<String>>,
+    /// No engine runs the song's graph (see [`CodeScope::set_audio_running`]).
+    audio_off: AtomicBool,
 }
 
 impl std::fmt::Debug for CodeScope {
@@ -213,10 +216,21 @@ impl CodeScope {
         n
     }
 
+    /// Whether an engine runs this song's graph. Without one nothing answers a save, so
+    /// [`CodeScope::capture`] keeps the last known settings without waiting or a note.
+    pub fn set_audio_running(&self, on: bool) {
+        self.session.audio_off.store(!on, Ordering::Relaxed);
+    }
+
     /// [`CodeScope::request_capture`], then waits up to `wait` for the audio thread to answer
     /// (it does so at the start of its next block). An instance that does not answer in time
-    /// (an engine that is not running) keeps its last known settings and leaves a note.
+    /// (a crashed or stuck module) keeps its last known settings and leaves a note. With no
+    /// audio running it only collects: the last known settings stay, silently.
     pub fn capture(&self, wait: Duration) {
+        if self.session.audio_off.load(Ordering::Relaxed) {
+            self.collect();
+            return;
+        }
         self.request_capture();
         let deadline = Instant::now() + wait;
         loop {
