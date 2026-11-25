@@ -10,6 +10,7 @@ use kabl_core::{
     Composite, CompositeId, PatchState, Snapshot,
 };
 use kabl_modules::Taper;
+use std::collections::btree_map;
 use std::path::Path;
 
 /// Every move and resize lands on this grid, in rack points.
@@ -250,11 +251,15 @@ impl Page {
         Ok(())
     }
 
-    /// Moves or resizes element `key` to `r` (x, y, w, h). A refused footprint is kept to be
-    /// drawn red; the element stays where it was.
+    /// Moves or resizes element `key` to `r` (x, y, w, h), placing it first when it is not on
+    /// the face yet (a palette drop). A refused footprint is kept to be drawn red; the draft
+    /// stays as it was.
     pub fn place(&mut self, state: &PatchState, key: u64, r: [f32; 4]) -> Result<(), String> {
         let mut panel = self.draft.panel.clone();
-        let p = panel.placements.get_mut(&key).ok_or("Not on the face")?;
+        let p = match panel.placements.entry(key) {
+            btree_map::Entry::Occupied(e) => e.into_mut(),
+            btree_map::Entry::Vacant(e) => e.insert(self.fresh(state, key)?),
+        };
         [p.x, p.y, p.width, p.height] = r;
         let result = self.commit(state, panel);
         if result.is_err() {
@@ -263,12 +268,8 @@ impl Page {
         result
     }
 
-    /// Places exposure `key` at the first free spot of its default size, top-left first.
-    pub fn add(&mut self, state: &PatchState, key: u64) -> Result<(), String> {
-        if self.draft.panel.placements.contains_key(&key) {
-            self.selected = Some(key);
-            return Ok(());
-        }
+    /// Exposure `key` as a new element of its default kind and size, at the origin.
+    fn fresh(&self, state: &PatchState, key: u64) -> Result<Placement, String> {
         let kind = kind_for(state, &self.draft.base, key)?;
         let (w, h) = match kind {
             Kind::Knob => (84.0, 110.0),
@@ -282,6 +283,26 @@ impl Page {
             }
             _ => (64.0, 58.0),
         };
+        Ok(Placement {
+            kind,
+            x: 0.0,
+            y: 0.0,
+            width: w,
+            height: h,
+            source: None,
+            label: None,
+            icons: Vec::new(),
+        })
+    }
+
+    /// Places exposure `key` at the first free spot of its default size, top-left first.
+    pub fn add(&mut self, state: &PatchState, key: u64) -> Result<(), String> {
+        if self.draft.panel.placements.contains_key(&key) {
+            self.selected = Some(key);
+            return Ok(());
+        }
+        let mut new = self.fresh(state, key)?;
+        let (w, h) = (new.width, new.height);
         let panel = &self.draft.panel;
         let free = |x: f32, y: f32| {
             panel
@@ -305,19 +326,8 @@ impl Page {
             return Err(e);
         };
         let mut panel = panel.clone();
-        panel.placements.insert(
-            key,
-            Placement {
-                kind,
-                x,
-                y,
-                width: w,
-                height: h,
-                source: None,
-                label: None,
-                icons: Vec::new(),
-            },
-        );
+        (new.x, new.y) = (x, y);
+        panel.placements.insert(key, new);
         self.commit(state, panel)?;
         self.selected = Some(key);
         Ok(())
@@ -508,7 +518,8 @@ fn keys(editor: &PatchEditor, ui: &mut egui::Ui, page: &mut Page, close: &mut bo
     if redo {
         page.redo();
     }
-    if esc {
+    // Esc cancels a drag in flight before it closes the page.
+    if esc && page.drag.take().is_none() {
         close_or_ask(page, close);
     }
     let Some(key) = page.selected else { return };
@@ -661,8 +672,11 @@ fn palette(
                         .map(|k| format!("{k:?}"))
                         .unwrap_or_else(|e| e);
                     let placed = page.draft.panel.placements.contains_key(&key);
+                    let fresh = (!placed)
+                        .then(|| page.fresh(editor.state(), key).ok())
+                        .flatten();
                     ui.horizontal(|ui| {
-                        let r = ui.add(
+                        let mut r = ui.add(
                             kit::Button::new(st, format!("{kind} · {}", e.label))
                                 .g4(32.0)
                                 .ghost()
@@ -671,6 +685,21 @@ fn palette(
                         view.record(format!("design:palette:{key}"), r.rect);
                         if placed {
                             g4::chip_label(ui, st, "placed", true, Some(st.roles.good));
+                        }
+                        // Only an exposure that can still be placed drags onto the face, held by
+                        // its middle.
+                        if let Some(p) = &fresh {
+                            r = r.interact(Sense::drag());
+                            if r.drag_started() {
+                                page.drag = Some(Drag {
+                                    key,
+                                    from: rect_of(p),
+                                    grab: pos2(p.width / 2.0, p.height / 2.0),
+                                    corner: None,
+                                });
+                                page.refused = None;
+                                page.note = None;
+                            }
                         }
                         if r.clicked() {
                             // A refusal keeps the draft and shows its reason in `page.note`.
@@ -819,6 +848,12 @@ fn face(
     let mut live = None;
     if let (Some(d), Some(at)) = (&page.drag, pointer) {
         let to = dragged(d.from, xf.inv(at) - d.grab, d.corner);
+        // A palette drag shows its element only over the canvas.
+        if !panel.placements.contains_key(&d.key) && rect.contains(at) {
+            if let Ok(p) = page.fresh(editor.state(), d.key) {
+                panel.placements.insert(d.key, p);
+            }
+        }
         if let Some(p) = panel.placements.get_mut(&d.key) {
             [p.x, p.y, p.width, p.height] = to;
             live = Some((
@@ -914,7 +949,13 @@ fn face(
             page.selected = Some(key);
         }
     };
-    for (&key, p) in &panel.placements {
+    // A palette drag's element is not on the draft yet: it takes no input.
+    let ghost = page
+        .drag
+        .as_ref()
+        .map(|d| d.key)
+        .filter(|k| !page.draft.panel.placements.contains_key(k));
+    for (&key, p) in panel.placements.iter().filter(|(&k, _)| Some(k) != ghost) {
         let r = xf.r(Rect::from_min_size(pos2(p.x, p.y), vec2(p.width, p.height)));
         let resp = ui.interact(r, Id::new(("design-el", key)), Sense::click_and_drag());
         view.record(format!("design:el:{key}"), r);
@@ -976,6 +1017,22 @@ fn face(
             st.font(Role::Caption),
             st.roles.bad,
         );
+    }
+    // A palette drag drops where it is released over the canvas; anywhere else cancels it.
+    let fresh = page
+        .drag
+        .as_ref()
+        .is_some_and(|d| !page.draft.panel.placements.contains_key(&d.key));
+    if fresh && ui.input(|i| i.pointer.any_released()) {
+        if let (Some(d), Some(at)) = (page.drag.take(), pointer) {
+            if rect.contains(at) {
+                let to = dragged(d.from, xf.inv(at) - d.grab, None);
+                // A refusal keeps the draft and shows its reason in `page.note`.
+                if page.place(state, d.key, to).is_ok() {
+                    page.selected = Some(d.key);
+                }
+            }
+        }
     }
     if !ui.input(|i| i.pointer.any_down()) {
         page.drag = None;
