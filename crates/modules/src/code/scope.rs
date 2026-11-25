@@ -214,21 +214,44 @@ impl CodeScope {
     }
 
     /// [`CodeScope::request_capture`], then waits up to `wait` for the audio thread to answer
-    /// (it does so at the start of its next block). An engine that is not running answers
-    /// nothing: the last known settings stand.
+    /// (it does so at the start of its next block). An instance that does not answer in time
+    /// (an engine that is not running) keeps its last known settings and leaves a note.
     pub fn capture(&self, wait: Duration) {
         self.request_capture();
         let deadline = Instant::now() + wait;
         loop {
+            // Read before collecting: an answer given after `collect` looked at its cell would
+            // otherwise be seen as served but never taken, and the save would lose it.
+            let waiting = self.unanswered();
             self.collect();
-            let waiting = lock(&self.session.cells)
-                .values()
-                .any(|(_, c)| c.save_pending());
-            if !waiting || Instant::now() >= deadline {
+            if waiting.is_empty() {
+                break;
+            }
+            if Instant::now() >= deadline {
+                let late = self.unanswered();
+                if late.len() < waiting.len() {
+                    continue; // answered during the collect: take it on the next pass
+                }
+                for id in late {
+                    self.session.note(format!(
+                        "code module {id} did not hand over its settings in time; \
+                         the song keeps its last known ones"
+                    ));
+                }
                 break;
             }
             std::thread::sleep(Duration::from_millis(2));
         }
+    }
+
+    /// Instances with a save request their running module has not served yet. A cell no module
+    /// holds any more (its graph is gone) never answers and is not waited for.
+    fn unanswered(&self) -> Vec<u64> {
+        lock(&self.session.cells)
+            .iter()
+            .filter(|(_, (_, c))| c.save_pending() && Arc::strong_count(c) > 1)
+            .map(|(&i, _)| i)
+            .collect()
     }
 
     /// Notes for the user since the last call.
