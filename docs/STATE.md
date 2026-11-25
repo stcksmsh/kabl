@@ -5,15 +5,15 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 
 ## Done
 - 11-24: L1 #209, CI2 #212, W1a #213, CI3 #215, CI4 #216, W2 #217, L2 #218, W3 #219, W4 #220, L4 #221, face labels #223, face design v1 #224, W5a clap-validator #225, R3 rc.2 install #227, Windows test fixes #229 #232 #234 #239 #241 #242, Acid Line #230, Space composite #214, L3a #231, face decisions #228, LF endings #235, golden hashes Linux-only #237, Perform header tools #236, L3b #240, owner config #226, L3c: Sound-check strip #244, Sounds ▶ preview #243, plugin Start card #245.
-- 11-25: state #246, faces slice 1 stored form v10 #247, R3 status-bar layout + REAPER README note #248.
+- 11-25: state #246, faces slice 1 stored form v10 #247, R3 status-bar layout + REAPER README note #248, faces slice 2 composite design page #249.
 
 ## In flight
-- #249 faces slice 2, composite design page (`claude/faces-design-page`): verify ok, review clean at ad0e0c494, CI running. Merge when green.
-- #250 LESSON-FORMAT `sound_check`/`plugin_text` docs + stale "Preview when selected" text (`claude/lesson-format-docs`): verify ok, review clean at 16d44246f, CI running. After #249 merges: update-branch, re-verify, re-review, merge.
+- #250 LESSON-FORMAT `sound_check`/`plugin_text` docs + stale "Preview when selected" text (`claude/lesson-format-docs`): review clean at 16d44246f; branch updated with master after #249: re-verify, re-review the merge, CI, merge.
+- #251 this state file: same steps after the update-branch.
 - #203 promo v2: parked.
 
 ## Next
-1. Faces: drag-from-palette onto the design page canvas (FACES.md §7; Kosta 11-25 "add drag"; no §9 slice covers it). Scope: crates/ui/src/design_page.rs + tests/design_page.rs. Start after #249 merges.
+1. Faces: drag-from-palette onto the design page canvas (FACES.md §7; Kosta 11-25 "add drag"; no §9 slice covers it). Scope: crates/ui/src/design_page.rs + tests/design_page.rs. Next slice to dispatch.
 2. Faces slice 3+: FACES.md §9 (slider ships vertical + horizontal for Kosta to pick on captures).
 3. CB2-CB4 (Drum Kit, Sequenced Part, Glue Bus): not built yet; Kosta judges each on screenshots.
 4. Windows: W6 VST3 (clap-wrapper), W7-W10. Kosta tests on a VM later.
