@@ -33,7 +33,7 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
         // Stored and checked by `Panel::validate`; each kind is lifted here once it draws.
         if !matches!(
             p.kind,
-            Kind::Knob | Kind::Selector | Kind::Jack | Kind::Slider
+            Kind::Knob | Kind::Selector | Kind::Jack | Kind::Slider | Kind::Toggle
         ) {
             return Err(format!(
                 "Binding {id}: {:?} elements are not supported yet",
@@ -42,7 +42,13 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
         }
         if let Some(e) = c.controls.get(&id) {
             let target = param_info(state, &e.target)?;
-            if (p.kind == Kind::Selector) != (target.taper == Taper::Stepped) {
+            if p.kind == Kind::Toggle {
+                if target.taper != Taper::Stepped || target.max - target.min != 1.0 {
+                    return Err(format!(
+                        "Binding {id}: toggles need a stepped parameter with exactly two options"
+                    ));
+                }
+            } else if (p.kind == Kind::Selector) != (target.taper == Taper::Stepped) {
                 return Err(format!("Binding {id}: stepped parameters need selectors; continuous parameters need knobs or sliders"));
             }
             if p.kind == Kind::Selector && p.width < (target.max - target.min + 1.0) * 18.0 {
@@ -72,6 +78,67 @@ pub(crate) fn param_info(
         .iter()
         .find(|p| p.name == param)
         .ok_or("Missing parameter")?)
+}
+/// A composite face toggle for two-option stepped `param` in `rect` (screen): the kit pill,
+/// on at the upper option. A click anywhere in `rect` sets the other option of the base value,
+/// one undo step per click.
+pub(crate) fn face_toggle(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    painter: &egui::Painter,
+    id: kabl_core::ModuleId,
+    param: &'static kabl_modules::ParamInfo,
+    rect: egui::Rect,
+) {
+    debug_assert!(param.taper == Taper::Stepped && param.max - param.min == 1.0);
+    let key = format!("{id}.{}", param.name);
+    ui_state.record(format!("knob:{key}"), rect);
+    ui_state.record(format!("toggle:{key}"), rect);
+    let resp = ui.interact(
+        rect,
+        egui::Id::new(("kabl-toggle", id, param.name)),
+        egui::Sense::click(),
+    );
+    let mut on = crate::routing::base_value(editor.state(), id, param).round() == param.max;
+    if resp.clicked() {
+        let routes = crate::routing::routes_into(editor.state(), id, param.name);
+        crate::routing::inspect(ui_state, &routes, id, param.name);
+        on = !on;
+        editor.set_param_gesture(
+            kabl_core::ParamTarget::Module {
+                id,
+                param: param.name.into(),
+            },
+            if on { param.max } else { param.min },
+            true,
+        );
+    }
+    let h = (rect.height() * 0.8).min(rect.width() / 2.0);
+    let pill = egui::Rect::from_center_size(rect.center(), egui::vec2(2.0 * h, h));
+    crate::kit::parts::toggle(painter, &ui_state.style, pill, on);
+    if resp.hovered() {
+        painter.rect_stroke(
+            pill.expand(1.0),
+            egui::CornerRadius::same(255),
+            egui::Stroke::new(1.0, ui_state.style.roles.accent),
+            egui::StrokeKind::Outside,
+        );
+    }
+    let module = editor
+        .state()
+        .modules
+        .get(&id)
+        .and_then(|m| registry::info_for(&m.kind))
+        .map_or("", |i| i.name);
+    resp.widget_info(|| {
+        egui::WidgetInfo::selected(
+            egui::WidgetType::Checkbox,
+            true,
+            on,
+            format!("{module} {}", crate::routing::param_label(param)),
+        )
+    });
 }
 pub fn import_art(path: &Path) -> Result<Artwork, String> {
     use std::io::Read;

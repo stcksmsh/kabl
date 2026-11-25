@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 50] = [
+const SCENES: [&str; 53] = [
     "rack",
     "perform",
     "sounds",
@@ -66,6 +66,9 @@ const SCENES: [&str; 50] = [
     "face-slider-h",
     "face-slider-v",
     "settings",
+    "design-page-toggle",
+    "face-toggle-off",
+    "face-toggle-on",
 ];
 
 struct Job {
@@ -493,7 +496,7 @@ impl App {
         }
         // The design page: a "Voice" composite made from the filter, once, with one control and
         // two jacks exposed; the face-slider scenes give it a face of the cutoff as a slider and
-        // the two jacks. Only "settings" comes after these scenes in SCENES.
+        // the two jacks. Only "settings" and the toggle scenes come after these scenes in SCENES.
         if j.scene.starts_with("design-page") || j.scene.starts_with("face-slider") {
             use kabl_core::PortRef;
             let svf = self
@@ -553,6 +556,65 @@ impl App {
             }
             c.panel = Some(Box::new(panel));
             kabl_ui::composites::set(&mut self.editor, id, c).unwrap();
+        }
+        // The toggle scenes, last in SCENES: an "Amp" composite made from the VCA, once, with
+        // its two-option "exponential" switch and its gain exposed. The face-toggle scenes give
+        // it a face of the switch as a toggle, off or on, and the gain as a knob.
+        let toggle = j.scene == "design-page-toggle" || j.scene.starts_with("face-toggle");
+        if toggle && self.editor.state().composites.len() < 2 {
+            use kabl_core::PortRef;
+            // The mockup patch has no VCA: one goes beside the mixer.
+            let vca = self
+                .editor
+                .add_module("vca", kabl_core::Vec2 { x: 904.0, y: 320.0 });
+            let id = kabl_ui::composites::encapsulate(
+                &mut self.editor,
+                [vca].into(),
+                Default::default(),
+                "Amp",
+            )
+            .unwrap();
+            for param in ["exponential", "gain"] {
+                let target = PortRef::Param {
+                    id: vca,
+                    param: param.into(),
+                };
+                kabl_ui::composites::add_exposure(&mut self.editor, id, target, true).unwrap();
+            }
+        }
+        if j.scene.starts_with("face-toggle") {
+            use kabl_core::panel::{Kind, Panel, Placement};
+            let (&id, c) = self.editor.state().composites.iter().next_back().unwrap();
+            let mut c = c.clone();
+            let keys: Vec<u64> = c.controls.keys().copied().collect();
+            let mut panel = Panel::default();
+            for (key, kind, x, w, h) in [
+                (keys[0], Kind::Toggle, 12.0, 72.0, 60.0),
+                (keys[1], Kind::Knob, 96.0, 84.0, 110.0),
+            ] {
+                panel.placements.insert(
+                    key,
+                    Placement {
+                        kind,
+                        x,
+                        y: 66.0,
+                        width: w,
+                        height: h,
+                        source: None,
+                        label: None,
+                        icons: Vec::new(),
+                    },
+                );
+            }
+            c.panel = Some(Box::new(panel));
+            let vca = *c.members.iter().next().unwrap();
+            kabl_ui::composites::set(&mut self.editor, id, c).unwrap();
+            let on = if j.scene == "face-toggle-on" {
+                1.0
+            } else {
+                0.0
+            };
+            self.editor.set_param(vca, "exponential", on);
         }
         {
             use kabl_ui::browser::{Dialog, Pending};
@@ -1060,7 +1122,14 @@ impl eframe::App for App {
         // The design page opens once the first frames, which reset its state, are past.
         let scene = self.jobs[self.i].scene;
         if self.f == 6 && scene.starts_with("design-page") {
-            let (&id, c) = self.editor.state().composites.iter().next().unwrap();
+            // The toggle scene designs the "Amp" composite, the others the "Voice".
+            let mut all = self.editor.state().composites.iter();
+            let (&id, c) = if scene == "design-page-toggle" {
+                all.next_back()
+            } else {
+                all.next()
+            }
+            .unwrap();
             kabl_ui::panels::open(&mut self.ui, id, c);
         }
         // The design page with every exposure placed and the cutoff knob selected; the red-drop
@@ -1077,6 +1146,11 @@ impl eframe::App for App {
                 // The slider scene turns the cutoff knob into a slider before the jacks go on.
                 if i == 0 && scene == "design-page-slider" {
                     page.set_kind(state, key, kabl_core::panel::Kind::Slider)
+                        .unwrap();
+                }
+                // The toggle scene turns the "exponential" selector into a toggle.
+                if i == 0 && scene == "design-page-toggle" {
+                    page.set_kind(state, key, kabl_core::panel::Kind::Toggle)
                         .unwrap();
                 }
             }
