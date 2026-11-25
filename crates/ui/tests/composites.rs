@@ -591,3 +591,303 @@ fn chronological_project_undo_keeps_interleaved_instance_state_independent() {
     assert!(restored.redo());
     assert_eq!(restored.state(), &after_a2);
 }
+
+mod faces {
+    use kabl_core::composite::{self, Snapshot};
+    use kabl_core::panel::{Kind, Panel, Placement, Source};
+    use kabl_core::{Composite, Definition, Exposure, ModuleId, Op, PatchState, PortRef, Vec2};
+    use kabl_ui::{compare, composites, PatchEditor};
+    use std::collections::BTreeMap;
+
+    /// The parent's id is below its nested child's, so restoring composites in id order puts
+    /// the parent back first.
+    const PARENT: u64 = 1;
+    const CHILD: u64 = 2;
+
+    struct Ids {
+        clock: ModuleId,
+        cues: ModuleId,
+        osc: ModuleId,
+        filter: ModuleId,
+    }
+
+    fn placement(kind: Kind, x: f32, w: f32, h: f32, source: Option<Source>) -> Placement {
+        Placement {
+            kind,
+            x,
+            y: 72.0,
+            width: w,
+            height: h,
+            source,
+            label: None,
+            icons: Vec::new(),
+        }
+    }
+
+    fn composite(name: &str, parent: Option<u64>, members: &[ModuleId]) -> Composite {
+        Composite {
+            name: name.into(),
+            help: String::new(),
+            definition: Definition {
+                id: format!("test.{name}"),
+                version: 1,
+            },
+            parent,
+            members: members.iter().copied().collect(),
+            pos: Vec2::default(),
+            ports: BTreeMap::new(),
+            controls: BTreeMap::new(),
+            next_interface: 1,
+            panel: None,
+            snapshots: Vec::new(),
+        }
+    }
+
+    fn control(id: ModuleId, param: &str) -> Exposure {
+        Exposure {
+            label: param.into(),
+            target: PortRef::Param {
+                id,
+                param: param.into(),
+            },
+            also: Vec::new(),
+        }
+    }
+
+    fn snapshot(id: u64, clock: ModuleId) -> Snapshot {
+        Snapshot {
+            id,
+            name: format!("S{id}"),
+            values: BTreeMap::from([(1, 800.0), (2, 1.0)]),
+            morph_beats: 2.0,
+            clock: Some(clock),
+        }
+    }
+
+    fn placements(c: &mut Composite) -> &mut BTreeMap<u64, Placement> {
+        &mut c.panel.as_mut().unwrap().placements
+    }
+
+    fn keys(p: &PatchState, id: u64) -> Vec<u64> {
+        p.composites[&id]
+            .panel
+            .as_ref()
+            .unwrap()
+            .placements
+            .keys()
+            .copied()
+            .collect()
+    }
+
+    /// Parent (clock, cues): display on the child's filter (key 1), a button pressing the
+    /// child's button 3 (key 2), transport on the clock (key 3), cue pads (key 4).
+    /// Child (osc, filter): knob on cutoff (key 1), button on snapshot 4 (key 3), button on
+    /// snapshot 6 (key 7), snapshot strip (key 5); snapshots 4 and 6 morph on the clock.
+    fn fixture() -> (PatchEditor, Ids) {
+        let mut e = PatchEditor::new();
+        let pos = Vec2::default();
+        let ids = Ids {
+            clock: e.add_module("clock", pos),
+            cues: e.add_module("cues", pos),
+            osc: e.add_module("osc.va", pos),
+            filter: e.add_module("filter.svf", pos),
+        };
+        e.set_param(ids.cues, "cue1.clock", ids.clock as f32);
+        let module = |id| Some(Source::Module { id, action: None });
+        let mut parent = composite("parent", None, &[ids.clock, ids.cues]);
+        parent.next_interface = 5;
+        parent.panel = Some(Box::new(Panel {
+            width: 600.0,
+            placements: BTreeMap::from([
+                (
+                    1,
+                    placement(Kind::Display, 12.0, 120.0, 60.0, module(ids.filter)),
+                ),
+                (
+                    2,
+                    placement(
+                        Kind::Button,
+                        140.0,
+                        54.0,
+                        40.0,
+                        Some(Source::Face {
+                            composite: CHILD,
+                            key: 3,
+                        }),
+                    ),
+                ),
+                (
+                    3,
+                    placement(Kind::Transport, 200.0, 120.0, 32.0, module(ids.clock)),
+                ),
+                (
+                    4,
+                    placement(Kind::CuePads, 330.0, 120.0, 120.0, module(ids.cues)),
+                ),
+            ]),
+            ..Panel::default()
+        }));
+        let mut child = composite("child", Some(PARENT), &[ids.osc, ids.filter]);
+        child.controls = BTreeMap::from([
+            (1, control(ids.filter, "cutoff_hz")),
+            (2, control(ids.osc, "waveform")),
+        ]);
+        child.next_interface = 8;
+        child.snapshots = vec![snapshot(4, ids.clock), snapshot(6, ids.clock)];
+        let snap = |id| Some(Source::Snapshot { id });
+        child.panel = Some(Box::new(Panel {
+            placements: BTreeMap::from([
+                (1, placement(Kind::Knob, 12.0, 84.0, 110.0, None)),
+                (3, placement(Kind::Button, 104.0, 54.0, 40.0, snap(4))),
+                (7, placement(Kind::Button, 104.0, 54.0, 40.0, snap(6))),
+                (5, placement(Kind::Snapshots, 170.0, 54.0, 40.0, None)),
+            ]),
+            ..Panel::default()
+        }));
+        placements(&mut child).get_mut(&7).unwrap().y = 200.0;
+        e.edit(vec![
+            Op::SetComposite {
+                id: PARENT,
+                value: Some(parent),
+            },
+            Op::SetComposite {
+                id: CHILD,
+                value: Some(child),
+            },
+        ]);
+        composite::validate(e.state()).unwrap();
+        (e, ids)
+    }
+
+    /// The step left a valid patch, and one undo puts back exactly `before`.
+    fn valid_and_undoes_to(e: &mut PatchEditor, before: &PatchState) {
+        composite::validate(e.state()).unwrap();
+        assert!(e.undo());
+        assert_eq!(e.state(), before);
+    }
+
+    #[test]
+    fn removing_a_module_with_cue_references_prunes_its_face_elements_and_snapshot_clocks() {
+        let (mut e, ids) = fixture();
+        let before = e.state().clone();
+        e.remove_module(ids.clock);
+        assert_eq!(keys(e.state(), PARENT), [1, 2, 4]);
+        assert!(e.state().composites[&CHILD]
+            .snapshots
+            .iter()
+            .all(|s| s.clock.is_none()));
+        valid_and_undoes_to(&mut e, &before);
+    }
+
+    #[test]
+    fn an_edit_removing_a_button_drops_face_buttons_pressing_it() {
+        let (mut e, _) = fixture();
+        let before = e.state().clone();
+        let mut child = before.composites[&CHILD].clone();
+        placements(&mut child).remove(&3);
+        e.edit(vec![Op::SetComposite {
+            id: CHILD,
+            value: Some(child),
+        }]);
+        assert_eq!(keys(e.state(), PARENT), [1, 3, 4]);
+        valid_and_undoes_to(&mut e, &before);
+    }
+
+    #[test]
+    fn a_restore_prunes_what_it_leaves_dangling() {
+        let (mut e, _) = fixture();
+        let before = e.state().clone();
+        let mut target = before.clone();
+        target.composites.get_mut(&CHILD).unwrap().snapshots.clear();
+        e.restore_to(compare::diff(e.state(), &target).unwrap());
+        // The snapshot buttons go, and with them the parent's button pressing one.
+        assert_eq!(keys(e.state(), CHILD), [1, 5]);
+        assert_eq!(keys(e.state(), PARENT), [1, 3, 4]);
+        valid_and_undoes_to(&mut e, &before);
+    }
+
+    #[test]
+    fn removing_a_composite_drops_dependents_in_its_parent() {
+        let (mut e, _) = fixture();
+        let before = e.state().clone();
+        e.edit(vec![Op::SetComposite {
+            id: CHILD,
+            value: None,
+        }]);
+        // The display's filter is no longer a leaf of the parent, and the pressed button is gone.
+        assert_eq!(keys(e.state(), PARENT), [3, 4]);
+        valid_and_undoes_to(&mut e, &before);
+    }
+
+    #[test]
+    fn deleting_a_snapshot_keeps_other_buttons_on_their_snapshots() {
+        let (mut e, _) = fixture();
+        let before = e.state().clone();
+        let mut child = before.composites[&CHILD].clone();
+        child.snapshots.retain(|s| s.id != 4);
+        e.edit(vec![Op::SetComposite {
+            id: CHILD,
+            value: Some(child),
+        }]);
+        let p = e.state();
+        assert_eq!(keys(p, CHILD), [1, 5, 7]);
+        assert_eq!(
+            p.composites[&CHILD].panel.as_ref().unwrap().placements[&7].source,
+            Some(Source::Snapshot { id: 6 })
+        );
+        assert_eq!(keys(p, PARENT), [1, 3, 4]);
+        valid_and_undoes_to(&mut e, &before);
+    }
+
+    #[test]
+    fn shrinking_members_drops_dependents_in_every_parent() {
+        let (mut e, ids) = fixture();
+        let before = e.state().clone();
+        let mut child = before.composites[&CHILD].clone();
+        child.members.remove(&ids.filter);
+        child.controls.remove(&1);
+        e.edit(vec![Op::SetComposite {
+            id: CHILD,
+            value: Some(child),
+        }]);
+        let p = e.state();
+        assert_eq!(keys(p, CHILD), [3, 5, 7]);
+        assert!(p.composites[&CHILD]
+            .snapshots
+            .iter()
+            .all(|s| s.values == BTreeMap::from([(2, 1.0)])));
+        assert_eq!(keys(p, PARENT), [2, 3, 4]);
+        valid_and_undoes_to(&mut e, &before);
+    }
+
+    #[test]
+    fn removing_an_exposure_drops_its_key_from_every_snapshot() {
+        let (mut e, ids) = fixture();
+        // The face holds only kinds that draw today, so the edit commits.
+        let mut child = e.state().composites[&CHILD].clone();
+        placements(&mut child).retain(|_, p| p.kind == Kind::Knob);
+        let mut lone = composite("lone", None, &[ids.osc, ids.filter]);
+        lone.controls = child.controls;
+        lone.next_interface = child.next_interface;
+        lone.snapshots = child.snapshots;
+        lone.panel = child.panel;
+        e.edit(vec![
+            Op::SetComposite {
+                id: CHILD,
+                value: None,
+            },
+            Op::SetComposite {
+                id: PARENT,
+                value: None,
+            },
+            Op::SetComposite {
+                id: 3,
+                value: Some(lone),
+            },
+        ]);
+        composites::remove_exposure(&mut e, 3, 1, true).unwrap();
+        for s in &e.state().composites[&3].snapshots {
+            assert_eq!(s.values, BTreeMap::from([(2, 1.0)]), "{}", s.id);
+        }
+    }
+}

@@ -21,6 +21,13 @@ pub fn validate(state: &kabl_core::PatchState) -> Result<(), String> {
         if let Some(panel) = &c.panel {
             panel.validate(c)?;
             for (&id, p) in &panel.placements {
+                // Stored and checked by `Panel::validate`; each kind is lifted here once it draws.
+                if !matches!(p.kind, Kind::Knob | Kind::Selector | Kind::Jack) {
+                    return Err(format!(
+                        "Binding {id}: {:?} elements are not supported yet",
+                        p.kind
+                    ));
+                }
                 if let Some(e) = c.controls.get(&id) {
                     let PortRef::Param { id: leaf, param } = &e.target else {
                         return Err("Control target must be a parameter".into());
@@ -394,7 +401,8 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
                                             let (w, h) = match kind {
                                                 Kind::Knob => (84.0, 110.0),
                                                 Kind::Selector => (180.0, 55.0),
-                                                Kind::Jack => (64.0, 58.0),
+                                                // Only knob, selector or jack is placed here.
+                                                _ => (64.0, 58.0),
                                             };
                                             view.panels.draft.placements.insert(
                                                 key,
@@ -404,6 +412,9 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
                                                     y: 72.0,
                                                     width: w,
                                                     height: h,
+                                                    source: None,
+                                                    label: None,
+                                                    icons: Vec::new(),
                                                 },
                                             );
                                         },

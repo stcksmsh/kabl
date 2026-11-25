@@ -14,6 +14,9 @@ fn placement(kind: Kind, x: f32, y: f32, width: f32, height: f32) -> Placement {
         y,
         width,
         height,
+        source: None,
+        label: None,
+        icons: Vec::new(),
     }
 }
 

@@ -84,6 +84,7 @@ fn wrap(log: &mut PatchLog, members: &[u64], control: bool) {
         controls,
         next_interface: 2,
         panel: None,
+        snapshots: Vec::new(),
     };
     log.append(
         Op::SetComposite {

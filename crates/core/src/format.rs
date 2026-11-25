@@ -23,27 +23,34 @@ use crate::op::Entry;
 /// v9 lets a composite port bind a cable parameter (`PortRef::CableParam`) and feed several
 /// targets (`Exposure::also`, fan-in). A v8 build refuses either, so a file is written as v9
 /// only when its log contains one and stays v8 otherwise; both load.
-pub const CURRENT_SCHEMA_VERSION: u32 = 9;
+///
+/// v10 adds composite faces: new panel element kinds, `Placement::{source, label, icons}`,
+/// `Panel::compact_width` and `Composite::snapshots`. A file is written as v10 only when its
+/// log uses one of them.
+pub const CURRENT_SCHEMA_VERSION: u32 = 10;
 const OLDEST_SCHEMA_VERSION: u32 = 8;
 
-/// The lowest schema that can hold `log`: v9 when any entry `save` writes (its op or its
-/// inverse) has a composite port that binds a cable parameter or feeds several targets, else v8.
+/// The lowest schema that can hold `log`, checked against every entry `save` writes (its op
+/// and its inverse): v10 when a composite uses a face element or field v9 lacks (see
+/// `composite::needs_faces`); else v9 when a composite port binds a cable parameter or feeds
+/// several targets; else v8.
 pub fn schema_for(log: &PatchLog) -> u32 {
-    fn binds(op: &crate::Op) -> bool {
+    fn any(op: &crate::Op, f: &impl Fn(&crate::Composite) -> bool) -> bool {
         match op {
-            crate::Op::SetComposite { value: Some(c), .. } => {
-                crate::composite::binds_cable_param(c) || crate::composite::fans_in(c)
-            }
-            crate::Op::Group { ops } => ops.iter().any(binds),
+            crate::Op::SetComposite { value: Some(c), .. } => f(c),
+            crate::Op::Group { ops } => ops.iter().any(|op| any(op, f)),
             _ => false,
         }
     }
-    if log
-        .entries()
-        .iter()
-        .any(|e| binds(&e.op) || binds(&e.inverse))
-    {
+    let uses = |f: &dyn Fn(&crate::Composite) -> bool| {
+        log.entries()
+            .iter()
+            .any(|e| any(&e.op, &f) || any(&e.inverse, &f))
+    };
+    if uses(&crate::composite::needs_faces) {
         CURRENT_SCHEMA_VERSION
+    } else if uses(&|c| crate::composite::binds_cable_param(c) || crate::composite::fans_in(c)) {
+        9
     } else {
         OLDEST_SCHEMA_VERSION
     }
@@ -122,7 +129,7 @@ pub fn load(dir: &Path) -> Result<PatchLog, FormatError> {
     replay(&fs::read_to_string(dir.join("log.jsonl"))?)
 }
 
-/// Accepts v8 and v9. Older development builds wrote other port names and are
+/// Accepts v8 to v10. Older development builds wrote other port names and are
 /// not supported (nothing is fixed before 1.0), so they get a clear refusal instead of a guess.
 fn check_schema(schema_version: u32) -> Result<(), FormatError> {
     if (OLDEST_SCHEMA_VERSION..=CURRENT_SCHEMA_VERSION).contains(&schema_version) {

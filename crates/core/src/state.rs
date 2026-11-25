@@ -323,8 +323,12 @@ impl PatchState {
                     c.ports
                         .retain(|_, e| e.retain_targets(|t| t.module_id() != Some(*id)));
                     if let Some(panel) = &mut c.panel {
-                        panel.placements.retain(|key, _| {
-                            c.controls.contains_key(key) || c.ports.contains_key(key)
+                        // Only exposure-bound elements; the editor's prune drops the rest
+                        // in the same step, so undo restores them in any order.
+                        panel.placements.retain(|key, p| {
+                            !p.kind.binds_exposure()
+                                || c.controls.contains_key(key)
+                                || c.ports.contains_key(key)
                         });
                     }
                 }
@@ -493,6 +497,7 @@ mod tests {
                 controls: BTreeMap::new(),
                 next_interface: 1,
                 panel: None,
+                snapshots: Vec::new(),
             }),
         });
         for op in &edits {

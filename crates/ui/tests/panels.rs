@@ -1,5 +1,5 @@
 use kabl_core::{
-    panel::{Artwork, Kind, Panel, Placement},
+    panel::{Artwork, Kind, Panel, Placement, Source},
     PortRef,
 };
 use kabl_ui::{composites, panels, PatchEditor};
@@ -57,6 +57,9 @@ fn panel(key: u64) -> Panel {
             y: 72.,
             width: 84.,
             height: 110.,
+            source: None,
+            label: None,
+            icons: Vec::new(),
         },
     );
     p
@@ -263,6 +266,9 @@ fn deleting_placed_leaf_prunes_metadata_and_undo_restores_complete_face() {
             y: 232.,
             width: 64.,
             height: 58.,
+            source: None,
+            label: None,
+            icons: Vec::new(),
         },
     );
     composites::set(&mut e, id, c).unwrap();
@@ -294,4 +300,144 @@ fn deleting_placed_leaf_prunes_metadata_and_undo_restores_complete_face() {
     assert_eq!(restored.state(), &before);
     restored.redo();
     assert_eq!(restored.state(), &deleted);
+}
+
+/// The fixture's composite with one element of `kind` on its face (on the cutoff control for a
+/// control kind, on a fresh key otherwise), valid as stored; `panels::validate`'s verdict.
+fn face_with(kind: Kind) -> Result<(), String> {
+    let (e, id, key) = fixture();
+    let mut state = e.state().clone();
+    let c = state.composites.get_mut(&id).unwrap();
+    let leaf = *c.members.iter().next().unwrap();
+    let (key, source) = if kind.binds_control() {
+        (key, None)
+    } else {
+        c.next_interface += 1;
+        let source = match kind {
+            Kind::Snapshots => None,
+            Kind::Button => Some(Source::Module {
+                id: leaf,
+                action: Some("trigger".into()),
+            }),
+            _ => Some(Source::Module {
+                id: leaf,
+                action: None,
+            }),
+        };
+        (c.next_interface - 1, source)
+    };
+    let (width, height) = match kind {
+        Kind::Slider => (120., 55.),
+        Kind::Toggle => (64., 55.),
+        Kind::Icons => (84., 55.),
+        _ => (120., 120.),
+    };
+    let mut p = Panel::default();
+    p.placements.insert(
+        key,
+        Placement {
+            kind,
+            x: 12.,
+            y: 72.,
+            width,
+            height,
+            source,
+            label: None,
+            icons: Vec::new(),
+        },
+    );
+    c.panel = Some(Box::new(p));
+    kabl_core::composite::validate(&state).unwrap();
+    panels::validate(&state)
+}
+fn refusal(kind: Kind) -> String {
+    face_with(kind).unwrap_err()
+}
+#[test]
+fn knob_selector_and_jack_are_accepted_as_before() {
+    let (mut e, id, key) = fixture();
+    let osc = *e
+        .state()
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "osc.va")
+        .unwrap()
+        .0;
+    composites::add_exposure(
+        &mut e,
+        id,
+        PortRef::Param {
+            id: osc,
+            param: "waveform".into(),
+        },
+        true,
+    )
+    .unwrap();
+    let mut c = e.state().composites[&id].clone();
+    let selector = *c.controls.keys().max().unwrap();
+    let jack = *c.ports.keys().next().unwrap();
+    let mut p = panel(key);
+    for (k, kind, x) in [(selector, Kind::Selector, 110.), (jack, Kind::Jack, 210.)] {
+        p.placements.insert(
+            k,
+            Placement {
+                kind,
+                x,
+                y: 72.,
+                width: 80.,
+                height: 60.,
+                source: None,
+                label: None,
+                icons: Vec::new(),
+            },
+        );
+    }
+    c.panel = Some(Box::new(p));
+    composites::set(&mut e, id, c).unwrap();
+    panels::validate(e.state()).unwrap();
+    assert_eq!(
+        e.state().composites[&id]
+            .panel
+            .as_ref()
+            .unwrap()
+            .placements
+            .len(),
+        3
+    );
+}
+#[test]
+fn sliders_are_not_supported_yet() {
+    assert!(refusal(Kind::Slider).ends_with("Slider elements are not supported yet"));
+}
+#[test]
+fn toggles_are_not_supported_yet() {
+    assert!(refusal(Kind::Toggle).ends_with("Toggle elements are not supported yet"));
+}
+#[test]
+fn icon_selectors_are_not_supported_yet() {
+    assert!(refusal(Kind::Icons).ends_with("Icons elements are not supported yet"));
+}
+#[test]
+fn displays_are_not_supported_yet() {
+    assert!(refusal(Kind::Display).ends_with("Display elements are not supported yet"));
+}
+#[test]
+fn buttons_are_not_supported_yet() {
+    assert!(refusal(Kind::Button).ends_with("Button elements are not supported yet"));
+}
+#[test]
+fn cue_pads_are_not_supported_yet() {
+    assert!(refusal(Kind::CuePads).ends_with("CuePads elements are not supported yet"));
+}
+#[test]
+fn banks_are_not_supported_yet() {
+    assert!(refusal(Kind::Banks).ends_with("Banks elements are not supported yet"));
+}
+#[test]
+fn transport_is_not_supported_yet() {
+    assert!(refusal(Kind::Transport).ends_with("Transport elements are not supported yet"));
+}
+#[test]
+fn snapshot_strips_are_not_supported_yet() {
+    assert!(refusal(Kind::Snapshots).ends_with("Snapshots elements are not supported yet"));
 }

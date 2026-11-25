@@ -6366,6 +6366,9 @@ mod tests {
             y: 72.,
             width: 84.,
             height: 110.,
+            source: None,
+            label: None,
+            icons: Vec::new(),
         };
         let super::Geo::Knob { c, r } = super::panel_control_geo(face, &placement) else {
             panic!("knob")
