@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 44] = [
+const SCENES: [&str; 46] = [
     "rack",
     "perform",
     "sounds",
@@ -59,6 +59,8 @@ const SCENES: [&str; 44] = [
     "dlg-restore",
     "about",
     "dev-tools",
+    "design-page",
+    "design-page-red-drop",
     "settings",
 ];
 
@@ -478,7 +480,7 @@ impl App {
         }
         // Panel authoring (advanced): a "Voice" composite made from the filter, once, with one
         // control and two jacks exposed. Last in SCENES, so no other scene sees the composite.
-        if j.scene == "dev-tools" {
+        if j.scene == "dev-tools" || j.scene.starts_with("design-page") {
             use kabl_core::PortRef;
             let svf = self
                 .editor
@@ -1013,9 +1015,28 @@ impl eframe::App for App {
             }
         }
         // Panel authoring opens once the first frames, which reset its state, are past.
-        if self.f == 6 && self.jobs[self.i].scene == "dev-tools" {
+        let scene = self.jobs[self.i].scene;
+        if self.f == 6 && (scene == "dev-tools" || scene.starts_with("design-page")) {
             let (&id, c) = self.editor.state().composites.iter().next().unwrap();
             kabl_ui::panels::open(&mut self.ui, id, c);
+        }
+        // The design page with every exposure placed and the cutoff knob selected; the red-drop
+        // scene then drops a jack onto the knob.
+        if self.f == 6 && scene.starts_with("design-page") {
+            let state = self.editor.state();
+            let page = self.ui.panels.page.as_mut().unwrap();
+            let c = &state.composites[&page.id];
+            let keys: Vec<u64> = c.controls.keys().chain(c.ports.keys()).copied().collect();
+            for &key in &keys {
+                page.add(state, key).unwrap();
+            }
+            page.selected = Some(keys[0]);
+            if scene == "design-page-red-drop" {
+                let knob = &page.draft.panel.placements[&keys[0]];
+                let at = [knob.x + 24.0, knob.y + 30.0, 64.0, 58.0];
+                assert!(page.place(state, keys[2], at).is_err());
+                page.selected = Some(keys[2]);
+            }
         }
         // The mockup's More controls: the wavetable oscillator's, Controls tab (once the first
         // frames, which reset the view, are past).
@@ -1179,6 +1200,7 @@ impl eframe::App for App {
             || self.jobs[self.i].scene.starts_with("menu-")
             || self.jobs[self.i].scene.starts_with("more-controls")
             || self.jobs[self.i].scene == "dev-tools"
+            || self.jobs[self.i].scene.starts_with("design-page")
             || self.jobs[self.i].scene == "settings"
             || self.jobs[self.i].scene.starts_with("learn-")
         {
