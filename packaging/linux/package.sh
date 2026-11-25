@@ -50,6 +50,8 @@ Install:    ./install.sh                   standalone and desktop entry under ~/
                                            CLAP plugin as ~/.clap/kabl.clap
             ./install.sh --prefix DIR --clap-dir DIR2    elsewhere
             ./install.sh --uninstall       removes exactly those files (never your sounds)
+REAPER:     REAPER searches ~/.clap for CLAP plugins by default. If kabl does not appear,
+            rescan plugins in REAPER's Preferences (Plug-ins > CLAP).
 Run:        ./bin/kabl-ui                  (opens the sound browser)
             ./bin/kabl-ui --size 1280x800  (smaller window)
 Factory sounds: share/kabl/patches (read-only; Save As makes your own copy).

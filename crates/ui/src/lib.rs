@@ -2192,105 +2192,128 @@ fn status_bar(
     st: &Style,
     right: impl FnOnce(&mut egui::Ui, &mut UiState),
 ) {
-    ui.horizontal_centered(|ui| {
+    // The host's controls are taller than the bar's padding leaves, so the row spans the bar's
+    // full height and stays inside the window.
+    let row = Rect::from_center_size(
+        ui.max_rect().center(),
+        vec2(ui.max_rect().width(), st.metrics.status_h),
+    );
+    let layout = egui::Layout::right_to_left(egui::Align::Center);
+    ui.scope_builder(egui::UiBuilder::new().max_rect(row).layout(layout), |ui| {
         ui.spacing_mut().item_spacing.x = st.sp(3);
-        if ui_state.status_meter {
-            let out = kit::label(ui, st, style::Role::Label, kit::Tone::Text2, "Out");
-            if ui_state.recorder.is_none() {
-                out.on_hover_text("Recording needs an audio device.");
-            }
-            record::meter_ui(ui, st, &mut ui_state.meter);
-            let peak = ui_state
-                .meter
-                .max_db
-                .map_or("no signal".to_string(), |m| format!("{m:+.1} dB"));
-            kit::label(ui, st, style::Role::Value, kit::Tone::Text2, peak);
+        // The right side is laid out first and keeps its size; the left side gets what is left
+        // and elides its text in it.
+        // Tempo and position are the rightmost, as in the mockup; the host's controls follow.
+        if let Some(pos) = ui_state.status_pos.clone() {
+            let r = kit::label(ui, st, style::Role::Value, kit::Tone::Text2, pos);
+            ui_state.record("status:position".into(), r.rect);
         }
-        if let Some(port) = ui_state.midi_input.clone() {
-            let (dot, _) =
-                ui.allocate_exact_size(egui::Vec2::splat(st.sp(2)), egui::Sense::hover());
-            ui.painter()
-                .circle_filled(dot.center(), st.sp(1), st.roles.good);
-            kit::label_truncated(
+        if let Some(bpm) = ui_state.status_bpm {
+            let r = kit::label(
                 ui,
                 st,
-                style::Role::Caption,
+                style::Role::Value,
                 kit::Tone::Text2,
-                format!("MIDI · {port}"),
+                format!("{bpm:.1} BPM"),
             );
+            ui_state.record("status:tempo".into(), r.rect);
         }
-        keys::toggle(ui_state, ui, st);
-        if !ui_state.status_audio.is_empty() {
-            let text = ui_state.status_audio.clone();
-            kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &text)
-                .on_hover_text(&text);
+        right(ui, ui_state);
+        // Sample rate and CPU, quiet; a click opens Diagnostics (buffer size, voices).
+        let khz = ui_state.sample_rate / 1000.0;
+        let mut quiet = format!("{khz:.1} kHz");
+        if let Some(cpu) = ui_state.status_cpu {
+            quiet.push_str(&format!(" · CPU {cpu:.0} %"));
         }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            // Tempo and position are the rightmost, as in the mockup; the host's controls follow.
-            if let Some(pos) = ui_state.status_pos.clone() {
-                kit::label(ui, st, style::Role::Value, kit::Tone::Text2, pos);
-            }
-            if let Some(bpm) = ui_state.status_bpm {
+        let quiet = kit::label(ui, st, style::Role::Caption, kit::Tone::Text3, quiet);
+        let quiet = ui.interact(quiet.rect, Id::new("status-diagnostics"), Sense::click());
+        ui_state.record("status:diagnostics".into(), quiet.rect);
+        let quiet = quiet.on_hover_text("Diagnostics");
+        egui::Popup::from_toggle_button_response(&quiet).show(|ui| {
+            kit::label(ui, st, style::Role::H3, kit::Tone::Text, "Diagnostics");
+            if let Some(frames) = ui_state.status_buffer {
                 kit::label(
                     ui,
                     st,
                     style::Role::Value,
                     kit::Tone::Text2,
-                    format!("{bpm:.1} BPM"),
+                    format!("Buffer {frames} frames"),
                 );
             }
-            right(ui, ui_state);
-            // Sample rate and CPU, quiet; a click opens Diagnostics (buffer size, voices).
-            let khz = ui_state.sample_rate / 1000.0;
-            let mut quiet = format!("{khz:.1} kHz");
-            if let Some(cpu) = ui_state.status_cpu {
-                quiet.push_str(&format!(" · CPU {cpu:.0} %"));
-            }
-            let quiet = kit::label(ui, st, style::Role::Caption, kit::Tone::Text3, quiet);
-            let quiet = ui.interact(quiet.rect, Id::new("status-diagnostics"), Sense::click());
-            ui_state.record("status:diagnostics".into(), quiet.rect);
-            let quiet = quiet.on_hover_text("Diagnostics");
-            egui::Popup::from_toggle_button_response(&quiet).show(|ui| {
-                kit::label(ui, st, style::Role::H3, kit::Tone::Text, "Diagnostics");
-                if let Some(frames) = ui_state.status_buffer {
-                    kit::label(
-                        ui,
-                        st,
-                        style::Role::Value,
-                        kit::Tone::Text2,
-                        format!("Buffer {frames} frames"),
-                    );
-                }
-                if let Some((used, all)) = ui_state.status_voices {
-                    kit::label(
-                        ui,
-                        st,
-                        style::Role::Value,
-                        kit::Tone::Text2,
-                        format!("Voices {used} / {all}"),
-                    );
-                }
-            });
-            if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
-                let t = rec.elapsed() as u64;
+            if let Some((used, all)) = ui_state.status_voices {
                 kit::label(
                     ui,
                     st,
-                    style::Role::Label,
-                    kit::Tone::Bad,
-                    format!("• REC {:02}:{:02}", t / 60, t % 60),
+                    style::Role::Value,
+                    kit::Tone::Text2,
+                    format!("Voices {used} / {all}"),
                 );
             }
-            let errors = kit::g4::error_count(&ui_state.toasts);
-            if errors > 0 {
-                let word = if errors == 1 { "error" } else { "errors" };
-                kit::label(
-                    ui,
-                    st,
-                    style::Role::Caption,
-                    kit::Tone::Bad,
-                    format!("• {errors} {word}"),
-                );
+        });
+        if let Some(rec) = ui_state.recorder.as_ref().filter(|r| r.recording()) {
+            let t = rec.elapsed() as u64;
+            kit::label(
+                ui,
+                st,
+                style::Role::Label,
+                kit::Tone::Bad,
+                format!("• REC {:02}:{:02}", t / 60, t % 60),
+            );
+        }
+        let errors = kit::g4::error_count(&ui_state.toasts);
+        if errors > 0 {
+            let word = if errors == 1 { "error" } else { "errors" };
+            kit::label(
+                ui,
+                st,
+                style::Role::Caption,
+                kit::Tone::Bad,
+                format!("• {errors} {word}"),
+            );
+        }
+        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+            if ui_state.status_meter {
+                let out = kit::label(ui, st, style::Role::Label, kit::Tone::Text2, "Out");
+                if ui_state.recorder.is_none() {
+                    out.on_hover_text("Recording needs an audio device.");
+                }
+                let meter = record::meter_ui(ui, st, &mut ui_state.meter);
+                ui_state.record("status:meter".into(), meter.rect);
+                let peak = ui_state
+                    .meter
+                    .max_db
+                    .map_or("no signal".to_string(), |m| format!("{m:+.1} dB"));
+                let r = kit::label(ui, st, style::Role::Value, kit::Tone::Text2, peak);
+                ui_state.record("status:peak".into(), r.rect);
+            }
+            if let Some(port) = ui_state.midi_input.clone() {
+                let (dot, _) =
+                    ui.allocate_exact_size(egui::Vec2::splat(st.sp(2)), egui::Sense::hover());
+                ui.painter()
+                    .circle_filled(dot.center(), st.sp(1), st.roles.good);
+                // A long port name keeps room for the Keys toggle and the audio message.
+                let w = (ui.available_width() / 3.0).max(0.0);
+                let r = ui
+                    .scope(|ui| {
+                        ui.set_max_width(w);
+                        kit::label_truncated(
+                            ui,
+                            st,
+                            style::Role::Caption,
+                            kit::Tone::Text2,
+                            format!("MIDI · {port}"),
+                        )
+                    })
+                    .inner
+                    .on_hover_text(&port);
+                ui_state.record("status:midi".into(), r.rect);
+            }
+            keys::toggle(ui_state, ui, st);
+            if !ui_state.status_audio.is_empty() {
+                let text = ui_state.status_audio.clone();
+                let r = kit::label_truncated(ui, st, style::Role::Caption, kit::Tone::Text2, &text)
+                    .on_hover_text(&text);
+                ui_state.record("status:message".into(), r.rect);
             }
         });
     });
