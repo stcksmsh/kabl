@@ -10,6 +10,7 @@ use kabl_core::{
     Composite, CompositeId, PatchState, Snapshot,
 };
 use kabl_modules::Taper;
+use std::collections::btree_map;
 use std::path::Path;
 
 /// Every move and resize lands on this grid, in rack points.
@@ -255,10 +256,10 @@ impl Page {
     /// stays as it was.
     pub fn place(&mut self, state: &PatchState, key: u64, r: [f32; 4]) -> Result<(), String> {
         let mut panel = self.draft.panel.clone();
-        if !panel.placements.contains_key(&key) {
-            panel.placements.insert(key, self.fresh(state, key)?);
-        }
-        let p = panel.placements.get_mut(&key).ok_or("Not on the face")?;
+        let p = match panel.placements.entry(key) {
+            btree_map::Entry::Occupied(e) => e.into_mut(),
+            btree_map::Entry::Vacant(e) => e.insert(self.fresh(state, key)?),
+        };
         [p.x, p.y, p.width, p.height] = r;
         let result = self.commit(state, panel);
         if result.is_err() {
