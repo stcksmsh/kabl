@@ -1,5 +1,5 @@
 # Builds kabl.vst3: the kabl CLAP wrapped by free-audio/clap-wrapper as a clap-first,
-# single-file VST3. The CLAP code is linked in as the kabl-clap static library, so the
+# VST3 bundle (kabl.vst3/Contents/x86_64-win/kabl.vst3). The CLAP code is linked in as the kabl-clap static library, so the
 # .vst3 needs no separate kabl.clap at run time.
 #
 # Inputs, produced by cargo before configuring (see the windows-vst3 job in ci.yml):
@@ -81,7 +81,7 @@ make_clapfirst_plugins(
     BUNDLE_IDENTIFIER dev.stcksmsh.kabl
     BUNDLE_VERSION 1.0.0
     COPY_AFTER_BUILD FALSE
-    WINDOWS_FOLDER_VST3 FALSE
+    WINDOWS_FOLDER_VST3 TRUE
     PLUGIN_FORMATS CLAP VST3
     ASSET_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/assets)
 

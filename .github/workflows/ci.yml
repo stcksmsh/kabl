@@ -239,13 +239,29 @@ jobs:
       - name: Build kabl.vst3 and the VST3 validator
         run: cmake --build build-vst3 --config Release --target kabl_vst3 vst3-validator
       - name: Steinberg VST3 validator on kabl.vst3
-        # The step fails when the validator exits non-zero, which it does for any failed test.
+        # Exactly one failure is expected: Process Format at 1234567.8 Hz, the rate the
+        # validator tries after 123456.78 Hz. The CLAP deliberately refuses rates outside
+        # 1 kHz-768 kHz (crates/clap/src/lib.rs, activate), so setActive fails there. Any
+        # other failure, or a different failure count, fails this step.
         run: |
-          mapfile -t found < <(find build-vst3/assets -name kabl.vst3 -type f)
+          mapfile -t found < <(find build-vst3/assets -name kabl.vst3 -type d -prune)
           test "${#found[@]}" = 1
           mkdir -p build-vst3/out
-          cp "${found[0]}" build-vst3/out/kabl.vst3
-          build-vst3/vst3sdk-validator/bin/Release/validator.exe build-vst3/out/kabl.vst3 | tee build-vst3/out/validator.txt
+          cp -r "${found[0]}" build-vst3/out/kabl.vst3
+          status=0
+          build-vst3/vst3sdk-validator/bin/Release/validator.exe build-vst3/out/kabl.vst3 > build-vst3/validator.txt || status=$?
+          cat build-vst3/validator.txt
+          echo "validator exit code: $status"
+          failures=$(tr -d '\r' < build-vst3/validator.txt | awk '
+            { gsub(/ +/, " ") }
+            /^TestSuite : / { suite = $0 }
+            /^\[/ && !/Succeeded\]$/ && !/Failed\]$/ { test = $0; info = ""; err = "" }
+            /^Info: / && err == "" { info = $0 }
+            /^ERROR: / { err = $0 }
+            /Failed\]$/ { print suite " | " test " | " info " | " err }')
+          echo "failures: $failures"
+          test "$failures" = "TestSuite : Single Precision (32 bit) Tests | [Process Format] | Info: 123456.78 Hz - processed successfully! | ERROR: IComponent::setActive (true) failed."
+          tr -d '\r' < build-vst3/validator.txt | grep -Eq '^Result: [0-9]+ tests passed, 1 tests failed$'
       - name: VST3 class id is the frozen one
         # The frozen id (OD-W5) as its 16 bytes. On Windows the validator prints ids in COM
         # notation, where the first three fields are little-endian words.
@@ -253,11 +269,12 @@ jobs:
           raw=bda9c239b42389589c969403a7b9d23e
           com="${raw:6:2}${raw:4:2}${raw:2:2}${raw:0:2}${raw:10:2}${raw:8:2}${raw:14:2}${raw:12:2}${raw:16:16}"
           com="${com^^}"
-          cids=$(tr -d '\r' < build-vst3/out/validator.txt | awk '/category = Audio Module Class/ {m = 1} m && /cid = / {print $3; m = 0}')
+          cids=$(tr -d '\r' < build-vst3/validator.txt | awk '/category = Audio Module Class/ {m = 1} m && /cid = / {print $3; m = 0}')
           echo "expected $com, validator reports: $cids"
           test "$cids" = "$com"
       - uses: actions/upload-artifact@v4
         with:
           name: kabl-windows-vst3
-          path: build-vst3/out/kabl.vst3
+          # The out directory holds only the bundle, so the zip keeps the kabl.vst3 folder.
+          path: build-vst3/out/
           if-no-files-found: error
