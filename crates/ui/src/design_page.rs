@@ -224,6 +224,8 @@ impl Page {
         self.draft.panel = e.panel;
         self.draft.snapshots = e.snapshots;
         self.draft.next_interface = e.next_interface;
+        // Staged icons belong to the draft they were imported on.
+        self.staged = None;
         self.refused = None;
         self.note = None;
         self.selected = self
@@ -373,7 +375,9 @@ impl Page {
             p.width = p.width.max(SLIDER.0);
             p.height = p.height.max(SLIDER.1);
         }
-        self.commit(state, panel)
+        self.commit(state, panel)?;
+        self.staged = self.staged.take().filter(|(k, _)| *k != key);
+        Ok(())
     }
 
     /// The option count of stepped control `key`, None for any other exposure.
@@ -433,6 +437,7 @@ impl Page {
             self.push();
             self.draft.panel.placements.remove(&key);
             self.selected = None;
+            self.staged = self.staged.take().filter(|(k, _)| *k != key);
         }
     }
 

@@ -341,3 +341,41 @@ fn the_design_page_imports_a_png_per_option_and_keeps_each_image_once() {
     assert_eq!(applied.placements[&key].kind, Kind::Icons);
     assert_eq!(applied.placements[&key].icons.len(), 2);
 }
+
+#[test]
+fn a_partial_icon_set_is_dropped_by_remove_kind_change_and_undo() {
+    let mut e = PatchEditor::seed_from(&kabl_standalone::default_patch());
+    let id = composites::encapsulate(&mut e, [VCA].into(), Default::default(), "Amp").unwrap();
+    composites::add_exposure(&mut e, id, param(VCA, "exponential"), true).unwrap();
+    let key = *e.state().composites[&id].controls.keys().next().unwrap();
+    let mut h = H::with(e);
+    let c = h.editor.state().composites[&id].clone();
+    panels::open(&mut h.ui, id, &c);
+    h.frames(2);
+    h.click(&format!("design:palette:{key}"));
+    // Stages a.png for option 0, then `drop` must forget it.
+    let stage_then = |h: &mut H, drop: &dyn Fn(&mut H)| {
+        let state = h.editor.state().clone();
+        let page = h.ui.panels.page.as_mut().unwrap();
+        page.set_icon(&state, key, 0, png("a.png", 100)).unwrap();
+        assert_eq!(page.icons(&state, key)[0], Some(png("a.png", 100)));
+        drop(h);
+        h.frames(1);
+        let page = h.ui.panels.page.as_ref().unwrap();
+        assert_eq!(page.icons(&state, key), vec![None, None]);
+    };
+    stage_then(&mut h, &|h| {
+        h.ui.panels.page.as_mut().unwrap().remove(key);
+        h.frames(1);
+        h.click(&format!("design:palette:{key}"));
+    });
+    stage_then(&mut h, &|h| {
+        let state = h.editor.state().clone();
+        let page = h.ui.panels.page.as_mut().unwrap();
+        page.set_kind(&state, key, Kind::Toggle).unwrap();
+        page.set_kind(&state, key, Kind::Selector).unwrap();
+    });
+    stage_then(&mut h, &|h| {
+        assert!(h.ui.panels.page.as_mut().unwrap().undo());
+    });
+}
