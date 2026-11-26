@@ -3241,7 +3241,8 @@ fn draw_module_shapes(
                 now,
                 painter,
                 xf,
-                m,
+                m.id,
+                m.info,
                 r,
                 th.panel,
             );
@@ -5977,6 +5978,13 @@ fn draw_authored_face(
     for (&key, p) in &panel.placements {
         let footprint = Rect::from_min_size(face.min + vec2(p.x, p.y), vec2(p.width, p.height));
         let screen = xf.r(footprint);
+        if p.kind == Kind::Display {
+            let now = ui.input(|i| i.time);
+            panels::face_display(
+                editor, view, &painter, xf, id, key, p, footprint, th.panel, now,
+            );
+            continue;
+        }
         let local = ui.new_child(egui::UiBuilder::new().max_rect(screen).id_salt((
             "face-control",
             id,

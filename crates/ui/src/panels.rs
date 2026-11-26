@@ -38,12 +38,29 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
         // Stored and checked by `Panel::validate`; each kind is lifted here once it draws.
         if !matches!(
             p.kind,
-            Kind::Knob | Kind::Selector | Kind::Jack | Kind::Slider | Kind::Toggle | Kind::Icons
+            Kind::Knob
+                | Kind::Selector
+                | Kind::Jack
+                | Kind::Slider
+                | Kind::Toggle
+                | Kind::Icons
+                | Kind::Display
         ) {
             return Err(format!(
                 "Binding {id}: {:?} elements are not supported yet",
                 p.kind
             ));
+        }
+        if p.kind == Kind::Display {
+            // `Panel::validate` has checked the source is a module without an action.
+            if let Some(kabl_core::panel::Source::Module { id: leaf, .. }) = p.source {
+                let m = state.modules.get(&leaf).ok_or_else(|| {
+                    format!("Binding {id}: the display's module {leaf} is missing")
+                })?;
+                if !crate::displays::has_display(&m.kind) {
+                    return Err(format!("Binding {id}: {} modules have no display", m.kind));
+                }
+            }
         }
         if let Some(e) = c.controls.get(&id) {
             let target = param_info(state, &e.target)?;
@@ -220,6 +237,55 @@ pub(crate) fn icon_textures(
         .iter()
         .map(egui::load::SizedTexture::from_handle)
         .collect()
+}
+/// Display element `key` of composite `id` in `footprint` (world units): asks for its leaf's tap
+/// while on screen, as a module face does, then draws the leaf's display inside the footprint.
+/// A source that is gone or has no display draws nothing.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn face_display(
+    editor: &PatchEditor,
+    view: &mut UiState,
+    painter: &egui::Painter,
+    xf: crate::Xf,
+    id: CompositeId,
+    key: u64,
+    p: &kabl_core::panel::Placement,
+    footprint: egui::Rect,
+    face: egui::Color32,
+    now: f64,
+) {
+    let Some(kabl_core::panel::Source::Module { id: leaf, .. }) = p.source else {
+        return;
+    };
+    let Some(info) = editor
+        .state()
+        .modules
+        .get(&leaf)
+        .and_then(|m| registry::info_for(&m.kind))
+        .filter(|i| crate::displays::has_display(i.kind))
+    else {
+        return;
+    };
+    let screen = xf.r(footprint);
+    let painter = painter.with_clip_rect(painter.clip_rect().intersect(screen));
+    if painter.clip_rect().is_positive() {
+        view.wants.display(leaf, info.kind);
+        view.wants.feeds(editor.state(), leaf, info.kind);
+    }
+    view.live.master = view.meter.level;
+    crate::displays::draw(
+        editor.state(),
+        &view.style,
+        &view.live,
+        now,
+        &painter,
+        xf,
+        leaf,
+        info,
+        footprint,
+        face,
+    );
+    view.record(format!("composite:{id}:display:{key}"), screen);
 }
 pub fn import_art(path: &Path) -> Result<Artwork, String> {
     use std::io::Read;

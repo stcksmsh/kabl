@@ -527,10 +527,11 @@ Pre-1.0 rule: one format step, no migration code. Exactly:
   other option with `editor.set_param`, inspect as `stepped_selector` does
   (`routing.rs:1532-1536`).
 - `icons`: `stepped_selector` (`routing.rs:1431`) gains an icon mode: same segments, hit IDs
-  (`sel:{key}.{k}`) and plug. Built-in glyphs (empty `icons`): `face::trace` of `displays::plot`
-  (`displays.rs:405`) over `displays::wave` (`displays.rs:436`, private: the icon slice makes it
-  `pub(crate)`) for sine, triangle, saw, square, and the LFO's sample-and-hold steps
-  (`displays.rs:727-740`); sets exist for `osc.va` and `lfo` `waveform`. Author PNGs: decoded
+  (`sel:{key}.{k}`) and plug. Built-in glyphs (empty `icons`): plain lines in the segment's ink
+  (`displays::glyph`), the points from `displays::plot` over `displays::wave` (made `pub(crate)`
+  by the icon slice) for sine, triangle, saw, square, and the LFO's sample-and-hold steps; sets
+  exist for `osc.va` and `lfo` `waveform`. Kosta chose the plain lines over the `face::trace`
+  display style on 2026-11-26, as #261 draws them. Author PNGs: decoded
   once with `panels::decode_art` (`panels.rs:13-18`) into a texture cache like the artwork one
   (`panels.rs:106`), drawn as an alpha mask tinted with the segment's ink, so one PNG works in
   both themes and in the selected and unselected states. An `icons` placement on a param with no

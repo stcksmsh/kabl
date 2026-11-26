@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 60] = [
+const SCENES: [&str; 63] = [
     "rack",
     "perform",
     "sounds",
@@ -76,6 +76,9 @@ const SCENES: [&str; 60] = [
     "face-icons-glyphs-min",
     "face-icons-png",
     "face-icons-png-min",
+    "face-display",
+    "face-display-min",
+    "design-page-displays",
 ];
 
 struct Job {
@@ -93,6 +96,8 @@ struct App {
     editor: PatchEditor,
     ui: UiState,
     _user: tempfile::TempDir,
+    /// The display scenes' engine, rendered offline a frame's worth at a time (no device).
+    engine: Option<(kabl_engine::patch_engine::PatchEngine, basedrop::Collector)>,
     /// A control to inspect a few frames before the screenshot (the lanes mid-opening).
     inspect_later: Option<(kabl_core::ModuleId, String)>,
     /// `KABL_ANIM=1`: the lanes animation as frames on a fixed 60 fps clock (see `anim_step`).
@@ -669,6 +674,68 @@ impl App {
             }
             self.editor.set_param(lfo, "waveform", 2.0);
         }
+        // The display scenes, last in SCENES: "Scopes" holds an FM oscillator and "Mid", which
+        // holds "Deep", which holds a VA oscillator. The face scenes show both oscillators'
+        // displays on the closed "Scopes" face, live from the engine rendered offline (see `ui`).
+        self.engine = None;
+        if j.scene.contains("-display") {
+            use kabl_core::panel::{Kind, Panel, Placement, Source};
+            // Faces ask for taps only while audio runs.
+            ui.inspect.audio = true;
+            let fm = self
+                .editor
+                .add_module("osc.fm", kabl_core::Vec2 { x: 904.0, y: 320.0 });
+            let va = self.editor.add_module(
+                "osc.va",
+                kabl_core::Vec2 {
+                    x: 1104.0,
+                    y: 320.0,
+                },
+            );
+            let composites = kabl_ui::composites::encapsulate;
+            let deep = composites(&mut self.editor, [va].into(), Default::default(), "Deep");
+            let mid = composites(
+                &mut self.editor,
+                Default::default(),
+                [deep.unwrap()].into(),
+                "Mid",
+            );
+            let id = composites(
+                &mut self.editor,
+                [fm].into(),
+                [mid.unwrap()].into(),
+                "Scopes",
+            )
+            .unwrap();
+            if j.scene.starts_with("face-display") {
+                let mut c = self.editor.state().composites[&id].clone();
+                let mut panel = Panel {
+                    width: 420.0,
+                    ..Panel::default()
+                };
+                for (leaf, x) in [(fm, 12.0), (va, 210.0)] {
+                    panel.placements.insert(
+                        c.next_interface,
+                        Placement {
+                            kind: Kind::Display,
+                            x,
+                            y: 66.0,
+                            width: 198.0,
+                            height: 120.0,
+                            source: Some(Source::Module {
+                                id: leaf,
+                                action: None,
+                            }),
+                            label: None,
+                            icons: Vec::new(),
+                        },
+                    );
+                    c.next_interface += 1;
+                }
+                c.panel = Some(Box::new(panel));
+                kabl_ui::composites::set(&mut self.editor, id, c).unwrap();
+            }
+        }
         if j.scene.starts_with("face-icons") {
             use kabl_core::panel::{Kind, Panel, Placement};
             let png = j.scene.starts_with("face-icons-png");
@@ -1209,9 +1276,11 @@ impl eframe::App for App {
         // The design page opens once the first frames, which reset its state, are past.
         let scene = self.jobs[self.i].scene;
         if self.f == 6 && scene.starts_with("design-page") {
-            // The toggle and icon scenes design the composite made last, the others the "Voice".
+            // The toggle, icon and display scenes design the composite made last, the others the
+            // "Voice".
             let mut all = self.editor.state().composites.iter();
-            let (&id, c) = if scene == "design-page-toggle" || scene.contains("-icons") {
+            let last = scene == "design-page-toggle" || scene.contains("-icons");
+            let (&id, c) = if last || scene.contains("-display") {
                 all.next_back()
             } else {
                 all.next()
@@ -1219,9 +1288,17 @@ impl eframe::App for App {
             .unwrap();
             kabl_ui::panels::open(&mut self.ui, id, c);
         }
+        // Both oscillators' displays placed from the Displays list.
+        if self.f == 6 && scene == "design-page-displays" {
+            let state = self.editor.state();
+            let page = self.ui.panels.page.as_mut().unwrap();
+            for (leaf, _) in kabl_ui::design_page::displays(state, page.id) {
+                page.add_display(state, leaf).unwrap();
+            }
+        }
         // The design page with every exposure placed and the cutoff knob selected; the red-drop
         // scene then drops a jack onto the knob.
-        if self.f == 6 && scene.starts_with("design-page") {
+        if self.f == 6 && scene.starts_with("design-page") && scene != "design-page-displays" {
             let state = self.editor.state();
             let page = self.ui.panels.page.as_mut().unwrap();
             let c = &state.composites[&page.id];
@@ -1260,6 +1337,43 @@ impl eframe::App for App {
             self.ui.panels.path = "icons/shape-4.png".into();
         }
         // The icon faces at zoom 1 or the smallest zoom, the "Shapes" face near the top left.
+        // The display faces at zoom 1 or the smallest zoom, the "Scopes" face near the top left.
+        if self.f == 6 && scene.starts_with("face-display") {
+            self.ui.zoom = if scene.ends_with("-min") {
+                kabl_ui::MIN_ZOOM
+            } else {
+                1.0
+            };
+            self.ui.pan = egui::vec2(-860.0, -240.0) * self.ui.zoom;
+        }
+        // The display scenes' audio, rendered offline: the engine is built once the scene is set
+        // up, then each frame takes the taps the faces ask for, renders a frame's worth of blocks
+        // with a held note and hands the face reports back.
+        if self.f >= 6 && scene.contains("-display") {
+            use kabl_engine::{graph::BLOCK, keyboard::KeyEvent, patch_engine::PatchEngine};
+            const SR: f32 = 48000.0;
+            let state = self.editor.state();
+            let (engine, _) = self.engine.get_or_insert_with(|| {
+                let collector = basedrop::Collector::new();
+                let mut engine = PatchEngine::new(&collector.handle(), state, SR, 8).unwrap();
+                engine.key(KeyEvent::On {
+                    note: 45,
+                    velocity: 100,
+                });
+                (engine, collector)
+            });
+            for c in std::mem::take(&mut self.ui.launches) {
+                engine.command(&c);
+            }
+            let (mut l, mut r) = ([0.0; BLOCK], [0.0; BLOCK]);
+            let now = ctx.input(|i| i.time);
+            for _ in 0..(SR as usize / 60).div_ceil(BLOCK) {
+                engine.process_block(&mut l, &mut r);
+                if let Some(rep) = engine.take_face_report() {
+                    self.ui.live.accept(&rep, now);
+                }
+            }
+        }
         if self.f == 6 && scene.starts_with("face-icons") {
             self.ui.zoom = if scene.ends_with("-min") {
                 kabl_ui::MIN_ZOOM
@@ -1612,6 +1726,7 @@ fn main() {
                 editor: PatchEditor::seed_from(&Default::default()),
                 ui: UiState::default(),
                 _user: tempfile::tempdir().unwrap(),
+                engine: None,
                 inspect_later: None,
                 anim,
                 tick: 0,

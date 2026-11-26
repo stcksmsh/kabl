@@ -509,8 +509,8 @@ fn icon_selectors_are_refused_on_a_continuous_param() {
     assert!(refusal(Kind::Icons).ends_with("icon selectors need a stepped parameter"));
 }
 #[test]
-fn displays_are_not_supported_yet() {
-    assert!(refusal(Kind::Display).ends_with("Display elements are not supported yet"));
+fn a_display_of_a_leaf_with_one_is_accepted() {
+    assert_eq!(face_with(Kind::Display), Ok(()));
 }
 #[test]
 fn buttons_are_not_supported_yet() {

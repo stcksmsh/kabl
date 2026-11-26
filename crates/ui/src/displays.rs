@@ -12,11 +12,10 @@ use egui::{pos2, Pos2, Rect, Stroke};
 use kabl_core::{ModuleId, PatchState, PortRef};
 use kabl_engine::facetap::{FaceTarget, FaceTargets, MAX_FACE_TAPS};
 use kabl_engine::patch_engine::Command;
-use kabl_modules::{registry, ModuleView, PortDirection};
+use kabl_modules::{registry, ModuleInfo, ModuleView, PortDirection};
 
 use crate::fx_displays;
 use crate::kit::face;
-use crate::rack::Placed;
 use crate::routing;
 use crate::style::{alpha, Style};
 use crate::Xf;
@@ -361,8 +360,29 @@ fn detail(z: f32) -> Detail {
     }
 }
 
+/// The module a display shows, on its own face or on a composite face.
+pub(crate) struct Shown {
+    pub id: ModuleId,
+    pub info: &'static ModuleInfo,
+}
+
+/// Whether modules of `kind` have a display for [`draw`] to draw.
+pub(crate) fn has_display(kind: &str) -> bool {
+    matches!(
+        kind,
+        "osc.va"
+            | "osc.wt"
+            | "osc.fm"
+            | "osc.fm6"
+            | "filter.svf"
+            | "filter.ladder"
+            | "env.adsr"
+            | "lfo"
+    ) || fx_displays::has_display(kind)
+}
+
 /// The module's parameter `name` as the compiler reads it: stored value or default.
-pub(crate) fn param(state: &PatchState, m: &Placed, name: &str) -> f32 {
+pub(crate) fn param(state: &PatchState, m: &Shown, name: &str) -> f32 {
     m.info
         .params
         .iter()
@@ -370,7 +390,7 @@ pub(crate) fn param(state: &PatchState, m: &Placed, name: &str) -> f32 {
         .map_or(0.0, |q| routing::base_value(state, m.id, q))
 }
 
-/// Draws the display of `m` in `r` (world units).
+/// Draws the display of module `id` of `info` in `r` (world units).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn draw(
     state: &PatchState,
@@ -379,10 +399,12 @@ pub(crate) fn draw(
     now: f64,
     painter: &egui::Painter,
     xf: Xf,
-    m: &Placed,
+    id: ModuleId,
+    info: &'static ModuleInfo,
     r: Rect,
     face: egui::Color32,
 ) {
+    let m = &Shown { id, info };
     let z = xf.zoom;
     let r = xf.r(r);
     face::display_frame(painter, st, r, face, z);
@@ -455,7 +477,7 @@ fn osc_va(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -494,7 +516,7 @@ fn scope(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -561,7 +583,7 @@ fn filter(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -661,7 +683,7 @@ fn envelope(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -751,7 +773,7 @@ fn lfo(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,

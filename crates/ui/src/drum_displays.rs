@@ -10,10 +10,10 @@ use egui::{pos2, Align2, Rect, Stroke};
 use kabl_core::PatchState;
 use kabl_modules::builtins::{clap_curve, snare_decays, thump_curve};
 
+use crate::displays::Shown;
 use crate::displays::{paint, param, plot, Detail, Live};
 use crate::fx_displays::{caption, faint, live_param};
 use crate::kit::face;
-use crate::rack::Placed;
 use crate::style::{alpha, Style};
 
 /// 60 dB as a neper ratio: the decays are times to fall this far.
@@ -31,7 +31,7 @@ pub(crate) fn draw(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
