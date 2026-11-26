@@ -586,3 +586,78 @@ fn embedded_code_that_is_another_module_is_refused() {
     host::register_blob(host::EXAMPLES[1].wasm).unwrap();
     host::set_active_scope(kabl_modules::code::CodeScope::new());
 }
+
+/// No audio device (`AudioHost::offline`): saving does not wait for a graph nothing runs, keeps
+/// the song's settings and tells the user nothing.
+#[test]
+fn saving_with_no_audio_running_keeps_the_settings_without_waiting_or_a_note() {
+    use kabl_modules::code::host;
+    use kabl_ui::control::{self, Delivery};
+    let _serial = serial();
+    let e = with_filter();
+    let leaf = module_of(&e, "demo.bitfilter");
+    let dir = tempfile::tempdir().unwrap();
+    let kept = good_settings();
+    let file = file_with_settings(dir.path(), &e, leaf, &kept);
+
+    let (log, _, code) = kabl_core::format::load_kabl_full(&file).unwrap();
+    assert!(kabl_standalone::code_load::register_for_cli(&code, log.state()).is_empty());
+    let collector = basedrop::Collector::new();
+    let mut d = Delivery::new(
+        None,
+        collector.handle(),
+        std::sync::Arc::new(kabl_engine::runtime::Feedback::default()),
+        SR,
+        4,
+        None,
+    );
+    let mut editor = PatchEditor::from_log(log);
+    let mut ui = UiState::default();
+    editor.mark_dirty();
+    control::deliver(&mut editor, &mut ui, &mut d);
+
+    let t = std::time::Instant::now();
+    let out = code_notice::embedded_for(editor.state());
+    assert!(
+        t.elapsed() < std::time::Duration::from_millis(200),
+        "{:?}",
+        t.elapsed()
+    );
+    let version = out.instance_blob(leaf).unwrap().version;
+    assert_eq!(
+        kabl_modules::code::state::SavedState::from_kept(out.kept_state(leaf, version).unwrap()),
+        Some(kept)
+    );
+    control::deliver(&mut editor, &mut ui, &mut d);
+    let msg = ui.last_message.clone().unwrap_or_default();
+    assert!(!msg.contains("in time"), "{msg}");
+    assert!(host::active_scope().take_notes().is_empty());
+}
+
+/// Opening a patch only reads which code it carries: no wait for the running graph's settings
+/// and no note about them, even while its modules have not run a block yet.
+#[test]
+fn opening_a_patch_raises_no_settings_note() {
+    use kabl_modules::code::host;
+    let _serial = serial();
+    let e = with_filter();
+    let leaf = module_of(&e, "demo.bitfilter");
+    let dir = tempfile::tempdir().unwrap();
+    let file = file_with_settings(dir.path(), &e, leaf, &good_settings());
+
+    let (log, _, code) = kabl_core::format::load_kabl_full(&file).unwrap();
+    assert!(kabl_standalone::code_load::register_for_cli(&code, log.state()).is_empty());
+    let collector = basedrop::Collector::new();
+    let _eng = PatchEngine::new(&collector.handle(), log.state(), SR, 4).unwrap();
+
+    let t = std::time::Instant::now();
+    let report = kabl_ui::module_install::missing_report(log.state());
+    assert!(
+        t.elapsed() < std::time::Duration::from_millis(200),
+        "{:?}",
+        t.elapsed()
+    );
+    assert!(report.is_empty(), "{report:?}");
+    let notes = host::active_scope().take_notes();
+    assert!(!notes.iter().any(|n| n.contains("in time")), "{notes:?}");
+}
