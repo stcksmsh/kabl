@@ -433,7 +433,7 @@ pub(crate) fn paint(
 }
 
 /// One period of a plain waveform: 0 sine, 1 triangle, 2 saw, 3 square with pulse width `pw`.
-fn wave(kind: i32, pw: f32, x: f32) -> f32 {
+pub(crate) fn wave(kind: i32, pw: f32, x: f32) -> f32 {
     match kind {
         0 => (std::f32::consts::TAU * x).sin(),
         1 => 1.0 - 4.0 * ((x + 0.25).fract() - 0.5).abs(),
@@ -723,6 +723,27 @@ fn envelope(
     }
 }
 
+/// The LFO's sample-and-hold picture: eight held levels.
+const STEPS: [f32; 8] = [0.3, -0.6, 0.8, -0.2, 0.55, -0.85, 0.1, 0.65];
+
+/// Whether `kind`'s `param` has a built-in icon glyph per option: the waveform selectors.
+pub(crate) fn has_glyphs(kind: &str, param: &str) -> bool {
+    matches!((kind, param), ("osc.va" | "lfo", "waveform"))
+}
+
+/// Waveform option `k`'s icon glyph (sine, triangle, saw, square, sample-and-hold steps), one
+/// cycle across `r`.
+pub(crate) fn glyph(p: &egui::Painter, r: Rect, k: usize, stroke: Stroke) {
+    let pts = plot(r, 64, |x| {
+        if k == 4 {
+            STEPS[((x * 8.0) as usize).min(7)]
+        } else {
+            wave(k as i32, 0.5, x)
+        }
+    });
+    p.add(egui::Shape::line(pts, stroke));
+}
+
 #[allow(clippy::too_many_arguments)]
 fn lfo(
     state: &PatchState,
@@ -737,7 +758,6 @@ fn lfo(
 ) {
     let kind = param(state, m, "waveform").round() as i32;
     // The module's own shapes: sine, triangle, saw, square; sample-and-hold as steps.
-    const STEPS: [f32; 8] = [0.3, -0.6, 0.8, -0.2, 0.55, -0.85, 0.1, 0.65];
     let f = |x: f32| match kind {
         1 => 1.0 - 4.0 * ((x + 0.25).fract() - 0.5).abs(),
         2 => 2.0 * x - 1.0,

@@ -505,8 +505,8 @@ fn toggle_is_accepted_only_on_a_two_option_stepped_param() {
     assert_eq!(continuous.unwrap_err(), want(key));
 }
 #[test]
-fn icon_selectors_are_not_supported_yet() {
-    assert!(refusal(Kind::Icons).ends_with("Icons elements are not supported yet"));
+fn icon_selectors_are_refused_on_a_continuous_param() {
+    assert!(refusal(Kind::Icons).ends_with("icon selectors need a stepped parameter"));
 }
 #[test]
 fn displays_are_not_supported_yet() {

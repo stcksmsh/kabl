@@ -18,7 +18,12 @@ pub fn validate(state: &kabl_core::PatchState) -> Result<(), String> {
     for c in state.composites.values() {
         if let Some(panel) = &c.panel {
             check(state, c, panel)?;
-            for art in [&panel.light, &panel.dark].into_iter().flatten() {
+            let icons = panel.placements.values().flat_map(|p| &p.icons);
+            for art in [&panel.light, &panel.dark]
+                .into_iter()
+                .flatten()
+                .chain(icons)
+            {
                 decode_art(art)?;
             }
         }
@@ -33,7 +38,7 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
         // Stored and checked by `Panel::validate`; each kind is lifted here once it draws.
         if !matches!(
             p.kind,
-            Kind::Knob | Kind::Selector | Kind::Jack | Kind::Slider | Kind::Toggle
+            Kind::Knob | Kind::Selector | Kind::Jack | Kind::Slider | Kind::Toggle | Kind::Icons
         ) {
             return Err(format!(
                 "Binding {id}: {:?} elements are not supported yet",
@@ -42,16 +47,41 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
         }
         if let Some(e) = c.controls.get(&id) {
             let target = param_info(state, &e.target)?;
-            if p.kind == Kind::Toggle {
-                if target.taper != Taper::Stepped || target.max - target.min != 1.0 {
-                    return Err(format!(
-                        "Binding {id}: toggles need a stepped parameter with exactly two options"
-                    ));
+            let stepped = target.taper == Taper::Stepped;
+            let options = (target.max - target.min).round() as usize + 1;
+            match p.kind {
+                Kind::Toggle => {
+                    if !stepped || target.max - target.min != 1.0 {
+                        return Err(format!(
+                            "Binding {id}: toggles need a stepped parameter with exactly two options"
+                        ));
+                    }
                 }
-            } else if (p.kind == Kind::Selector) != (target.taper == Taper::Stepped) {
-                return Err(format!("Binding {id}: stepped parameters need selectors; continuous parameters need knobs or sliders"));
+                Kind::Icons => {
+                    if !stepped {
+                        return Err(format!(
+                            "Binding {id}: icon selectors need a stepped parameter"
+                        ));
+                    }
+                    if p.icons.is_empty() && !glyphs(state, &e.target) {
+                        return Err(format!(
+                            "Binding {id}: no built-in icons for this parameter; import a PNG per option"
+                        ));
+                    }
+                    if !p.icons.is_empty() && p.icons.len() != options {
+                        return Err(format!(
+                            "Binding {id}: {} icons for {options} options",
+                            p.icons.len()
+                        ));
+                    }
+                }
+                k => {
+                    if (k == Kind::Selector) != stepped {
+                        return Err(format!("Binding {id}: stepped parameters need selectors; continuous parameters need knobs or sliders"));
+                    }
+                }
             }
-            if p.kind == Kind::Selector && p.width < (target.max - target.min + 1.0) * 18.0 {
+            if matches!(p.kind, Kind::Selector | Kind::Icons) && p.width < options as f32 * 18.0 {
                 return Err(format!(
                     "Binding {id}: selector needs at least 18 points per choice"
                 ));
@@ -59,6 +89,16 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
         }
     }
     Ok(())
+}
+/// Whether the parameter `target` names has built-in icon glyphs.
+pub(crate) fn glyphs(state: &kabl_core::PatchState, target: &PortRef) -> bool {
+    let PortRef::Param { id, param } = target else {
+        return false;
+    };
+    state
+        .modules
+        .get(id)
+        .is_some_and(|m| crate::displays::has_glyphs(&m.kind, param))
 }
 /// The module parameter a control exposure aliases.
 pub(crate) fn param_info(
@@ -144,6 +184,43 @@ pub(crate) fn face_toggle(
     let routes = crate::routing::routes_into(editor.state(), id, param.name);
     crate::routing::selector_plug(ui_state, painter, look, &routes, rect)
 }
+/// The textures of icon selector `key` on composite `id`'s face, one per option, each PNG's
+/// alpha as a white mask the selector tints with its ink. Empty when `icons` is, or when a PNG
+/// does not decode (`validate` refuses such a face).
+pub(crate) fn icon_textures(
+    view: &mut UiState,
+    ctx: &egui::Context,
+    id: CompositeId,
+    key: u64,
+    icons: &[Artwork],
+) -> Vec<egui::load::SizedTexture> {
+    let cache = &mut view.panels.icons;
+    if cache.get(&(id, key)).is_none_or(|(old, _)| old != icons) {
+        let decoded: Vec<_> = icons
+            .iter()
+            .map(decode_art)
+            .collect::<Result<_, _>>()
+            .unwrap_or_default();
+        let handles = decoded.iter().enumerate().map(|(k, image)| {
+            let size = [image.width() as usize, image.height() as usize];
+            let mask = image
+                .pixels()
+                .map(|p| egui::Color32::from_rgba_unmultiplied(255, 255, 255, p.0[3]))
+                .collect();
+            ctx.load_texture(
+                format!("icon-{id}-{key}-{k}"),
+                egui::ColorImage::new(size, mask),
+                egui::TextureOptions::LINEAR,
+            )
+        });
+        cache.insert((id, key), (icons.to_vec(), handles.collect()));
+    }
+    cache[&(id, key)]
+        .1
+        .iter()
+        .map(egui::load::SizedTexture::from_handle)
+        .collect()
+}
 pub fn import_art(path: &Path) -> Result<Artwork, String> {
     use std::io::Read;
     let file = std::fs::File::open(path).map_err(|e| e.to_string())?;
@@ -197,6 +274,8 @@ pub struct View {
     pub error: Option<String>,
     pub fallback: Option<CompositeId>,
     pub textures: BTreeMap<(CompositeId, bool), (Artwork, egui::TextureHandle, egui::Color32)>,
+    /// Icon selector PNGs per (composite, placement key), as alpha masks.
+    icons: BTreeMap<(CompositeId, u64), (Vec<Artwork>, Vec<egui::TextureHandle>)>,
     editor: u64,
 }
 /// Opens the design page for `c`, its face (or the default face) as the starting draft.
@@ -230,6 +309,20 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
             .get(id)
             .and_then(|c| c.panel.as_deref())
             .and_then(art)
+            .is_some_and(|a| a == *old)
+            || drafted.is_some_and(|a| a == *old)
+    });
+    view.panels.icons.retain(|(id, key), (old, _)| {
+        let icons = |p: &Panel| p.placements.get(key).map(|p| p.icons.clone());
+        let drafted = page
+            .filter(|p| p.id == *id)
+            .and_then(|p| icons(&p.draft.panel));
+        editor
+            .state()
+            .composites
+            .get(id)
+            .and_then(|c| c.panel.as_deref())
+            .and_then(icons)
             .is_some_and(|a| a == *old)
             || drafted.is_some_and(|a| a == *old)
     });
