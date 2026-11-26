@@ -292,14 +292,14 @@ Fallback to nice-plug's export only if Live fails in a way upstream will not fix
 | W3 | File browser: profile home, drive roots, breadcrumbs | DEP | S | W2 |
 | W4 | Atomic save: retry, or `ReplaceFileW` | DEP | S | W1 |
 | W5 | Windows CLAP in CI plus clap-validator | DEP | S | W1 |
-| W6 | VST3 through clap-wrapper (`packaging/windows/vst3/CMakeLists.txt`, pinned clap-wrapper and VST3 SDK, clap-first `kabl.vst3`, Steinberg validator in CI); C++ deps listed by hand in THIRD-PARTY-NOTICES | DEP; OWNER (OD-W5 class id) | M: CMake plus CI time 5-10 min | W5 |
+| W6 | VST3 through clap-wrapper (`packaging/windows/vst3/CMakeLists.txt`, pinned clap-wrapper and VST3 SDK, clap-first `kabl.vst3`, Steinberg validator in CI); C++ deps listed by hand in THIRD-PARTY-NOTICES | DEP (OD-W5 decided: freeze the id) | M: CMake plus CI time 5-10 min | W5 |
 | W7 | VST3 param and MIDI fit (flags, groups, CC mapping) | DEP | S-M | W6 |
 | W8 | Editor: per-monitor DPI manifest, scaling, resize, Live keyboard focus, reopen leak check | DEP | M: baseview windowing hazards are the main schedule risk | W6 |
-| W9 | Inno Setup installer: Program Files, VST3 and CLAP common folders, Start menu; the uninstaller keeps user data | DEP; OWNER (OD-W4) | M | W5, W6 |
+| W9 | Inno Setup installer: Program Files, VST3 and CLAP common folders, Start menu; the uninstaller keeps user data | DEP (OD-W4 decided: Inno Setup) | M | W5, W6 |
 | W10 | Release job: installer, zip, SHA256SUMS, optional signing; checks the "VST compatible" logo use against Steinberg's usage guidelines (OD-W6) | DEP (OD-W3 decided: unsigned first) | S | W9 |
 | W11a | ASIO in the standalone (decided 2026-11-26, OD-W8 B; the plugin uses the host's driver). **Required for 1.0.** First check the ASIO SDK licence against GPL-3.0-or-later (Steinberg offers it under GPLv3 as of 2025 per our understanding; unverified); no work starts before that check | DEP; licence check | M | W1 |
 | W11b | Optional: Windows theme, idle priority | DEP | S each | W1 |
-| WA | Real-Windows acceptance pass (Kosta, or an agent with remote access): the 9-point list in the feasibility report (discovery, playback across buffers and rates, MIDI via Live, automation surviving edits, state recall including Linux-to-Windows, editor x20 and DPI, 8+ instances, clean-VM install and uninstall, AppData paths with non-ASCII names) | DEP; OWNER (OD-W1, OD-W2) | L: needs a machine and a Live licence | W7-W10 |
+| WA | Real-Windows acceptance pass (Kosta, or an agent with remote access): the 9-point list in the feasibility report (discovery, playback across buffers and rates, MIDI via Live, automation surviving edits, state recall including Linux-to-Windows, editor x20 and DPI, 8+ instances, clean-VM install and uninstall, AppData paths with non-ASCII names) | DEP (OD-W1 VM later, OD-W2 Live trial later: both decided) | L: needs a machine and a Live licence | W7-W10 |
 
 Order: W1; W2-W4 beside W5; W6; W7 and W8; W9 and W10; WA.
 
