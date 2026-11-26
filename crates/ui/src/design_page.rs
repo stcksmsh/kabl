@@ -25,6 +25,8 @@ const INSPECTOR_W: f32 = 280.0;
 const SLIDER: (f32, f32) = (120.0, 168.0);
 /// A new display's footprint.
 const DISPLAY: (f32, f32) = (168.0, 96.0);
+/// A new button's footprint: room for a cue name at the pad's type size.
+const BUTTON: (f32, f32) = (132.0, 48.0);
 
 /// What the page edits, and the composite it was taken from.
 #[derive(Clone, Debug, PartialEq)]
@@ -50,6 +52,8 @@ struct Entry {
 pub enum Ask {
     Close,
     Reload,
+    /// Apply would drop `Page::dropping`: their targets in nested composites are gone.
+    Drop,
 }
 
 /// A move (no corner) or a resize from one corner, `(right, bottom)`.
@@ -69,6 +73,8 @@ pub struct Page {
     /// Why the last edit was refused, or what Apply said.
     pub note: Option<String>,
     pub ask: Option<Ask>,
+    /// The elements Apply would drop, with the names the page lists them by, while it asks.
+    pub dropping: Vec<(u64, String)>,
     undo: Vec<Entry>,
     redo: Vec<Entry>,
     /// Each distinct PNG of this session once, so history entries stay small.
@@ -139,22 +145,89 @@ pub fn displays(state: &PatchState, id: CompositeId) -> Vec<(ModuleId, String)> 
             if !crate::displays::has_display(kind) {
                 return None;
             }
-            let mut name = crate::help::module_title(kind, leaf);
-            let mut at = state
-                .composites
-                .iter()
-                .find(|(_, c)| c.members.contains(&leaf))
-                .map(|(&c, _)| c);
-            while let Some(c) = at
-                .filter(|&c| c != id)
-                .and_then(|c| state.composites.get(&c))
-            {
-                name = format!("{} / {name}", c.name);
-                at = c.parent;
-            }
-            Some((leaf, name))
+            Some((leaf, leaf_name(state, id, leaf)))
         })
         .collect()
+}
+
+/// Leaf `leaf`'s name seen from composite `id`: `Module #N`, after the composites between.
+fn leaf_name(state: &PatchState, id: CompositeId, leaf: ModuleId) -> String {
+    let name = state
+        .modules
+        .get(&leaf)
+        .map(|m| crate::help::module_title(&m.kind, leaf))
+        .unwrap_or_default();
+    let at = state
+        .composites
+        .iter()
+        .find(|(_, c)| c.members.contains(&leaf))
+        .map(|(&c, _)| c);
+    within(state, id, at, name)
+}
+
+/// `name` after the names of composite `at` and its parents up to, not including, `id`.
+fn within(
+    state: &PatchState,
+    id: CompositeId,
+    mut at: Option<CompositeId>,
+    mut name: String,
+) -> String {
+    while let Some(c) = at
+        .filter(|&c| c != id)
+        .and_then(|c| state.composites.get(&c))
+    {
+        name = format!("{} / {name}", c.name);
+        at = c.parent;
+    }
+    name
+}
+
+/// What a button on composite `id`'s face may press, each with its name: every leaf's
+/// `perform::button_actions` in module order (`Module #N · Launch Intro`), then every button on
+/// the face of a nested composite (`Composite / Launch Intro`).
+pub fn buttons(state: &PatchState, id: CompositeId) -> Vec<(Source, String)> {
+    let actions = kabl_core::composite::leaves(state, id)
+        .into_iter()
+        .flat_map(|leaf| {
+            let module = leaf_name(state, id, leaf);
+            crate::perform::button_actions(state, leaf)
+                .into_iter()
+                .map(move |(action, label)| {
+                    let source = Source::Module {
+                        id: leaf,
+                        action: Some(action),
+                    };
+                    (source, format!("{module} · {label}"))
+                })
+        });
+    let faces = kabl_core::composite::descendants(state, id)
+        .into_iter()
+        .filter(|&d| d != id)
+        .flat_map(|d| {
+            let keys: Vec<u64> = state.composites[&d]
+                .panel
+                .iter()
+                .flat_map(|p| &p.placements)
+                .filter(|(_, p)| p.kind == Kind::Button)
+                .map(|(&k, _)| k)
+                .collect();
+            keys.into_iter().map(move |key| {
+                let name = within(state, id, Some(d), panels::button_name(state, d, key));
+                (Source::Face { composite: d, key }, name)
+            })
+        });
+    actions.chain(faces).collect()
+}
+
+/// The palette hit-rect key of a button source.
+fn button_hit(source: &Source) -> String {
+    match source {
+        Source::Module { id, action } => {
+            format!("design:button:{id}.{}", action.as_deref().unwrap_or(""))
+        }
+        Source::Face { composite, key } => format!("design:button:face:{composite}.{key}"),
+        Source::Snapshot { id } => format!("design:button:snapshot:{id}"),
+    }
 }
 
 /// The kinds exposure `key` may take on the face (FACES.md section 2), its default first.
@@ -192,6 +265,7 @@ impl Page {
             refused: None,
             note: None,
             ask: None,
+            dropping: Vec::new(),
             undo: Vec::new(),
             redo: Vec::new(),
             pool: Vec::new(),
@@ -404,6 +478,34 @@ impl Page {
         })
     }
 
+    /// Places a button pressing `source` under a fresh key at the first free spot; selects the
+    /// element already pressing it instead, if there is one.
+    pub fn add_button(&mut self, state: &PatchState, source: Source) -> Result<(), String> {
+        if let Some(key) = self.button_of(&source) {
+            self.selected = Some(key);
+            return Ok(());
+        }
+        let key = self.draft.next_interface;
+        let new = Placement {
+            kind: Kind::Button,
+            x: 0.0,
+            y: 0.0,
+            width: BUTTON.0,
+            height: BUTTON.1,
+            source: Some(source),
+            label: None,
+            icons: Vec::new(),
+        };
+        self.put(state, key, new, key + 1)
+    }
+
+    /// The button element pressing `source`.
+    pub fn button_of(&self, source: &Source) -> Option<u64> {
+        self.draft.panel.placements.iter().find_map(|(&k, p)| {
+            (p.kind == Kind::Button && p.source.as_ref() == Some(source)).then_some(k)
+        })
+    }
+
     /// `new` as element `key` at the first free spot of its size, top-left first, with the
     /// draft's `next_interface` becoming `next`.
     fn put(
@@ -568,8 +670,10 @@ impl Page {
 
 /// Writes the draft over the current composite as one project undo step: its panel, snapshots
 /// and `next_interface`, nothing else. Refused when the composite changed since the page took
-/// its draft.
-fn apply(editor: &mut PatchEditor, page: &mut Page) -> Result<(), String> {
+/// its draft. When nested composites lost what some elements press, it writes nothing, lists
+/// those elements in `page.dropping` and asks, unless `confirmed`, which writes the draft without
+/// them. Whether it wrote.
+fn apply(editor: &mut PatchEditor, page: &mut Page, confirmed: bool) -> Result<bool, String> {
     let current = editor
         .state()
         .composites
@@ -582,11 +686,40 @@ fn apply(editor: &mut PatchEditor, page: &mut Page) -> Result<(), String> {
     c.panel = (page.draft.panel != Panel::default()).then(|| Box::new(page.draft.panel.clone()));
     c.snapshots = page.draft.snapshots.clone();
     c.next_interface = page.draft.next_interface;
+    let mut candidate = editor.state().clone();
+    candidate.composites.insert(page.id, c.clone());
+    // The document is pruned after every edit, so only the written composite can change.
+    if let Some(pruned) = kabl_core::composite::prune(&candidate)
+        .into_iter()
+        .find_map(|op| match op {
+            kabl_core::Op::SetComposite { id, value } if id == page.id => value,
+            _ => None,
+        })
+    {
+        let kept = pruned.panel.as_ref().map(|p| &p.placements);
+        let dropping: Vec<(u64, String)> = page
+            .draft
+            .panel
+            .placements
+            .iter()
+            .filter(|(k, _)| kept.is_none_or(|kept| !kept.contains_key(k)))
+            .map(|(&k, p)| {
+                let name = p.label.clone().unwrap_or_else(|| format!("{:?}", p.kind));
+                (k, format!("{name} · element {k}"))
+            })
+            .collect();
+        if !dropping.is_empty() && !confirmed {
+            page.dropping = dropping;
+            page.ask = Some(Ask::Drop);
+            return Ok(false);
+        }
+        c = pruned;
+    }
     composites::set(editor, page.id, c)?;
     let selected = page.selected;
     *page = Page::new(page.id, &editor.state().composites[&page.id]);
     page.selected = selected;
-    Ok(())
+    Ok(true)
 }
 
 /// A number field that edits a text copy and gives the number back when focus leaves it.
@@ -845,7 +978,7 @@ fn top_bar(
                 let r = ui.add(kit::Button::new(st, "Apply").g4(32.0).primary().enabled(on));
                 view.record("design:apply".into(), r.rect);
                 if r.clicked() {
-                    page.note = apply(editor, page).err();
+                    page.note = apply(editor, page, false).err();
                 }
             });
         },
@@ -927,6 +1060,26 @@ fn palette(
                         }
                     });
                 }
+                kit::section(ui, st, "Buttons");
+                for (source, name) in buttons(editor.state(), page.id) {
+                    let placed = page.button_of(&source).is_some();
+                    ui.horizontal(|ui| {
+                        let r = ui.add(
+                            kit::Button::new(st, name)
+                                .g4(32.0)
+                                .ghost()
+                                .min_width(if placed { 160.0 } else { 236.0 }),
+                        );
+                        view.record(button_hit(&source), r.rect);
+                        if placed {
+                            g4::chip_label(ui, st, "placed", true, Some(st.roles.good));
+                        }
+                        if r.clicked() {
+                            // A refusal keeps the draft and shows why.
+                            page.note = page.add_button(editor.state(), source).err();
+                        }
+                    });
+                }
             });
     });
 }
@@ -956,10 +1109,15 @@ fn inspector(
                 .get(&key)
                 .or_else(|| page.draft.base.ports.get(&key))
                 .map(|e| e.label.clone())
-                .or_else(|| match p.source {
-                    Some(Source::Module { id: leaf, .. }) => displays(editor.state(), page.id)
+                .or_else(|| match &p.source {
+                    Some(Source::Module { id: leaf, .. }) if p.kind == Kind::Display => {
+                        displays(editor.state(), page.id)
+                            .into_iter()
+                            .find_map(|(m, name)| (m == *leaf).then_some(name))
+                    }
+                    Some(source) if p.kind == Kind::Button => buttons(editor.state(), page.id)
                         .into_iter()
-                        .find_map(|(m, name)| (m == leaf).then_some(name)),
+                        .find_map(|(s, name)| (s == *source).then_some(name)),
                     _ => None,
                 })
                 .unwrap_or_default();
@@ -1330,30 +1488,47 @@ fn ask(
             "Discard the draft and reload?",
             "The draft's changes are lost.",
         ),
+        Ask::Drop => (
+            "Apply without these elements?",
+            "What they press in a nested composite is gone, so Apply drops them:",
+        ),
     };
     egui::Modal::new(Id::new("design-ask")).show(ctx, |ui| {
         ui.set_width(420.0);
         ui.spacing_mut().item_spacing = vec2(8.0, 12.0);
         kit::label(ui, st, Role::H3, Tone::Text, title);
         kit::paragraph(ui, st, Role::Body, Tone::Text2, detail);
+        if q == Ask::Drop {
+            for (key, name) in &page.dropping {
+                let r = kit::label(ui, st, Role::Body, Tone::Text, name);
+                view.record(format!("design:dropping:{key}"), r.rect);
+            }
+        }
         ui.horizontal(|ui| {
-            if q == Ask::Close && button(ui, view, st, "ask:apply", "Apply", true) {
+            let apply_text = if q == Ask::Drop {
+                "Apply without them"
+            } else {
+                "Apply"
+            };
+            if q != Ask::Reload && button(ui, view, st, "ask:apply", apply_text, true) {
                 page.ask = None;
-                match apply(editor, page) {
-                    Ok(()) => *close = true,
+                match apply(editor, page, q == Ask::Drop) {
+                    Ok(applied) => *close = q == Ask::Close && applied,
                     Err(e) => page.note = Some(e),
                 }
             }
-            let discard = if q == Ask::Close {
-                "Discard"
-            } else {
-                "Discard and reload"
+            let discard = match q {
+                Ask::Close => Some("Discard"),
+                Ask::Reload => Some("Discard and reload"),
+                Ask::Drop => None,
             };
-            if button(ui, view, st, "ask:discard", discard, true) {
-                page.ask = None;
-                match q {
-                    Ask::Close => *close = true,
-                    Ask::Reload => reload(editor, page, close),
+            if let Some(discard) = discard {
+                if button(ui, view, st, "ask:discard", discard, true) {
+                    page.ask = None;
+                    match q {
+                        Ask::Reload => reload(editor, page, close),
+                        _ => *close = true,
+                    }
                 }
             }
             if button(ui, view, st, "ask:keep", "Keep editing", true) {
