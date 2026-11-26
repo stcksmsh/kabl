@@ -1,0 +1,336 @@
+{
+  "version": 5,
+  "patch": {
+    "modules": {
+      "1": {
+        "kind": "midi.in",
+        "pos": {
+          "x": 40.0,
+          "y": 40.0
+        },
+        "params": {}
+      },
+      "2": {
+        "kind": "osc.va",
+        "pos": {
+          "x": 240.0,
+          "y": 40.0
+        },
+        "params": {
+          "base_hz": 261.63,
+          "waveform": 2.0,
+          "cc.base_hz": 74.0
+        }
+      },
+      "3": {
+        "kind": "filter.svf",
+        "pos": {
+          "x": 440.0,
+          "y": 40.0
+        },
+        "params": {
+          "cutoff_hz": 3000.0,
+          "resonance": 0.2
+        }
+      },
+      "4": {
+        "kind": "env.adsr",
+        "pos": {
+          "x": 240.0,
+          "y": 220.0
+        },
+        "params": {
+          "attack_ms": 5.0,
+          "decay_ms": 120.0,
+          "release_ms": 250.0,
+          "sustain": 0.6
+        }
+      },
+      "5": {
+        "kind": "vca",
+        "pos": {
+          "x": 640.0,
+          "y": 40.0
+        },
+        "params": {
+          "exponential": 0.0,
+          "gain": 0.0
+        }
+      },
+      "6": {
+        "kind": "out",
+        "pos": {
+          "x": 840.0,
+          "y": 40.0
+        },
+        "params": {}
+      }
+    },
+    "cables": {
+      "1": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "pitch"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 2,
+            "port": "pitch"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "2": {
+        "from": {
+          "Module": {
+            "id": 2,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 3,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "3": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "gate"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 4,
+            "port": "gate"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "4": {
+        "from": {
+          "Module": {
+            "id": 3,
+            "port": "lp"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 5,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "5": {
+        "from": {
+          "Module": {
+            "id": 4,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 5,
+            "port": "cv"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "6": {
+        "from": {
+          "Module": {
+            "id": 5,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 6,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "7": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "wheel"
+          }
+        },
+        "to": {
+          "Param": {
+            "id": 2,
+            "param": "fine"
+          }
+        },
+        "params": {
+          "amount": 0.5
+        },
+        "steps": []
+      }
+    }
+  },
+  "output_gain": 1.0,
+  "lanes": [
+    {
+      "target": {
+        "module": 2,
+        "kind": "osc.va",
+        "param": "base_hz"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 3,
+        "kind": "filter.svf",
+        "param": "cutoff_hz"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 3,
+        "kind": "filter.svf",
+        "param": "resonance"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 4,
+        "kind": "env.adsr",
+        "param": "attack_ms"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 4,
+        "kind": "env.adsr",
+        "param": "decay_ms"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 4,
+        "kind": "env.adsr",
+        "param": "release_ms"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 4,
+        "kind": "env.adsr",
+        "param": "sustain"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 5,
+        "kind": "vca",
+        "param": "gain"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 6,
+        "kind": "out",
+        "param": "level_db"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 1,
+        "kind": "midi.in",
+        "param": "bend"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 1,
+        "kind": "midi.in",
+        "param": "channel"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 1,
+        "kind": "midi.in",
+        "param": "glide_ms"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 2,
+        "kind": "osc.va",
+        "param": "blend"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 2,
+        "kind": "osc.va",
+        "param": "curve"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 2,
+        "kind": "osc.va",
+        "param": "detune"
+      },
+      "retired": false
+    },
+    {
+      "target": {
+        "module": 2,
+        "kind": "osc.va",
+        "param": "fine"
+      },
+      "retired": false
+    }
+  ],
+  "slot_values": [
+    0.37221918,
+    0.72536373,
+    0.21052632,
+    0.339794,
+    0.61583626,
+    0.679588,
+    0.6,
+    0.0,
+    0.8333333,
+    0.083333336,
+    0.0,
+    0.49680924,
+    0.5,
+    0.0,
+    0.15,
+    0.5
+  ],
+  "host_clock": false
+}

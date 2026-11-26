@@ -6,8 +6,9 @@
 #   KABL_CLAP_STATICLIB    kabl_clap.lib from `cargo rustc -p kabl-clap --crate-type staticlib`
 #   KABL_CLAP_NATIVE_LIBS  the file rustc wrote with `--print native-static-libs=<file>`
 #
-# Targets: kabl_vst3 (writes <build>/assets/VST3/kabl.vst3) and vst3-validator
-# (Steinberg's validator from the same VST3 SDK, at <build>/vst3sdk-validator/bin/Release).
+# Targets: kabl_vst3 (writes <build>/assets/VST3/kabl.vst3), vst3-validator
+# (Steinberg's validator from the same VST3 SDK, at <build>/vst3sdk-validator/bin/Release)
+# and kabl-vst3-host (host/, kabl's parameter and MIDI check, at <build>/vst3-host/bin/Release).
 
 cmake_minimum_required(VERSION 3.25)
 
@@ -97,4 +98,13 @@ ExternalProject_Add(vst3-validator
         -DSMTG_ENABLE_VSTGUI_SUPPORT=OFF
     BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release --target validator
     INSTALL_COMMAND ""
+    EXCLUDE_FROM_ALL TRUE)
+
+ExternalProject_Add(kabl-vst3-host
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/host
+    BINARY_DIR ${CMAKE_BINARY_DIR}/vst3-host
+    CMAKE_ARGS -DVST3_SDK_ROOT=${vst3sdk_SOURCE_DIR}
+    BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --config Release --target kabl-vst3-host
+    INSTALL_COMMAND ""
+    BUILD_ALWAYS TRUE
     EXCLUDE_FROM_ALL TRUE)

@@ -237,7 +237,7 @@ jobs:
             "-DKABL_CLAP_STATICLIB=$root/target/release/kabl_clap.lib" \
             "-DKABL_CLAP_NATIVE_LIBS=$root/target/kabl-clap-native-libs.txt"
       - name: Build kabl.vst3 and the VST3 validator
-        run: cmake --build build-vst3 --config Release --target kabl_vst3 vst3-validator
+        run: cmake --build build-vst3 --config Release --target kabl_vst3 vst3-validator kabl-vst3-host
       - name: Steinberg VST3 validator on kabl.vst3
         # Exactly one failure is expected: Process Format at 1234567.8 Hz, the rate the
         # validator tries after 123456.78 Hz. The CLAP deliberately refuses rates outside
@@ -272,6 +272,11 @@ jobs:
           cids=$(tr -d '\r' < build-vst3/validator.txt | awk '/category = Audio Module Class/ {m = 1} m && /cid = / {print $3; m = 0}')
           echo "expected $com, validator reports: $cids"
           test "$cids" = "$com"
+      - name: VST3 parameters and MIDI controllers reach kabl
+        # kabl's own host on the VST3 SDK hosting classes (packaging/windows/vst3/host): the 18
+        # frozen parameter ids, automatable and in their units, and CC 1, CC 64, pitch bend and
+        # CC 74 through IMidiMapping, measured in kabl's audio output. Exits non-zero on any FAIL.
+        run: build-vst3/vst3-host/bin/Release/kabl-vst3-host.exe build-vst3/out/kabl.vst3 packaging/windows/vst3/host/midi-fixture.json
       - uses: actions/upload-artifact@v4
         with:
           name: kabl-windows-vst3
