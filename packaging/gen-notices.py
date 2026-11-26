@@ -61,3 +61,5 @@ if missing:
 out.write("## Licence texts\n\nEach text appears once, followed by the crates that ship it.\n\n")
 for t, crates in sorted(texts.values(), key=lambda v: v[1][0]):
     out.write("---\n\nShipped by: " + ", ".join(crates) + "\n\n```text\n" + t + "\n```\n\n")
+# C++ libraries fetched by CMake are outside Cargo.lock; their notices are kept by hand.
+out.write((ROOT / "packaging/windows/cpp-notices.md").read_text())
