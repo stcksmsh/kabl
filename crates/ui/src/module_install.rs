@@ -120,16 +120,21 @@ fn installed_text(i: &Installed) -> String {
 /// runs from the copy in the patch). The built-in examples are not packages and are skipped.
 pub fn missing_report(state: &kabl_core::PatchState) -> Vec<String> {
     let (have, _) = install::scan(&dir());
-    let used: Vec<(String, u32)> =
-        crate::code_notice::entries(&crate::code_notice::embedded_for(state))
-            .into_iter()
-            .filter(|e| {
-                !kabl_modules::code::host::EXAMPLES
-                    .iter()
-                    .any(|x| x.kind == e.module_id)
-            })
-            .map(|e| (e.module_id, e.version))
-            .collect();
+    // Only the blobs matter here: no wait for the running graph's settings, and no note.
+    let code = kabl_standalone::code_load::embedded_for(
+        state,
+        &kabl_modules::code::host::active_scope(),
+        std::time::Duration::ZERO,
+    );
+    let used: Vec<(String, u32)> = crate::code_notice::entries(&code)
+        .into_iter()
+        .filter(|e| {
+            !kabl_modules::code::host::EXAMPLES
+                .iter()
+                .any(|x| x.kind == e.module_id)
+        })
+        .map(|e| (e.module_id, e.version))
+        .collect();
     install::missing(&have, &used)
         .into_iter()
         .map(|(id, v)| {

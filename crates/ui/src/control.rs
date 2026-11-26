@@ -480,6 +480,7 @@ pub fn deliver(editor: &mut PatchEditor, ui_state: &mut UiState, d: &mut Deliver
     d.flush();
     // Module settings that could not be loaded or saved: said once, like a stand-in warning.
     let scope = d.code_scope();
+    scope.set_audio_running(d.tx.is_some());
     scope.collect();
     let notes = scope.take_notes();
     if !notes.is_empty() {
