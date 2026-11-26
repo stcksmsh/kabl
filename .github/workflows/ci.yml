@@ -230,10 +230,12 @@ jobs:
           cargo rustc --locked --release -p kabl-clap --lib --crate-type staticlib --
           --print native-static-libs=target/kabl-clap-native-libs.txt
       - name: Configure (fetches clap-wrapper, the CLAP SDK and the VST3 SDK)
-        run: >
-          cmake -S packaging/windows/vst3 -B build-vst3
-          -DKABL_CLAP_STATICLIB:FILEPATH=target/release/kabl_clap.lib
-          -DKABL_CLAP_NATIVE_LIBS:FILEPATH=target/kabl-clap-native-libs.txt
+        run: |
+          cat target/kabl-clap-native-libs.txt
+          root=$(cygpath -m "$PWD")
+          cmake -S packaging/windows/vst3 -B build-vst3 \
+            "-DKABL_CLAP_STATICLIB=$root/target/release/kabl_clap.lib" \
+            "-DKABL_CLAP_NATIVE_LIBS=$root/target/kabl-clap-native-libs.txt"
       - name: Build kabl.vst3 and the VST3 validator
         run: cmake --build build-vst3 --config Release --target kabl_vst3 vst3-validator
       - name: Steinberg VST3 validator on kabl.vst3

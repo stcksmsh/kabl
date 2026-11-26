@@ -26,12 +26,11 @@ add_compile_options(/Zc:__cplusplus)
 
 set(KABL_CLAP_STATICLIB "" CACHE FILEPATH "kabl-clap built as a static library")
 set(KABL_CLAP_NATIVE_LIBS "" CACHE FILEPATH "rustc's native-static-libs list for that library")
-if(NOT EXISTS "${KABL_CLAP_STATICLIB}")
-    message(FATAL_ERROR "KABL_CLAP_STATICLIB does not exist: '${KABL_CLAP_STATICLIB}'")
-endif()
-if(NOT EXISTS "${KABL_CLAP_NATIVE_LIBS}")
-    message(FATAL_ERROR "KABL_CLAP_NATIVE_LIBS does not exist: '${KABL_CLAP_NATIVE_LIBS}'")
-endif()
+foreach(input KABL_CLAP_STATICLIB KABL_CLAP_NATIVE_LIBS)
+    if(NOT IS_ABSOLUTE "${${input}}" OR NOT EXISTS "${${input}}")
+        message(FATAL_ERROR "${input} must be an existing absolute path: '${${input}}'")
+    endif()
+endforeach()
 
 # The VST3 class id, frozen (OD-W5). It is the 16 bytes bda9c239b42389589c969403a7b9d23e,
 # which clap-wrapper also derives from the CLAP id dev.stcksmsh.kabl; written here in the
