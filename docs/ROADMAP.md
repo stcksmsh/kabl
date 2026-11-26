@@ -34,17 +34,19 @@ Effort is relative and per slice. **S** is about one bounded PR of a day or less
 
 ## Order
 
-The brief sets this order: roadmap; first-run and learning foundation; composite candidates; the first composites; migrate representative patches, then the corpus; learning progression on real composites; Windows standalone and VST3; promo; macOS later.
+The brief sets this order: roadmap; first-run and learning foundation; composite candidates; the first composites; migrate representative patches, then the corpus; learning progression on real composites; Windows standalone and VST3; promo; macOS in 1.1, after 1.0.
 
-Release 1.0 on Linux finishes first and blocks nothing in A to D.
+Release 1.0 now includes Windows, faces, composites and lessons (see Workstream 0), so A to D are on its critical path. Only the Linux release mechanics (R0-R5) can finish first.
 
 In practice the streams overlap. A/B and C share no files until L8. The Windows path, filesystem and CI slices (W1 to W5) touch different files from A, B and C, so they can run beside them. W6 and later (VST3, editor, installer) wait until A1 is in place, because the editor work should see the first-run UI it has to host.
 
 ---
 
-## Workstream 0: release 1.0 (Linux x86_64, CLAP + standalone)
+## Workstream 0: release 1.0 (Linux and Windows; CLAP, VST3 and standalone)
 
 **Objective.** Tag `v1.0.0` from a verified release candidate that Kosta has accepted.
+
+**1.0 definition (Kosta, 2026-11-25 and 11-26).** Linux and Windows; CLAP, VST3 (Windows) and standalone. 1.0 also includes faces (`docs/composites/FACES.md` slices 5-11), composites CB2-CB5 and lessons L5-L8, so the tag waits on Workstreams B, C and D as well as the release mechanics below. macOS is 1.1.
 
 **Scope.** Release mechanics and acceptance fixes only. No new features. Code: `.github/workflows/release.yml`, `packaging/linux/package.sh`, `docs/ACCEPTANCE-V1.md`.
 
@@ -265,7 +267,7 @@ D10 panel UX is "changes requested" (`docs/panel-authoring/design.md:3`). The DS
 
 **Objective.** Windows standalone and a Windows VST3 (plus a Windows CLAP) on the same engine and patch model. Accepted in Ableton Live first and REAPER second, on real Windows. Linux stays first-class: Linux CI is unchanged and Windows jobs are only added.
 
-**Scope.** Platform fixes in `crates/ui` and `crates/standalone`, the CLAP crate's Windows build, a clap-wrapper VST3 build under `packaging/windows/`, Windows CI and release jobs, and an installer. macOS and AU are out of scope.
+**Scope.** Platform fixes in `crates/ui` and `crates/standalone`, the CLAP crate's Windows build, a clap-wrapper VST3 build under `packaging/windows/`, Windows CI and release jobs, and an installer. macOS and AU are out of scope for 1.0 (macOS is 1.1).
 
 **Deliverables.** A green Windows CI job; `kabl.clap` and `kabl.vst3` that pass their validators; a Windows standalone; an Inno Setup installer and zip on the Releases page; a real-Windows acceptance report for Live and REAPER (WA).
 
@@ -285,7 +287,7 @@ Fallback to nice-plug's export only if Live fails in a way upstream will not fix
 
 | id | slice | status | effort | depends |
 |---|---|---|---|---|
-| W1 | RT handle `Send` fix; a `windows-latest` MSVC CI job (build ui, clap and standalone; `cargo test`; Linux-only tests skipped) | OWNER (OD-W9, toolchain) | S | - |
+| W1 | RT handle `Send` fix; a `windows-latest` MSVC CI job (build ui, clap and standalone; `cargo test`; Linux-only tests skipped) | NOW (OD-W9 decided: native MSVC) | S | - |
 | W2 | Platform paths in one place (`%APPDATA%`, `%LOCALAPPDATA%`), Linux paths unchanged | DEP | S | W1 |
 | W3 | File browser: profile home, drive roots, breadcrumbs | DEP | S | W2 |
 | W4 | Atomic save: retry, or `ReplaceFileW` | DEP | S | W1 |
@@ -294,8 +296,9 @@ Fallback to nice-plug's export only if Live fails in a way upstream will not fix
 | W7 | VST3 param and MIDI fit (flags, groups, CC mapping) | DEP | S-M | W6 |
 | W8 | Editor: per-monitor DPI manifest, scaling, resize, Live keyboard focus, reopen leak check | DEP | M: baseview windowing hazards are the main schedule risk | W6 |
 | W9 | Inno Setup installer: Program Files, VST3 and CLAP common folders, Start menu; the uninstaller keeps user data | DEP; OWNER (OD-W4) | M | W5, W6 |
-| W10 | Release job: installer, zip, SHA256SUMS, optional signing | DEP; OWNER (OD-W3) | S | W9 |
-| W11 | Optional: Windows theme, idle priority, ASIO | OWNER (OD-W8) | S each | W1 |
+| W10 | Release job: installer, zip, SHA256SUMS, optional signing; checks the "VST compatible" logo use against Steinberg's usage guidelines (OD-W6) | DEP (OD-W3 decided: unsigned first) | S | W9 |
+| W11a | ASIO in the standalone (decided 2026-11-26, OD-W8 B; the plugin uses the host's driver). **Required for 1.0.** First check the ASIO SDK licence against GPL-3.0-or-later (Steinberg offers it under GPLv3 as of 2025 per our understanding; unverified); no work starts before that check | DEP; licence check | M | W1 |
+| W11b | Optional: Windows theme, idle priority | DEP | S each | W1 |
 | WA | Real-Windows acceptance pass (Kosta, or an agent with remote access): the 9-point list in the feasibility report (discovery, playback across buffers and rates, MIDI via Live, automation surviving edits, state recall including Linux-to-Windows, editor x20 and DPI, 8+ instances, clean-VM install and uninstall, AppData paths with non-ASCII names) | DEP; OWNER (OD-W1, OD-W2) | L: needs a machine and a Live licence | W7-W10 |
 
 Order: W1; W2-W4 beside W5; W6; W7 and W8; W9 and W10; WA.
@@ -343,7 +346,7 @@ Order: W1; W2-W4 beside W5; W6; W7 and W8; W9 and W10; WA.
 
 ## Deferred, and what is kept from older plans
 
-- **macOS and AU.** Deferred by the brief. Plan it after WA. The v2 plan's notes stay as reference: Apple Developer fee, the cpal CoreAudio floor, the baseview teardown hazards.
+- **macOS and AU.** Deferred by the brief; macOS is 1.1 (Kosta, 2026-11-26). Plan it after WA. The v2 plan's notes stay as reference: Apple Developer fee, the cpal CoreAudio floor, the baseview teardown hazards.
 - **v2 PLAN items not adopted now:**
   - A1 polyphony, MPE and microtuning; A2 and A3 DSP families. These are unrelated DSP work, which the brief forbids during the pivot.
   - The Linux launch campaign, `kabl render` and `kabl modules --json`, community setup, funding, the AV track.
@@ -425,7 +428,9 @@ Owner-gated, startable as soon as their decision lands:
 
 ---
 
-## Owner decisions (all OPEN)
+## Owner decisions
+
+Windows and VST3: OD-W1 to OD-W9 are all decided (below). The other sections keep their own status marks and were not re-audited here.
 
 Each decision lists its alternatives, its consequences and a recommendation. The evidence is in the linked report. Answering with the decision's id and a letter is enough.
 
@@ -547,6 +552,7 @@ Each decision lists its alternatives, its consequences and a recommendation. The
   - B is cheapest, but the OpenGL editor is a known risk on VMs, so editor and DPI results would not count.
   - C puts every Windows round trip on Kosta's time.
 - **Recommend A**, with remote access for agents or Kosta running the checklist.
+- **Decided 2026-11-24 (Kosta): VM later.**
 
 **OD-W2. Ableton Live licence** (blocks WA)
 - Options:
@@ -559,6 +565,7 @@ Each decision lists its alternatives, its consequences and a recommendation. The
   - C: Live is the primary acceptance host in the brief, and it has no CLAP support, so it fails the brief.
 - The REAPER evaluation is free either way.
 - **Recommend A.**
+- **Decided 2026-11-24 (Kosta): Live trial later.**
 
 **OD-W3. Code signing.**
 - Options:
@@ -569,6 +576,7 @@ Each decision lists its alternatives, its consequences and a recommendation. The
   - EV is not worth it.
 - **The reports conflict here; see "Inconsistencies".**
 - **Recommend:** A, then apply to B. Fall back to D. Use C only if eligibility is confirmed.
+- **Decided 2026-11-24 (Kosta): A, unsigned first.**
 
 **OD-W4. Installer** (blocks W9)
 - Options:
@@ -580,6 +588,7 @@ Each decision lists its alternatives, its consequences and a recommendation. The
   - B: heavier to author; mainly useful for managed enterprise deployment.
   - C: users have to find the right folders themselves, which fails the brief's "clean install".
 - **Recommend A.**
+- **Decided 2026-11-26 (Kosta): A.** Inno Setup plus a zip.
 
 **OD-W5. Freeze the VST3 class id** (blocks W6 release)
 - The id is `bda9c239b42389589c969403a7b9d23e`, derived from `dev.stcksmsh.kabl` by clap-wrapper.
@@ -588,6 +597,7 @@ Each decision lists its alternatives, its consequences and a recommendation. The
   - B: choose a new id before the first release.
 - Consequence: once a release ships, a changed id means hosts treat kabl as a different plugin and every saved project loses it. B is free only before the first Windows release.
 - **Recommend A.**
+- **Decided 2026-11-26 (Kosta): A.** Freeze `bda9c239b42389589c969403a7b9d23e`.
 
 **OD-W6. VST logo**
 - Options:
@@ -595,6 +605,7 @@ Each decision lists its alternatives, its consequences and a recommendation. The
   - B: use the VST compatible logo, following Steinberg's trademark rules.
 - Consequence: B adds a usage-guidelines check to the release, for a small marketing gain. The VST3 SDK licence (MIT) does not require the logo.
 - **Recommend A** for the first release.
+- **Decided 2026-11-26 (Kosta): B.** Use the "VST compatible" logo per Steinberg's usage guidelines; W10 checks the guidelines, and the logo goes into installer and website art.
 
 **OD-W7. Ship a Windows CLAP**
 - Options:
@@ -604,6 +615,7 @@ Each decision lists its alternatives, its consequences and a recommendation. The
   - A: REAPER and Bitwig load the CLAP natively, the same format as on Linux, so Linux projects carry over most directly.
   - B is not really possible: the clap-first `kabl.vst3` loads `kabl.clap` from the CLAP common folder, so the file ships either way and B only hides it.
 - **Recommend A.**
+- **Decided 2026-11-26 (Kosta): A.** Ship `kabl.clap` beside `kabl.vst3`.
 
 **OD-W8. ASIO in v1**
 - Options:
@@ -613,6 +625,7 @@ Each decision lists its alternatives, its consequences and a recommendation. The
   - A: no extra SDK. In the plugin, the host owns the driver, so ASIO matters only for the standalone.
   - B: adds the Steinberg ASIO SDK to the build and a licence review, plus a second standalone audio path to test.
 - **Recommend A.**
+- **Decided 2026-11-26 (Kosta): B.** ASIO in the first Windows release, standalone only. W11a is required for 1.0; check the ASIO SDK licence against GPL-3.0-or-later before it starts.
 
 **OD-W9. Toolchain.**
 - Options:
@@ -620,6 +633,7 @@ Each decision lists its alternatives, its consequences and a recommendation. The
   - B: cargo-xwin cross from Linux, which means accepting Microsoft's CRT and SDK licence.
   - C: MinGW. It works, but the `.vst3` then depends on `libc++` and `libunwind` DLLs.
 - **Recommend A.**
+- **Decided 2026-11-26 (Kosta): A.** Native MSVC on `windows-latest` (the CI Windows job already uses it).
 
 ---
 
