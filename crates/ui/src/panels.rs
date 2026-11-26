@@ -82,6 +82,7 @@ pub(crate) fn param_info(
 /// A composite face toggle for two-option stepped `param` in `rect` (screen): the kit pill,
 /// on at the upper option. A click anywhere in `rect` sets the other option of the base value,
 /// one undo step per click.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn face_toggle(
     editor: &mut PatchEditor,
     ui_state: &mut UiState,
@@ -90,7 +91,8 @@ pub(crate) fn face_toggle(
     id: kabl_core::ModuleId,
     param: &'static kabl_modules::ParamInfo,
     rect: egui::Rect,
-) {
+    look: crate::routing::Look,
+) -> Vec<(kabl_core::CableId, egui::Pos2)> {
     debug_assert!(param.taper == Taper::Stepped && param.max - param.min == 1.0);
     let key = format!("{id}.{}", param.name);
     ui_state.record(format!("knob:{key}"), rect);
@@ -139,6 +141,8 @@ pub(crate) fn face_toggle(
             format!("{module} {}", crate::routing::param_label(param)),
         )
     });
+    let routes = crate::routing::routes_into(editor.state(), id, param.name);
+    crate::routing::selector_plug(ui_state, painter, look, &routes, rect)
 }
 pub fn import_art(path: &Path) -> Result<Artwork, String> {
     use std::io::Read;

@@ -1695,7 +1695,7 @@ pub(crate) fn face_slider(
 }
 
 /// A selector's route plug and "< N mods" badge, below its rect.
-fn selector_plug(
+pub(crate) fn selector_plug(
     ui_state: &mut UiState,
     painter: &egui::Painter,
     look: Look,
