@@ -6,8 +6,8 @@ use crate::wheel::OwnedScroll;
 use crate::{composites, panels, PatchEditor, UiState};
 use egui::{pos2, vec2, Id, Pos2, Rect, Sense, Stroke};
 use kabl_core::{
-    panel::{Artwork, Kind, Panel, Placement, HEIGHT},
-    Composite, CompositeId, PatchState, PortRef, Snapshot,
+    panel::{Artwork, Kind, Panel, Placement, Source, HEIGHT},
+    Composite, CompositeId, ModuleId, PatchState, PortRef, Snapshot,
 };
 use kabl_modules::Taper;
 use std::collections::btree_map;
@@ -23,6 +23,8 @@ const INSPECTOR_W: f32 = 280.0;
 /// The least footprint a slider gets: wide enough for the horizontal variant and tall enough for
 /// the vertical one, since which draws is a view setting.
 const SLIDER: (f32, f32) = (120.0, 168.0);
+/// A new display's footprint.
+const DISPLAY: (f32, f32) = (168.0, 96.0);
 
 /// What the page edits, and the composite it was taken from.
 #[derive(Clone, Debug, PartialEq)]
@@ -125,6 +127,34 @@ fn kind_for(state: &PatchState, c: &Composite, key: u64) -> Result<Kind, String>
             Kind::Knob
         },
     )
+}
+
+/// The leaves of composite `id` whose kind has a display, in module order, each with its name:
+/// `Module #N`, after the names of the composites between it and `id` (`Composite / Module #N`).
+pub fn displays(state: &PatchState, id: CompositeId) -> Vec<(ModuleId, String)> {
+    kabl_core::composite::leaves(state, id)
+        .into_iter()
+        .filter_map(|leaf| {
+            let kind = &state.modules.get(&leaf)?.kind;
+            if !crate::displays::has_display(kind) {
+                return None;
+            }
+            let mut name = crate::help::module_title(kind, leaf);
+            let mut at = state
+                .composites
+                .iter()
+                .find(|(_, c)| c.members.contains(&leaf))
+                .map(|(&c, _)| c);
+            while let Some(c) = at
+                .filter(|&c| c != id)
+                .and_then(|c| state.composites.get(&c))
+            {
+                name = format!("{} / {name}", c.name);
+                at = c.parent;
+            }
+            Some((leaf, name))
+        })
+        .collect()
 }
 
 /// The kinds exposure `key` may take on the face (FACES.md section 2), its default first.
@@ -265,18 +295,21 @@ impl Page {
         true
     }
 
-    /// Replaces the draft's panel with `panel` as one step when it is a valid face; otherwise
-    /// keeps the draft and says why.
-    fn commit(&mut self, state: &PatchState, panel: Panel) -> Result<(), String> {
-        if panel == self.draft.panel {
+    /// Replaces the draft's panel with `panel` and its `next_interface` with `next` as one step
+    /// when that is a valid face; otherwise keeps the draft and says why.
+    fn commit(&mut self, state: &PatchState, panel: Panel, next: u64) -> Result<(), String> {
+        if panel == self.draft.panel && next == self.draft.next_interface {
             return Ok(());
         }
-        if let Err(e) = panels::check(state, &self.draft.base, &panel) {
+        let mut c = self.draft.base.clone();
+        c.next_interface = next;
+        if let Err(e) = panels::check(state, &c, &panel) {
             self.note = Some(e.clone());
             return Err(e);
         }
         self.push();
         self.draft.panel = panel;
+        self.draft.next_interface = next;
         Ok(())
     }
 
@@ -290,7 +323,7 @@ impl Page {
             btree_map::Entry::Vacant(e) => e.insert(self.fresh(state, key)?),
         };
         [p.x, p.y, p.width, p.height] = r;
-        let result = self.commit(state, panel);
+        let result = self.commit(state, panel, self.draft.next_interface);
         if result.is_err() {
             self.refused = Some((key, r));
         }
@@ -330,7 +363,56 @@ impl Page {
             self.selected = Some(key);
             return Ok(());
         }
-        let mut new = self.fresh(state, key)?;
+        let new = self.fresh(state, key)?;
+        self.put(state, key, new, self.draft.next_interface)
+    }
+
+    /// Places leaf `leaf`'s display under a fresh key at the first free spot; selects the
+    /// element already showing it instead, if there is one.
+    pub fn add_display(&mut self, state: &PatchState, leaf: ModuleId) -> Result<(), String> {
+        if let Some(key) = self.display_of(leaf) {
+            self.selected = Some(key);
+            return Ok(());
+        }
+        let key = self.draft.next_interface;
+        let new = Placement {
+            kind: Kind::Display,
+            x: 0.0,
+            y: 0.0,
+            width: DISPLAY.0,
+            height: DISPLAY.1,
+            source: Some(Source::Module {
+                id: leaf,
+                action: None,
+            }),
+            label: None,
+            icons: Vec::new(),
+        };
+        self.put(state, key, new, key + 1)
+    }
+
+    /// The element showing leaf `leaf`'s display.
+    pub fn display_of(&self, leaf: ModuleId) -> Option<u64> {
+        self.draft.panel.placements.iter().find_map(|(&k, p)| {
+            (p.kind == Kind::Display
+                && p.source
+                    == Some(Source::Module {
+                        id: leaf,
+                        action: None,
+                    }))
+            .then_some(k)
+        })
+    }
+
+    /// `new` as element `key` at the first free spot of its size, top-left first, with the
+    /// draft's `next_interface` becoming `next`.
+    fn put(
+        &mut self,
+        state: &PatchState,
+        key: u64,
+        mut new: Placement,
+        next: u64,
+    ) -> Result<(), String> {
         let (w, h) = (new.width, new.height);
         let panel = &self.draft.panel;
         let free = |x: f32, y: f32| {
@@ -357,7 +439,7 @@ impl Page {
         let mut panel = panel.clone();
         (new.x, new.y) = (x, y);
         panel.placements.insert(key, new);
-        self.commit(state, panel)?;
+        self.commit(state, panel, next)?;
         self.selected = Some(key);
         Ok(())
     }
@@ -375,7 +457,7 @@ impl Page {
             p.width = p.width.max(SLIDER.0);
             p.height = p.height.max(SLIDER.1);
         }
-        self.commit(state, panel)?;
+        self.commit(state, panel, self.draft.next_interface)?;
         self.staged = self.staged.take().filter(|(k, _)| *k != key);
         Ok(())
     }
@@ -427,7 +509,7 @@ impl Page {
         let p = panel.placements.get_mut(&key).expect("checked above");
         p.kind = Kind::Icons;
         p.icons = icons.iter().flatten().cloned().collect();
-        let result = self.commit(state, panel);
+        let result = self.commit(state, panel, self.draft.next_interface);
         self.staged = result.is_err().then_some((key, icons));
         result
     }
@@ -444,7 +526,7 @@ impl Page {
     pub fn set_width(&mut self, state: &PatchState, width: f32) -> Result<(), String> {
         let mut panel = self.draft.panel.clone();
         panel.width = width;
-        self.commit(state, panel)
+        self.commit(state, panel, self.draft.next_interface)
     }
 
     /// Sets (or clears) the light or dark face artwork.
@@ -825,6 +907,26 @@ fn palette(
                         }
                     });
                 }
+                kit::section(ui, st, "Displays");
+                for (leaf, name) in displays(editor.state(), page.id) {
+                    let placed = page.display_of(leaf).is_some();
+                    ui.horizontal(|ui| {
+                        let r = ui.add(
+                            kit::Button::new(st, name)
+                                .g4(32.0)
+                                .ghost()
+                                .min_width(if placed { 160.0 } else { 236.0 }),
+                        );
+                        view.record(format!("design:display:{leaf}"), r.rect);
+                        if placed {
+                            g4::chip_label(ui, st, "placed", true, Some(st.roles.good));
+                        }
+                        if r.clicked() {
+                            // A refusal keeps the draft and shows its reason in `page.note`.
+                            let _ = page.add_display(editor.state(), leaf);
+                        }
+                    });
+                }
             });
     });
 }
@@ -854,6 +956,12 @@ fn inspector(
                 .get(&key)
                 .or_else(|| page.draft.base.ports.get(&key))
                 .map(|e| e.label.clone())
+                .or_else(|| match p.source {
+                    Some(Source::Module { id: leaf, .. }) => displays(editor.state(), page.id)
+                        .into_iter()
+                        .find_map(|(m, name)| (m == leaf).then_some(name)),
+                    _ => None,
+                })
                 .unwrap_or_default();
             kit::label(
                 ui,

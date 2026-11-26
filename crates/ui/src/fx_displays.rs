@@ -11,9 +11,9 @@ use egui::{pos2, vec2, Align2, Pos2, Rect, Stroke};
 use kabl_core::{ModuleId, PatchState, PortRef};
 use kabl_modules::builtins::{band_centers, band_response_db, compressor_reduction, formant_bands};
 
+use crate::displays::Shown;
 use crate::displays::{modulated_norm, paint, param, plot, Detail, Live};
 use crate::kit::face;
-use crate::rack::Placed;
 use crate::routing;
 use crate::style::{alpha, Role, Style};
 
@@ -40,7 +40,7 @@ fn delay(w: f32) -> C {
 }
 
 /// The parameter as it is now: modulated by every route with a live source, else the stored value.
-pub(crate) fn live_param(state: &PatchState, live: &Live, now: f64, m: &Placed, name: &str) -> f32 {
+pub(crate) fn live_param(state: &PatchState, live: &Live, now: f64, m: &Shown, name: &str) -> f32 {
     let Some(q) = m.info.params.iter().find(|q| q.name == name) else {
         return 0.0;
     };
@@ -134,6 +134,26 @@ pub(crate) fn caption(p: &egui::Painter, st: &Style, z: f32, at: Pos2, align: Al
     }
 }
 
+/// Whether [`draw`] has a picture for modules of `kind`.
+pub(crate) fn has_display(kind: &str) -> bool {
+    matches!(
+        kind,
+        "mixer"
+            | "delay"
+            | "reverb"
+            | "out"
+            | "eq"
+            | "compressor"
+            | "limiter"
+            | "phaser"
+            | "flanger"
+            | "filter.comb"
+            | "filter.formant"
+            | "vocoder"
+            | "bitcrusher"
+    ) || kind.starts_with("drum.")
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn draw(
     state: &PatchState,
@@ -141,7 +161,7 @@ pub(crate) fn draw(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -173,7 +193,7 @@ fn eq(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -308,7 +328,7 @@ fn compressor(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -338,7 +358,7 @@ fn limiter(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -361,7 +381,7 @@ fn sweep(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -429,7 +449,7 @@ fn comb(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -467,7 +487,7 @@ fn formant(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -529,7 +549,7 @@ fn vocoder(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -592,7 +612,7 @@ fn bitcrusher(
     state: &PatchState,
     st: &Style,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -639,7 +659,7 @@ fn mixer(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
@@ -706,7 +726,7 @@ fn delay_taps(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
 ) {
@@ -744,7 +764,7 @@ fn reverb_decay(
     live: &Live,
     now: f64,
     p: &egui::Painter,
-    m: &Placed,
+    m: &Shown,
     r: Rect,
     z: f32,
     d: Detail,
