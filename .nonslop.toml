@@ -12,6 +12,7 @@ test = "cargo +1.99.0 test --workspace"
 clean = "cargo clean"
 
 [slop]
+disable = ["gate-tampered"]                       # pre-1.0 (Kosta 2026-11-26): agents may edit CI and lint config; remove before production
 # From the slopstop evaluation on kabl (nonslop eval/slopstop/REPORT-IMPROVED.md): 11 findings over nine PRs.
 allow_suppress = ["clippy::too_many_arguments"]   # house pattern in preset builders and egui helpers
 exclude = ["docs/**"]                             # probe scripts and design mockups, not product code
