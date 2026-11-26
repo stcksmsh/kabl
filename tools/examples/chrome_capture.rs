@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 53] = [
+const SCENES: [&str; 54] = [
     "rack",
     "perform",
     "sounds",
@@ -69,6 +69,7 @@ const SCENES: [&str; 53] = [
     "design-page-toggle",
     "face-toggle-off",
     "face-toggle-on",
+    "face-toggle-mod",
 ];
 
 struct Job {
@@ -615,6 +616,20 @@ impl App {
                 0.0
             };
             self.editor.set_param(vca, "exponential", on);
+            if j.scene == "face-toggle-mod" {
+                let lfo = self
+                    .editor
+                    .add_module("lfo", kabl_core::Vec2 { x: 904.0, y: 520.0 });
+                self.editor.connect_route(
+                    kabl_core::PortRef::Module {
+                        id: lfo,
+                        port: "out".into(),
+                    },
+                    vca,
+                    "exponential",
+                );
+                ui.cable_view = kabl_ui::CableView::Hidden;
+            }
         }
         {
             use kabl_ui::browser::{Dialog, Pending};

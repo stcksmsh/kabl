@@ -533,7 +533,7 @@ impl Default for UiState {
             prefs_saved: None,
             cable_life: Default::default(),
             cable_intensity: Default::default(),
-            vertical_sliders: false,
+            vertical_sliders: true,
             theme_mode: Default::default(),
             reduce_motion: Default::default(),
             desktop: Default::default(),
@@ -6100,18 +6100,16 @@ fn draw_authored_face(
                     look,
                     vertical,
                 ),
-                Geo::Select { rect } if p.kind == Kind::Toggle => {
-                    panels::face_toggle(
-                        editor,
-                        view,
-                        &mut local,
-                        &painter,
-                        *leaf,
-                        param,
-                        xf.r(rect),
-                    );
-                    Vec::new()
-                }
+                Geo::Select { rect } if p.kind == Kind::Toggle => panels::face_toggle(
+                    editor,
+                    view,
+                    &mut local,
+                    &painter,
+                    *leaf,
+                    param,
+                    xf.r(rect),
+                    look,
+                ),
                 Geo::Select { rect } => routing::stepped_selector(
                     editor,
                     view,
