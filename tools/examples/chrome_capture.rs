@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 54] = [
+const SCENES: [&str; 60] = [
     "rack",
     "perform",
     "sounds",
@@ -70,6 +70,12 @@ const SCENES: [&str; 54] = [
     "face-toggle-off",
     "face-toggle-on",
     "face-toggle-mod",
+    "design-page-icons",
+    "design-page-icons-done",
+    "face-icons-glyphs",
+    "face-icons-glyphs-min",
+    "face-icons-png",
+    "face-icons-png-min",
 ];
 
 struct Job {
@@ -631,6 +637,72 @@ impl App {
                 ui.cable_view = kabl_ui::CableView::Hidden;
             }
         }
+        // The icon scenes, last in SCENES: a "Shapes" composite of an LFO and a VCA with the
+        // LFO's waveform, the VCA's two-option switch and the LFO's rate exposed. The face-icons
+        // scenes draw the waveform with the built-in glyphs or with PNGs (and then the switch
+        // too), at zoom 1 or at the smallest zoom ("-min").
+        if j.scene.contains("-icons") {
+            use kabl_core::PortRef;
+            let lfo = self
+                .editor
+                .add_module("lfo", kabl_core::Vec2 { x: 904.0, y: 320.0 });
+            let vca = self.editor.add_module(
+                "vca",
+                kabl_core::Vec2 {
+                    x: 1104.0,
+                    y: 320.0,
+                },
+            );
+            let id = kabl_ui::composites::encapsulate(
+                &mut self.editor,
+                [lfo, vca].into(),
+                Default::default(),
+                "Shapes",
+            )
+            .unwrap();
+            for (m, param) in [(lfo, "waveform"), (vca, "exponential"), (lfo, "rate_hz")] {
+                let target = PortRef::Param {
+                    id: m,
+                    param: param.into(),
+                };
+                kabl_ui::composites::add_exposure(&mut self.editor, id, target, true).unwrap();
+            }
+            self.editor.set_param(lfo, "waveform", 2.0);
+        }
+        if j.scene.starts_with("face-icons") {
+            use kabl_core::panel::{Kind, Panel, Placement};
+            let png = j.scene.starts_with("face-icons-png");
+            let (&id, c) = self.editor.state().composites.iter().next_back().unwrap();
+            let mut c = c.clone();
+            let keys: Vec<u64> = c.controls.keys().copied().collect();
+            let mut panel = Panel::default();
+            let (wave, switch, switch_kind) = if png {
+                (icon_set(0..5), icon_set(5..7), Kind::Icons)
+            } else {
+                (Vec::new(), Vec::new(), Kind::Selector)
+            };
+            for (key, kind, icons, x, w, h) in [
+                (keys[0], Kind::Icons, wave, 12.0, 150.0, 60.0),
+                (keys[1], switch_kind, switch, 174.0, 96.0, 60.0),
+                (keys[2], Kind::Knob, Vec::new(), 12.0, 84.0, 110.0),
+            ] {
+                panel.placements.insert(
+                    key,
+                    Placement {
+                        kind,
+                        x,
+                        y: if kind == Kind::Knob { 132.0 } else { 66.0 },
+                        width: w,
+                        height: h,
+                        source: None,
+                        label: None,
+                        icons,
+                    },
+                );
+            }
+            c.panel = Some(Box::new(panel));
+            kabl_ui::composites::set(&mut self.editor, id, c).unwrap();
+        }
         {
             use kabl_ui::browser::{Dialog, Pending};
             let save_as = |error: Option<&str>| Dialog::SaveAs {
@@ -1137,9 +1209,9 @@ impl eframe::App for App {
         // The design page opens once the first frames, which reset its state, are past.
         let scene = self.jobs[self.i].scene;
         if self.f == 6 && scene.starts_with("design-page") {
-            // The toggle scene designs the "Amp" composite, the others the "Voice".
+            // The toggle and icon scenes design the composite made last, the others the "Voice".
             let mut all = self.editor.state().composites.iter();
-            let (&id, c) = if scene == "design-page-toggle" {
+            let (&id, c) = if scene == "design-page-toggle" || scene.contains("-icons") {
                 all.next_back()
             } else {
                 all.next()
@@ -1170,12 +1242,31 @@ impl eframe::App for App {
                 }
             }
             page.selected = (!drag).then_some(keys[0]);
+            // The waveform's PNGs imported in the inspector: three of five, or all of them.
+            if scene.contains("-icons") {
+                let n = if scene.ends_with("-done") { 5 } else { 3 };
+                for (k, art) in icon_set(0..n).into_iter().enumerate() {
+                    page.set_icon(state, keys[0], k, art).unwrap();
+                }
+            }
             if scene == "design-page-red-drop" {
                 let knob = &page.draft.panel.placements[&keys[0]];
                 let at = [knob.x + 24.0, knob.y + 30.0, 64.0, 58.0];
                 assert!(page.place(state, keys[2], at).is_err());
                 page.selected = Some(keys[2]);
             }
+        }
+        if self.f == 6 && scene.starts_with("design-page-icons") {
+            self.ui.panels.path = "icons/shape-4.png".into();
+        }
+        // The icon faces at zoom 1 or the smallest zoom, the "Shapes" face near the top left.
+        if self.f == 6 && scene.starts_with("face-icons") {
+            self.ui.zoom = if scene.ends_with("-min") {
+                kabl_ui::MIN_ZOOM
+            } else {
+                1.0
+            };
+            self.ui.pan = egui::vec2(-860.0, -240.0) * self.ui.zoom;
         }
         // The last jack dragged from the palette and held over the face: onto a free spot, or
         // onto the knob for the red scene. The button stays down through the shot.
@@ -1401,6 +1492,35 @@ impl eframe::App for App {
         }
         ctx.request_repaint();
     }
+}
+
+/// Icon PNGs `shape-<i>.png` for the icon scenes: white shapes on transparency (circle, ring,
+/// square, triangle, diamond, plus, cross), 48 points square.
+fn icon_set(shapes: std::ops::Range<usize>) -> Vec<kabl_core::panel::Artwork> {
+    shapes
+        .map(|i| {
+            let img = RgbaImage::from_fn(48, 48, |x, y| {
+                let (x, y) = (x as f32 - 23.5, y as f32 - 23.5);
+                let r = (x * x + y * y).sqrt();
+                let inside = match i {
+                    0 => r < 18.0,
+                    1 => (12.0..19.0).contains(&r),
+                    2 => x.abs() < 16.0 && y.abs() < 16.0,
+                    3 => y < 16.0 && y > -18.0 && x.abs() < (y + 18.0) * 0.55,
+                    4 => x.abs() + y.abs() < 20.0,
+                    5 => (x.abs() < 5.0 || y.abs() < 5.0) && r < 20.0,
+                    _ => ((x - y).abs() < 7.0 || (x + y).abs() < 7.0) && r < 20.0,
+                };
+                image::Rgba([255, 255, 255, if inside { 255 } else { 0 }])
+            });
+            let mut png = std::io::Cursor::new(Vec::new());
+            img.write_to(&mut png, image::ImageFormat::Png).unwrap();
+            kabl_core::panel::Artwork {
+                name: format!("shape-{i}.png"),
+                png: png.into_inner(),
+            }
+        })
+        .collect()
 }
 
 /// The file browser scenes' folders, as in the mockup: `HOME/Music/kabl/patches` with patch

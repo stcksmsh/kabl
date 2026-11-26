@@ -1426,7 +1426,8 @@ fn pill_faded(
 
 /// Segmented selector for a `Taper::Stepped` param (envelope timing, waveforms) at screen
 /// `rect`, label above. Accepts routes like a knob (its whole rect is the drop target); returns
-/// its plug point for route cables.
+/// its plug point for route cables. `icons` draws an icon per segment instead of its text: one
+/// alpha-mask texture per option, or none for the built-in glyphs (text where there are none).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn stepped_selector(
     editor: &mut PatchEditor,
@@ -1438,6 +1439,7 @@ pub(crate) fn stepped_selector(
     param: &'static ParamInfo,
     rect: Rect,
     look: Look,
+    icons: Option<&[egui::load::SizedTexture]>,
 ) -> Vec<(CableId, Pos2)> {
     debug_assert_eq!(param.taper, Taper::Stepped);
     let th = theme(&ui_state.style);
@@ -1465,12 +1467,13 @@ pub(crate) fn stepped_selector(
     };
     let w = rect.width() / n as f32;
     // Segments too narrow for the longest option would draw their labels over each other: a
-    // dropdown of the same options instead, whatever the module.
+    // dropdown of the same options instead, whatever the module. Icons shrink with their
+    // segments instead, so every segment stays a click target.
     let longest = (0..n)
         .map(|k| text_of(k).chars().count())
         .max()
         .unwrap_or(1);
-    if w < (7.2 * longest as f32 + 2.0) * z {
+    if icons.is_none() && w < (7.2 * longest as f32 + 2.0) * z {
         let cur = ((value - param.min).max(0.0) as usize).min(n - 1);
         let opened = ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
             egui::ComboBox::from_id_salt(("kabl-sel", id, param.name))
@@ -1520,18 +1523,47 @@ pub(crate) fn stepped_selector(
                 egui::StrokeKind::Inside,
             );
         }
-        if let Some(font) = crate::kit::face::selector_font(&ui_state.style, z) {
-            painter.text(
-                r.center(),
-                egui::Align2::CENTER_CENTER,
-                text_of(k),
-                font,
-                if on { th.seg_on_text } else { look.ink2 },
-            );
+        let ink = if on { th.seg_on_text } else { look.ink2 };
+        // The icon's square, inset from the segment so neighbours never touch.
+        let side = (r.width() - 6.0 * z).min(r.height() - 8.0 * z).max(1.0);
+        let icon = Rect::from_center_size(r.center(), EguiVec2::splat(side));
+        match icons {
+            Some(tex) if tex.len() == n => {
+                let size = tex[k].size;
+                let fit = Rect::from_center_size(icon.center(), size * side / size.max_elem());
+                painter.image(
+                    tex[k].id,
+                    fit,
+                    Rect::from_min_max(Pos2::ZERO, egui::pos2(1.0, 1.0)),
+                    ink,
+                );
+            }
+            Some(_) if crate::displays::has_glyphs(kind, param.name) => {
+                let g = icon.shrink2(EguiVec2::new(0.0, side * 0.2));
+                crate::displays::glyph(painter, g, k, Stroke::new((1.6 * z).max(1.0), ink));
+            }
+            _ => {
+                if let Some(font) = crate::kit::face::selector_font(&ui_state.style, z) {
+                    painter.text(
+                        r.center(),
+                        egui::Align2::CENTER_CENTER,
+                        text_of(k),
+                        font,
+                        ink,
+                    );
+                }
+            }
         }
         if resp.clicked() {
             inspect(ui_state, &routes, id, param.name);
-            if !on {
+            if !on && icons.is_some() {
+                // A face icon selector: every click its own undo step, as a face toggle.
+                let target = ParamTarget::Module {
+                    id,
+                    param: param.name.into(),
+                };
+                editor.set_param_gesture(target, opt, true);
+            } else if !on {
                 editor.set_param(id, param.name, opt);
             }
         }

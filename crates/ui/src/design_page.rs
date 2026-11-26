@@ -7,7 +7,7 @@ use crate::{composites, panels, PatchEditor, UiState};
 use egui::{pos2, vec2, Id, Pos2, Rect, Sense, Stroke};
 use kabl_core::{
     panel::{Artwork, Kind, Panel, Placement, HEIGHT},
-    Composite, CompositeId, PatchState, Snapshot,
+    Composite, CompositeId, PatchState, PortRef, Snapshot,
 };
 use kabl_modules::Taper;
 use std::collections::btree_map;
@@ -72,6 +72,8 @@ pub struct Page {
     /// Each distinct PNG of this session once, so history entries stay small.
     pool: Vec<Vec<u8>>,
     drag: Option<Drag>,
+    /// Icon PNGs imported for element `.0`'s options while some option still has none.
+    staged: Option<(u64, Vec<Option<Artwork>>)>,
 }
 
 fn rect_of(p: &Placement) -> [f32; 4] {
@@ -132,11 +134,15 @@ fn kinds_for(state: &PatchState, c: &Composite, key: u64) -> Result<Vec<Kind>, S
         Kind::Selector => {
             let e = &c.controls[&key];
             let p = panels::param_info(state, &e.target)?;
+            let mut kinds = vec![Kind::Selector];
             if p.max - p.min == 1.0 {
-                vec![Kind::Selector, Kind::Toggle]
-            } else {
-                vec![Kind::Selector]
+                kinds.push(Kind::Toggle);
             }
+            // Without built-in glyphs an element becomes icons by importing a PNG per option.
+            if panels::glyphs(state, &e.target) {
+                kinds.push(Kind::Icons);
+            }
+            kinds
         }
         k => vec![k],
     })
@@ -160,6 +166,7 @@ impl Page {
             redo: Vec::new(),
             pool: Vec::new(),
             drag: None,
+            staged: None,
         }
     }
 
@@ -217,6 +224,8 @@ impl Page {
         self.draft.panel = e.panel;
         self.draft.snapshots = e.snapshots;
         self.draft.next_interface = e.next_interface;
+        // Staged icons belong to the draft they were imported on.
+        self.staged = None;
         self.refused = None;
         self.note = None;
         self.selected = self
@@ -359,11 +368,68 @@ impl Page {
         let mut panel = self.draft.panel.clone();
         let p = panel.placements.get_mut(&key).ok_or("Not on the face")?;
         p.kind = kind;
+        if kind != Kind::Icons {
+            p.icons.clear();
+        }
         if kind == Kind::Slider {
             p.width = p.width.max(SLIDER.0);
             p.height = p.height.max(SLIDER.1);
         }
-        self.commit(state, panel)
+        self.commit(state, panel)?;
+        self.staged = self.staged.take().filter(|(k, _)| *k != key);
+        Ok(())
+    }
+
+    /// The option count of stepped control `key`, None for any other exposure.
+    pub fn options(&self, state: &PatchState, key: u64) -> Option<usize> {
+        let e = self.draft.base.controls.get(&key)?;
+        let p = panels::param_info(state, &e.target).ok()?;
+        (p.taper == Taper::Stepped).then(|| (p.max - p.min).round() as usize + 1)
+    }
+
+    /// Element `key`'s icon PNG per option: the draft's, or those imported so far.
+    pub fn icons(&self, state: &PatchState, key: u64) -> Vec<Option<Artwork>> {
+        let n = self.options(state, key).unwrap_or(0);
+        match (&self.staged, self.draft.panel.placements.get(&key)) {
+            (Some((k, v)), _) if *k == key && v.len() == n => v.clone(),
+            (_, Some(p)) if p.icons.len() == n => p.icons.iter().cloned().map(Some).collect(),
+            _ => vec![None; n],
+        }
+    }
+
+    /// Sets option `k`'s icon PNG of stepped element `key`. Once every option has one, the
+    /// element becomes an icon selector of those PNGs as one step; until then they wait here.
+    pub fn set_icon(
+        &mut self,
+        state: &PatchState,
+        key: u64,
+        k: usize,
+        art: Artwork,
+    ) -> Result<(), String> {
+        let mut icons = self.icons(state, key);
+        let checked = art
+            .validate()
+            .and_then(|()| match self.draft.panel.placements.get(&key) {
+                Some(_) if k < icons.len() => Ok(()),
+                Some(_) => Err("Icons need a stepped control on the face".to_string()),
+                None => Err("Not on the face".to_string()),
+            });
+        if let Err(e) = checked {
+            self.note = Some(e.clone());
+            return Err(e);
+        }
+        icons[k] = Some(art);
+        if icons.iter().any(Option::is_none) {
+            self.staged = Some((key, icons));
+            return Ok(());
+        }
+        let mut panel = self.draft.panel.clone();
+        let p = panel.placements.get_mut(&key).expect("checked above");
+        p.kind = Kind::Icons;
+        p.icons = icons.iter().flatten().cloned().collect();
+        let result = self.commit(state, panel);
+        self.staged = result.is_err().then_some((key, icons));
+        result
     }
 
     pub fn remove(&mut self, key: u64) {
@@ -371,6 +437,7 @@ impl Page {
             self.push();
             self.draft.panel.placements.remove(&key);
             self.selected = None;
+            self.staged = self.staged.take().filter(|(k, _)| *k != key);
         }
     }
 
@@ -582,6 +649,24 @@ fn reload(editor: &PatchEditor, page: &mut Page, close: &mut bool) {
     }
 }
 
+/// The local file path the Import buttons read, with Browse.
+fn path_field(ui: &mut egui::Ui, view: &mut UiState, st: &Style) {
+    let r = kit::field(ui, st, &mut view.panels.path, "Local file path", None, None);
+    view.record("design:path".into(), r.rect);
+    if button(ui, view, st, "browse", "Browse…", true) {
+        let hint = view.panels.path.clone();
+        crate::filebrowser::open(
+            view,
+            crate::filebrowser::Purpose::PanelArt,
+            "Choose artwork",
+            crate::filebrowser::Mode::Open,
+            crate::filebrowser::IMAGE,
+            "",
+            &hint,
+        );
+    }
+}
+
 fn button(
     ui: &mut egui::Ui,
     view: &mut UiState,
@@ -777,7 +862,11 @@ fn inspector(
                 Tone::Text,
                 format!("{:?} · {label}", p.kind),
             );
-            let kinds = kinds_for(editor.state(), &page.draft.base, key).unwrap_or_default();
+            let mut kinds = kinds_for(editor.state(), &page.draft.base, key).unwrap_or_default();
+            // Icons of imported PNGs, on a parameter with no built-in glyphs.
+            if p.kind == Kind::Icons && !kinds.contains(&Kind::Icons) {
+                kinds.push(Kind::Icons);
+            }
             if kinds.len() > 1 {
                 let mut pick = None;
                 kit::segmented(ui, st, |ui| {
@@ -814,26 +903,51 @@ fn inspector(
                 // A refusal keeps the draft and shows its reason in `page.note`.
                 let _ = page.place(editor.state(), key, r);
             }
+            let icons = page.icons(editor.state(), key);
+            if !icons.is_empty() {
+                kit::section(ui, st, "Icons");
+                path_field(ui, view, st);
+                let target = &page.draft.base.controls[&key].target;
+                let labels = match target {
+                    PortRef::Param { id, param } => editor
+                        .state()
+                        .modules
+                        .get(id)
+                        .and_then(|m| crate::routing::step_labels(&m.kind, param)),
+                    _ => None,
+                };
+                for (k, art) in icons.iter().enumerate() {
+                    let mut import = false;
+                    ui.horizontal(|ui| {
+                        let option = labels
+                            .and_then(|l| l.get(k).map(|s| s.to_string()))
+                            .unwrap_or_else(|| format!("{}", k + 1));
+                        kit::label(ui, st, Role::Body, Tone::Text2, option);
+                        let dot = if art.is_some() {
+                            st.roles.good
+                        } else {
+                            st.roles.warn
+                        };
+                        let name = art.as_ref().map_or("built-in or text", |a| &a.name);
+                        g4::chip_label(ui, st, name, true, Some(dot));
+                        import = button(ui, view, st, &format!("icon:{k}"), "Import…", true);
+                    });
+                    if import {
+                        let a = panels::import_art(Path::new(&view.panels.path));
+                        // A refusal keeps the draft and shows its reason in `page.note`.
+                        let _ = a
+                            .and_then(|a| page.set_icon(editor.state(), key, k, a))
+                            .map_err(|e| page.note = Some(e));
+                    }
+                }
+            }
             if button(ui, view, st, "remove", "Remove from face", true) {
                 page.remove(key);
             }
             return;
         }
         kit::section(ui, st, "Face artwork");
-        let r = kit::field(ui, st, &mut view.panels.path, "Local file path", None, None);
-        view.record("design:path".into(), r.rect);
-        if button(ui, view, st, "browse", "Browse…", true) {
-            let hint = view.panels.path.clone();
-            crate::filebrowser::open(
-                view,
-                crate::filebrowser::Purpose::PanelArt,
-                "Choose artwork",
-                crate::filebrowser::Mode::Open,
-                crate::filebrowser::IMAGE,
-                "",
-                &hint,
-            );
-        }
+        path_field(ui, view, st);
         for (dark, key, text) in [
             (false, "import-light", "Light PNG"),
             (true, "import-dark", "Dark PNG"),

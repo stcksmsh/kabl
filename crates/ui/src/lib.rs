@@ -4556,6 +4556,7 @@ fn draw_control(
                 c.param,
                 xf.r(rect),
                 look,
+                None,
             );
             drawn.plugs.extend(plugs);
             if ui_state.flash_on(m.id, c.param.name, now) {
@@ -6110,17 +6111,22 @@ fn draw_authored_face(
                     xf.r(rect),
                     look,
                 ),
-                Geo::Select { rect } => routing::stepped_selector(
-                    editor,
-                    view,
-                    &mut local,
-                    &painter,
-                    *leaf,
-                    info.kind,
-                    param,
-                    xf.r(rect),
-                    look,
-                ),
+                Geo::Select { rect } => {
+                    let icons = (p.kind == Kind::Icons)
+                        .then(|| panels::icon_textures(view, ui.ctx(), id, key, &p.icons));
+                    routing::stepped_selector(
+                        editor,
+                        view,
+                        &mut local,
+                        &painter,
+                        *leaf,
+                        info.kind,
+                        param,
+                        xf.r(rect),
+                        look,
+                        icons.as_deref(),
+                    )
+                }
             };
             drawn.plugs.extend(plugs);
             let now = ui.input(|i| i.time);
