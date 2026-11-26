@@ -771,7 +771,7 @@ impl App {
             let mut place = |id, sources: Vec<Source>| {
                 let mut c = self.editor.state().composites[&id].clone();
                 let mut panel = Panel {
-                    width: 572.0,
+                    width: 570.0,
                     ..Panel::default()
                 };
                 let mut keys = Vec::new();
@@ -1428,15 +1428,19 @@ impl eframe::App for App {
             self.ui.panels.path = "icons/shape-4.png".into();
         }
         // The icon faces at zoom 1 or the smallest zoom, the "Shapes" face near the top left.
-        // The display faces at zoom 1 or the smallest zoom, the "Scopes" face near the top left;
-        // the button face at zoom 1.
-        if self.f == 6 && (scene.starts_with("face-display") || scene == "face-buttons") {
+        // The display faces at zoom 1 or the smallest zoom, the "Scopes" face near the top left.
+        if self.f == 6 && scene.starts_with("face-display") {
             self.ui.zoom = if scene.ends_with("-min") {
                 kabl_ui::MIN_ZOOM
             } else {
                 1.0
             };
             self.ui.pan = egui::vec2(-860.0, -240.0) * self.ui.zoom;
+        }
+        // The "Top" face, first in the rack, at zoom 1.
+        if self.f == 6 && scene == "face-buttons" {
+            self.ui.zoom = 1.0;
+            self.ui.pan = egui::Vec2::ZERO;
         }
         // The display scenes' audio, rendered offline: the engine is built once the scene is set
         // up, then each frame takes the taps the faces ask for, renders a frame's worth of blocks
@@ -1569,6 +1573,18 @@ impl eframe::App for App {
                 pos: at,
                 button: egui::PointerButton::Secondary,
                 pressed: self.f == 8,
+                modifiers: egui::Modifiers::NONE,
+            });
+        }
+        // The palette scrolled down to the Buttons list's nested entries.
+        if self.f == 8 && self.jobs[self.i].scene == "design-page-buttons" {
+            // The clock's Run / Stop entry, module 1 of the performance patch.
+            let at = self.ui.hits["design:button:1.run"].center();
+            self.inject.push(egui::Event::PointerMoved(at));
+            self.inject.push(egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: egui::vec2(0.0, -2000.0),
+                phase: egui::TouchPhase::Move,
                 modifiers: egui::Modifiers::NONE,
             });
         }

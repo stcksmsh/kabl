@@ -5987,8 +5987,8 @@ fn draw_authored_face(
         }
         if p.kind == Kind::Button {
             // A pad in the cue-pad look, lit as the cue or bank its chain ends on.
-            let (on, queued) = panels::lit(view, editor.state(), id, key);
-            let name = panels::button_name(editor.state(), id, key);
+            let (on, queued) = panels::lit(view, editor.state(), p);
+            let name = panels::button_name(editor.state(), p);
             let now = ui.input(|i| i.time);
             let hit = format!("composite:{id}:button:{key}");
             if pad(view, ui, &painter, z, hit, screen, &name, on, queued, now).clicked() {

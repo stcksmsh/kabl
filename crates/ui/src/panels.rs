@@ -2,7 +2,7 @@
 use crate::wheel::OwnedScroll;
 use crate::{composites, PatchEditor, UiState};
 use kabl_core::{
-    panel::{Artwork, Kind, Panel, Source},
+    panel::{Artwork, Kind, Panel, Placement, Source},
     Composite, CompositeId, ModuleId, PatchState, PortRef,
 };
 use kabl_modules::{registry, Taper};
@@ -163,20 +163,23 @@ fn offers(kind: &str, action: &str) -> bool {
 }
 /// The leaf and action a press of button `key` on composite `id`'s face ends on, following face
 /// targets into nested composites; None when a link of the chain is gone.
-pub fn resolve(
-    state: &PatchState,
-    mut id: CompositeId,
-    mut key: u64,
-) -> Option<(ModuleId, String)> {
+pub fn resolve(state: &PatchState, id: CompositeId, key: u64) -> Option<(ModuleId, String)> {
+    chain(state, placement(state, id, key)?)
+}
+fn placement(state: &PatchState, id: CompositeId, key: u64) -> Option<&Placement> {
+    state
+        .composites
+        .get(&id)?
+        .panel
+        .as_ref()?
+        .placements
+        .get(&key)
+}
+/// The leaf and action button `p` ends on. `p` need not be in the document: the design page
+/// draws its draft's buttons.
+fn chain<'a>(state: &'a PatchState, mut p: &'a Placement) -> Option<(ModuleId, String)> {
     // Every hop goes strictly deeper and nesting is at most 8, so a valid chain ends by then.
     for _ in 0..=8 {
-        let p = state
-            .composites
-            .get(&id)?
-            .panel
-            .as_ref()?
-            .placements
-            .get(&key)?;
         if p.kind != Kind::Button {
             return None;
         }
@@ -185,7 +188,7 @@ pub fn resolve(
                 id: leaf,
                 action: Some(action),
             } => return Some((*leaf, action.clone())),
-            Source::Face { composite, key: k } => (id, key) = (*composite, *k),
+            Source::Face { composite, key } => p = placement(state, *composite, *key)?,
             _ => return None,
         }
     }
@@ -198,10 +201,10 @@ pub fn press(editor: &PatchEditor, view: &mut UiState, id: CompositeId, key: u64
         crate::perform::fire(editor, view, leaf, &action);
     }
 }
-/// `(lit, queued)` of button `key` on composite `id`'s face: the state of the cue or bank its
-/// chain ends on, as the module face shows it.
-pub fn lit(view: &UiState, state: &PatchState, id: CompositeId, key: u64) -> (bool, bool) {
-    let Some((leaf, action)) = resolve(state, id, key) else {
+/// `(lit, queued)` of button `p`: the state of the cue or bank its chain ends on, as the module
+/// face shows it.
+pub fn lit(view: &UiState, state: &PatchState, p: &Placement) -> (bool, bool) {
+    let Some((leaf, action)) = chain(state, p) else {
         return (false, false);
     };
     let bank_of = |s: ModuleId| {
@@ -228,22 +231,18 @@ pub fn lit(view: &UiState, state: &PatchState, id: CompositeId, key: u64) -> (bo
         _ => (false, false),
     }
 }
-/// The name button `key` on composite `id`'s face prints: its label, else the name of the button
-/// it targets, else its action's name.
-pub fn button_name(state: &PatchState, mut id: CompositeId, mut key: u64) -> String {
+/// The name button `p` prints: its label, else the name of the button it targets, else its
+/// action's name; empty when its chain is broken.
+pub fn button_name<'a>(state: &'a PatchState, mut p: &'a Placement) -> String {
     for _ in 0..=8 {
-        let Some(p) = state
-            .composites
-            .get(&id)
-            .and_then(|c| c.panel.as_ref()?.placements.get(&key))
-        else {
-            break;
-        };
         if let Some(label) = &p.label {
             return label.clone();
         }
         match &p.source {
-            Some(Source::Face { composite, key: k }) => (id, key) = (*composite, *k),
+            Some(Source::Face { composite, key }) => match placement(state, *composite, *key) {
+                Some(next) => p = next,
+                None => break,
+            },
             Some(Source::Module {
                 id: leaf,
                 action: Some(action),

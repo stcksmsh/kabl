@@ -204,17 +204,15 @@ pub fn buttons(state: &PatchState, id: CompositeId) -> Vec<(Source, String)> {
         .into_iter()
         .filter(|&d| d != id)
         .flat_map(|d| {
-            let keys: Vec<u64> = state.composites[&d]
+            state.composites[&d]
                 .panel
                 .iter()
                 .flat_map(|p| &p.placements)
                 .filter(|(_, p)| p.kind == Kind::Button)
-                .map(|(&k, _)| k)
-                .collect();
-            keys.into_iter().map(move |key| {
-                let name = within(state, id, Some(d), panels::button_name(state, d, key));
-                (Source::Face { composite: d, key }, name)
-            })
+                .map(move |(&key, p)| {
+                    let name = within(state, id, Some(d), panels::button_name(state, p));
+                    (Source::Face { composite: d, key }, name)
+                })
         });
     actions.chain(faces).collect()
 }

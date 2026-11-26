@@ -4,7 +4,7 @@
 use egui::{Event, PointerButton, Pos2, RawInput, Rect};
 use kabl_core::{
     panel::{Kind, Panel, Placement, Source},
-    CompositeId, ModuleId, Vec2,
+    CompositeId, ModuleId, PatchState, Vec2,
 };
 use kabl_engine::patch_engine::Command;
 use kabl_modules::builtins::{seq::BANKS, Transport};
@@ -24,6 +24,10 @@ fn module(id: ModuleId, action: &str) -> Source {
 
 fn face(composite: CompositeId, key: u64) -> Source {
     Source::Face { composite, key }
+}
+
+fn placement(state: &PatchState, id: CompositeId, key: u64) -> &Placement {
+    &state.composites[&id].panel.as_ref().unwrap().placements[&key]
 }
 
 /// `sources` as buttons on the face of `id`, after the elements already there, each under a
@@ -273,6 +277,9 @@ fn the_design_page_lists_every_leaf_action_and_the_buttons_of_nested_faces() {
         .button_of(&restart)
         .expect("the restart button is placed");
     assert_eq!(key, c.next_interface);
+    // The page's preview names the draft's button, which is not in the document yet.
+    let draft = &page.draft.panel.placements[&key];
+    assert_eq!(panels::button_name(h.editor.state(), draft), "Restart");
     h.click("design:apply");
     let applied = &h.editor.state().composites[&top];
     let p = &applied.panel.as_ref().unwrap().placements[&key];
@@ -290,6 +297,12 @@ fn pressing_a_cue_button_on_a_closed_face_queues_that_cue() {
     assert_eq!(h.launched(), vec![(BASS, 1), (ARP, 1)]);
     assert_eq!(h.ui.last_cue.get(&cue_module), Some(&1));
     assert_eq!(h.ui.last_message, None);
+
+    // At the smallest zoom the pad's hit rect still fires.
+    h.ui.zoom = kabl_ui::MIN_ZOOM;
+    h.frames(2);
+    h.click(&format!("composite:{top}:button:{}", k.top[0]));
+    assert_eq!(h.launched(), vec![(BASS, 1), (ARP, 1)]);
 }
 
 #[test]
@@ -335,7 +348,7 @@ fn a_clock_button_under_the_host_clock_is_refused_as_on_the_module_face() {
 fn lit_state_follows_the_cue_and_the_bank_directly_and_through_a_chain() {
     let (e, [top, ..], _, k) = fixture();
     let mut view = UiState::default();
-    let lit = |view: &UiState, key| panels::lit(view, e.state(), top, key);
+    let lit = |view: &UiState, key| panels::lit(view, e.state(), placement(e.state(), top, key));
     let [cue, cue_chain, bass_b, arp_b_chain, run, _] = k.top;
     // Both sequencers at their startup bank A: no cue of B, no bank B.
     for key in [cue, cue_chain, bass_b, arp_b_chain, run] {
@@ -372,10 +385,17 @@ fn a_chain_whose_nested_button_is_gone_does_nothing_and_does_not_panic() {
     assert_eq!(panels::resolve(&dangling, top, k.top[1]), None);
     assert_eq!(panels::resolve(&dangling, top, k.top[5]), None);
     assert_eq!(
-        panels::lit(&UiState::default(), &dangling, top, k.top[1]),
+        panels::lit(
+            &UiState::default(),
+            &dangling,
+            placement(&dangling, top, k.top[1])
+        ),
         (false, false)
     );
-    assert_eq!(panels::button_name(&dangling, top, k.top[1]), "");
+    assert_eq!(
+        panels::button_name(&dangling, placement(&dangling, top, k.top[1])),
+        ""
+    );
 
     // In the document, removing the arp prunes Deep's arp button and the chain pressing it from
     // Top, and the face still draws and presses what is left.
