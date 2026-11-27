@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 82] = [
+const SCENES: [&str; 83] = [
     "rack",
     "perform",
     "sounds",
@@ -82,6 +82,7 @@ const SCENES: [&str; 82] = [
     "face-buttons",
     "design-page-buttons",
     "face-snapshots",
+    "design-page-snapshots",
     "drum-kit-rack",
     "drum-kit-face",
     "drum-kit-design",
@@ -1507,6 +1508,29 @@ impl eframe::App for App {
                 assert!(page.place(state, keys[2], at).is_err());
                 page.selected = Some(keys[2]);
             }
+        }
+        // Three snapshots of the cutoff in the list, one renamed with a morph length, the
+        // strip and the first one's button on the face.
+        if self.f == 6 && scene == "design-page-snapshots" {
+            let c = self.editor.state().composites.values().next().unwrap();
+            let svf = c.controls.values().next().unwrap().target.clone();
+            let mut snaps = Vec::new();
+            for hz in [400.0, 1200.0, 3000.0] {
+                if let kabl_core::PortRef::Param { id, param } = &svf {
+                    self.editor.set_param(*id, param, hz);
+                }
+                let state = self.editor.state();
+                let page = self.ui.panels.page.as_mut().unwrap();
+                snaps.push(page.capture(state).unwrap());
+            }
+            let state = self.editor.state();
+            let page = self.ui.panels.page.as_mut().unwrap();
+            page.rename(snaps[2], "Open").unwrap();
+            page.set_morph(state, snaps[2], 4.0, None).unwrap();
+            page.add_strip(state).unwrap();
+            page.add_button(state, kabl_core::panel::Source::Snapshot { id: snaps[0] })
+                .unwrap();
+            page.selected = None;
         }
         if self.f == 6 && scene.starts_with("design-page-icons") {
             self.ui.panels.path = "icons/shape-4.png".into();

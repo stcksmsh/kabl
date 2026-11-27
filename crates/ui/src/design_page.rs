@@ -6,6 +6,7 @@ use crate::wheel::OwnedScroll;
 use crate::{composites, panels, PatchEditor, UiState};
 use egui::{pos2, vec2, Id, Pos2, Rect, Sense, Stroke};
 use kabl_core::{
+    composite::MAX_SNAPSHOTS,
     panel::{Artwork, Kind, Panel, Placement, Source, HEIGHT},
     Composite, CompositeId, ModuleId, PatchState, PortRef, Snapshot,
 };
@@ -20,6 +21,10 @@ const HISTORY: usize = 100;
 const BAR_H: f32 = 56.0;
 const PALETTE_W: f32 = 260.0;
 const INSPECTOR_W: f32 = 280.0;
+/// The snapshot list under the canvas.
+const LIST_H: f32 = 196.0;
+/// A new snapshot strip's footprint: three pads.
+const STRIP: (f32, f32) = (270.0, 48.0);
 /// The least footprint a slider gets: wide enough for the horizontal variant and tall enough for
 /// the vertical one, since which draws is a view setting.
 const SLIDER: (f32, f32) = (120.0, 168.0);
@@ -383,6 +388,7 @@ impl Page {
         }
         let mut c = self.draft.base.clone();
         c.next_interface = next;
+        c.snapshots = self.draft.snapshots.clone();
         if let Err(e) = panels::check(state, &c, &panel) {
             self.note = Some(e.clone());
             return Err(e);
@@ -503,6 +509,35 @@ impl Page {
             icons: Vec::new(),
         };
         self.put(state, key, new, key + 1)
+    }
+
+    /// Places the snapshot strip at the first free spot; selects it instead when it is placed.
+    pub fn add_strip(&mut self, state: &PatchState) -> Result<(), String> {
+        if let Some(key) = self.strip() {
+            self.selected = Some(key);
+            return Ok(());
+        }
+        let key = self.draft.next_interface;
+        let new = Placement {
+            kind: Kind::Snapshots,
+            x: 0.0,
+            y: 0.0,
+            width: STRIP.0,
+            height: STRIP.1,
+            source: None,
+            label: None,
+            icons: Vec::new(),
+        };
+        self.put(state, key, new, key + 1)
+    }
+
+    /// The snapshot strip element.
+    pub fn strip(&self) -> Option<u64> {
+        self.draft
+            .panel
+            .placements
+            .iter()
+            .find_map(|(&k, p)| (p.kind == Kind::Snapshots).then_some(k))
     }
 
     /// The button element pressing `source`.
@@ -672,6 +707,106 @@ impl Page {
             self.selected = None;
         }
     }
+
+    /// The document value of every exposed control, by exposure key (FACES.md section 3.1).
+    fn values(&self, state: &PatchState) -> std::collections::BTreeMap<u64, f32> {
+        self.draft
+            .base
+            .controls
+            .iter()
+            .filter_map(|(&k, e)| Some((k, crate::snapshots::control(state, &e.target)?.1)))
+            .collect()
+    }
+
+    /// Captures the current values as a new snapshot, "Snapshot N", a jump until it gets a
+    /// length and a clock. Its id.
+    pub fn capture(&mut self, state: &PatchState) -> Result<u64, String> {
+        if self.draft.snapshots.len() >= MAX_SNAPSHOTS {
+            let e = format!("At most {MAX_SNAPSHOTS} snapshots");
+            self.note = Some(e.clone());
+            return Err(e);
+        }
+        let id = self.draft.next_interface;
+        let name = (1..)
+            .map(|n| format!("Snapshot {n}"))
+            .find(|n| self.draft.snapshots.iter().all(|s| s.name != *n))
+            .unwrap();
+        let values = self.values(state);
+        self.push();
+        self.draft.snapshots.push(Snapshot {
+            id,
+            name,
+            values,
+            morph_beats: 0.0,
+            clock: None,
+        });
+        self.draft.next_interface += 1;
+        Ok(id)
+    }
+
+    /// Changes snapshot `snap` with `f` as one step, when that changes it.
+    fn edit_snapshot(&mut self, snap: u64, f: impl FnOnce(&mut Snapshot)) {
+        let Some(i) = self.draft.snapshots.iter().position(|s| s.id == snap) else {
+            return;
+        };
+        let mut s = self.draft.snapshots[i].clone();
+        f(&mut s);
+        if s != self.draft.snapshots[i] {
+            self.push();
+            self.draft.snapshots[i] = s;
+        }
+    }
+
+    /// Replaces snapshot `snap`'s values with the current ones.
+    pub fn recapture(&mut self, state: &PatchState, snap: u64) {
+        let values = self.values(state);
+        self.edit_snapshot(snap, |s| s.values = values);
+    }
+
+    /// Names snapshot `snap` (1-40 characters, trimmed).
+    pub fn rename(&mut self, snap: u64, name: &str) -> Result<(), String> {
+        let name = name.trim();
+        if name.is_empty() || name.chars().count() > 40 {
+            let e = "A snapshot name is 1-40 characters".to_string();
+            self.note = Some(e.clone());
+            return Err(e);
+        }
+        self.edit_snapshot(snap, |s| s.name = name.into());
+        Ok(())
+    }
+
+    /// Sets snapshot `snap`'s morph length (0-16 beats; 0 jumps) and reference clock.
+    pub fn set_morph(
+        &mut self,
+        state: &PatchState,
+        snap: u64,
+        beats: f32,
+        clock: Option<ModuleId>,
+    ) -> Result<(), String> {
+        if clock.is_some_and(|c| state.modules.get(&c).is_none_or(|m| m.kind != "clock")) {
+            let e = "The reference clock must be a clock module".to_string();
+            self.note = Some(e.clone());
+            return Err(e);
+        }
+        let beats = beats.clamp(0.0, crate::cues::MAX_MORPH_BEATS);
+        self.edit_snapshot(snap, |s| (s.morph_beats, s.clock) = (beats, clock));
+        Ok(())
+    }
+
+    /// Deletes snapshot `snap` and, in the same step, the draft's buttons that recall it
+    /// (FACES.md section 3.4). Its id is not reused.
+    pub fn delete_snapshot(&mut self, snap: u64) {
+        if self.draft.snapshots.iter().all(|s| s.id != snap) {
+            return;
+        }
+        self.push();
+        self.draft.snapshots.retain(|s| s.id != snap);
+        let gone = Some(Source::Snapshot { id: snap });
+        self.draft.panel.placements.retain(|_, p| p.source != gone);
+        self.selected = self
+            .selected
+            .filter(|k| self.draft.panel.placements.contains_key(k));
+    }
 }
 
 /// Writes the draft over the current composite as one project undo step: its panel, snapshots
@@ -729,18 +864,38 @@ fn apply(editor: &mut PatchEditor, page: &mut Page, confirmed: bool) -> Result<b
 }
 
 /// A number field that edits a text copy and gives the number back when focus leaves it.
-fn num_field(ui: &mut egui::Ui, st: &Style, key: &str, v: f32) -> (egui::Response, Option<f32>) {
+pub(crate) fn num_field(
+    ui: &mut egui::Ui,
+    st: &Style,
+    key: &str,
+    v: f32,
+) -> (egui::Response, Option<f32>) {
+    let (r, s) = text_field(ui, st, key, &format!("{v}"), 64.0);
+    (
+        r,
+        s.and_then(|s| s.trim().parse::<f32>().ok().filter(|x| x.is_finite())),
+    )
+}
+
+/// A text field that edits a copy of `v` and gives it back when focus leaves it.
+pub(crate) fn text_field(
+    ui: &mut egui::Ui,
+    st: &Style,
+    key: &str,
+    v: &str,
+    width: f32,
+) -> (egui::Response, Option<String>) {
     let id = Id::new(("design-num", key));
     let mut s = ui
         .data_mut(|d| d.get_temp::<String>(id))
-        .unwrap_or_else(|| format!("{v}"));
-    let r = kit::field(ui, st, &mut s, "", None, Some(64.0));
+        .unwrap_or_else(|| v.to_string());
+    let r = kit::field(ui, st, &mut s, "", None, Some(width));
     let mut out = None;
     if r.has_focus() {
         ui.data_mut(|d| d.insert_temp(id, s));
     } else {
         if r.lost_focus() {
-            out = s.trim().parse::<f32>().ok().filter(|x| x.is_finite());
+            out = Some(s);
         }
         ui.data_mut(|d| d.remove::<String>(id));
     }
@@ -765,6 +920,8 @@ pub fn show(editor: &mut PatchEditor, view: &mut UiState, ui: &mut egui::Ui) {
     );
     let right = Rect::from_min_max(pos2(area.right() - INSPECTOR_W, bar.bottom()), area.max);
     let canvas = Rect::from_min_max(pos2(left.right(), bar.bottom()), right.left_bottom());
+    let list = Rect::from_min_max(pos2(canvas.left(), canvas.bottom() - LIST_H), canvas.max);
+    let canvas = Rect::from_min_max(canvas.min, pos2(canvas.right(), list.top()));
     let mut close = false;
     if page.ask.is_none() && !crate::routing::wants_text_input(ui.ctx()) {
         keys(editor, ui, &mut page, &mut close);
@@ -777,6 +934,7 @@ pub fn show(editor: &mut PatchEditor, view: &mut UiState, ui: &mut egui::Ui) {
         (bar.left_bottom(), bar.right_bottom()),
         (left.right_top(), left.right_bottom()),
         (right.left_top(), right.left_bottom()),
+        (list.left_top(), list.right_top()),
     ] {
         p.line_segment([a, b], Stroke::new(1.0, st.roles.line));
     }
@@ -784,6 +942,7 @@ pub fn show(editor: &mut PatchEditor, view: &mut UiState, ui: &mut egui::Ui) {
     palette(editor, view, ui, st, &mut page, left);
     face(editor, view, ui, st, &mut page, current.as_ref(), canvas);
     inspector(editor, view, ui, st, &mut page, right);
+    crate::snapshots::design_list(editor, view, ui, st, &mut page, list);
     if changed {
         let strip = Rect::from_min_size(
             canvas.min + vec2(16.0, 12.0),
@@ -1086,6 +1245,48 @@ fn palette(
                         }
                     });
                 }
+                let snaps: Vec<(u64, String)> = page
+                    .draft
+                    .snapshots
+                    .iter()
+                    .map(|s| (s.id, s.name.clone()))
+                    .collect();
+                for (id, name) in snaps {
+                    let source = Source::Snapshot { id };
+                    let placed = page.button_of(&source).is_some();
+                    ui.horizontal(|ui| {
+                        let r = ui.add(
+                            kit::Button::new(st, format!("Snapshot · {name}"))
+                                .g4(32.0)
+                                .ghost()
+                                .min_width(if placed { 160.0 } else { 236.0 }),
+                        );
+                        view.record(button_hit(&source), r.rect);
+                        if placed {
+                            g4::chip_label(ui, st, "placed", true, Some(st.roles.good));
+                        }
+                        if r.clicked() {
+                            page.note = page.add_button(editor.state(), source).err();
+                        }
+                    });
+                }
+                kit::section(ui, st, "Blocks");
+                let placed = page.strip().is_some();
+                ui.horizontal(|ui| {
+                    let r = ui.add(
+                        kit::Button::new(st, "Snapshot strip")
+                            .g4(32.0)
+                            .ghost()
+                            .min_width(if placed { 160.0 } else { 236.0 }),
+                    );
+                    view.record("design:block:snapshots".into(), r.rect);
+                    if placed {
+                        g4::chip_label(ui, st, "placed", true, Some(st.roles.good));
+                    }
+                    if r.clicked() {
+                        page.note = page.add_strip(editor.state()).err();
+                    }
+                });
             });
     });
 }
@@ -1304,6 +1505,7 @@ fn face(
     if let Some(current) = current {
         let mut shown = current.clone();
         shown.panel = Some(Box::new(panel.clone()));
+        shown.snapshots = page.draft.snapshots.clone();
         let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect));
         child.set_clip_rect(rect.intersect(ui.clip_rect()));
         // The face's own hit rects would point the rack's keys at the page.

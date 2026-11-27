@@ -303,6 +303,45 @@ fn a_morphing_recall_sends_other_values_then_its_parts_and_never_a_value_for_its
     assert_eq!(sent.len(), 1);
 }
 
+/// Recalls the morphing snapshot after `live` reported on the cutoff, then undoes it; the
+/// cutoff morph's start.
+fn cutoff_from(f: &mut Fix, snap: u64, live: Option<(f32, std::time::Instant)>) -> f32 {
+    let mut ui = UiState::default();
+    snapshots::recall(&mut f.editor, &mut ui, f.lead, snap);
+    let cutoff = |ui: &UiState| {
+        *ui.morphs[0].parts[0]
+            .targets
+            .iter()
+            .find(|t| t.to == 3000.0)
+            .unwrap()
+    };
+    let target = cutoff(&ui).target;
+    assert!(f.editor.undo());
+    let mut ui = UiState::default();
+    if let Some((progress, at)) = live {
+        ui.accept_morph(target, 1000.0, 2000.0, progress, at);
+    }
+    snapshots::recall(&mut f.editor, &mut ui, f.lead, snap);
+    let from = cutoff(&ui).from;
+    assert!(f.editor.undo());
+    from
+}
+
+#[test]
+fn a_recall_during_a_running_morph_starts_from_the_live_engine_value() {
+    let mut f = fixture();
+    let snap = morphing(&mut f);
+    let stored = value(&f.editor, FILTER, "cutoff_hz");
+    assert_ne!(stored, 1000.0);
+    let now = std::time::Instant::now();
+    assert_eq!(cutoff_from(&mut f, snap, None), stored);
+    assert_eq!(cutoff_from(&mut f, snap, Some((0.5, now))), 1000.0);
+    // An arrived morph, or a report that stopped coming, starts from the document.
+    assert_eq!(cutoff_from(&mut f, snap, Some((1.0, now))), stored);
+    let stale = now - std::time::Duration::from_secs(1);
+    assert_eq!(cutoff_from(&mut f, snap, Some((0.5, stale))), stored);
+}
+
 #[test]
 fn a_recall_without_a_clock_or_length_jumps() {
     let mut f = fixture();

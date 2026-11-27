@@ -140,6 +140,42 @@ impl UiState {
         (at.elapsed() < std::time::Duration::from_millis(400)).then_some(*m)
     }
 
+    /// Takes one morph report from the audio thread: `target` is at `value`, heading to `to`,
+    /// `progress` of the way (1 = arrived, held). A macro's goes to `macro_live`, any other
+    /// param's to `param_live`.
+    pub fn accept_morph(
+        &mut self,
+        target: kabl_engine::runtime::RuntimeTarget,
+        value: f32,
+        to: f32,
+        progress: f32,
+        at: std::time::Instant,
+    ) {
+        let live = MacroLive {
+            value,
+            to,
+            progress,
+        };
+        match target {
+            kabl_engine::runtime::RuntimeTarget::Param {
+                id,
+                kind: "macro",
+                index,
+            } => {
+                self.macro_live.insert((id, index as u8), (live, at));
+            }
+            t => {
+                self.param_live.insert(t, (live, at));
+            }
+        }
+    }
+
+    /// What the audio thread says about a morph moving `target`, while its reports keep coming.
+    pub fn live_param(&self, target: &kabl_engine::runtime::RuntimeTarget) -> Option<MacroLive> {
+        let (m, at) = self.param_live.get(target)?;
+        (at.elapsed() < std::time::Duration::from_millis(400)).then_some(*m)
+    }
+
     /// Where param `p` of `id` is now: a macro a cue is driving reads as the cue moved it,
     /// anything else as stored.
     pub fn param_now(&self, state: &PatchState, id: ModuleId, p: &kabl_modules::ParamInfo) -> f32 {
@@ -270,6 +306,9 @@ pub struct UiState {
     /// Macros a cue is moving or holding, as the audio thread reports them: `(macro module,
     /// output)` to what was last reported and when. The stored knob value is the hand's.
     pub macro_live: HashMap<(ModuleId, u8), (MacroLive, std::time::Instant)>,
+    /// Other params a snapshot morph is moving or holding, reported the same way: where a new
+    /// recall's morph of them starts.
+    pub param_live: HashMap<kabl_engine::runtime::RuntimeTarget, (MacroLive, std::time::Instant)>,
     /// The cue last launched on each `cues` module: the one a macro-only cue (no sequencer to
     /// show it playing) counts as current, and the one "Store macros" writes to.
     pub last_cue: HashMap<ModuleId, usize>,
@@ -525,6 +564,7 @@ impl Default for UiState {
             clock_running: HashMap::new(),
             clock_pos: HashMap::new(),
             macro_live: HashMap::new(),
+            param_live: HashMap::new(),
             last_cue: HashMap::new(),
             live: displays::Live::default(),
             wants: displays::Wants::default(),

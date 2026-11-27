@@ -582,3 +582,140 @@ fn the_kind_chooser_offers_a_toggle_only_for_a_two_option_param() {
     let applied = h.editor.state().composites[&amp].panel.clone().unwrap();
     assert_eq!(applied.placements[&key].kind, Kind::Toggle);
 }
+
+impl H {
+    fn page_mut(&mut self) -> &mut Page {
+        self.ui
+            .panels
+            .page
+            .as_mut()
+            .expect("the design page is open")
+    }
+
+    /// The plain composite's page with one snapshot captured by the list's Capture button.
+    fn with_snapshot() -> (Self, u64) {
+        let mut h = H::new();
+        h.open(h.plain);
+        h.click("design:snap:capture");
+        let id = h.page().draft.snapshots[0].id;
+        (h, id)
+    }
+
+    fn cutoff(&self) -> f32 {
+        self.editor.state().modules[&3].params["cutoff_hz"]
+    }
+}
+
+#[test]
+fn capture_is_one_draft_step_holding_every_exposed_control() {
+    let mut h = H::new();
+    h.open(h.plain);
+    let before = h.page().draft.clone();
+    h.click("design:snap:capture");
+    let s = &h.page().draft.snapshots[0];
+    assert_eq!(s.name, "Snapshot 1");
+    assert_eq!((s.morph_beats, s.clock), (0.0, None));
+    let cutoff = h.keys(h.plain)[0];
+    assert_eq!(s.values, [(cutoff, 3000.0)].into());
+    assert_eq!(h.page().draft.next_interface, before.next_interface + 1);
+    h.click("design:snap:capture");
+    assert_eq!(h.page().draft.snapshots[1].name, "Snapshot 2");
+    h.click("design:undo");
+    h.click("design:undo");
+    assert_eq!(h.page().draft, before);
+}
+
+#[test]
+fn capture_is_refused_past_the_limit() {
+    let mut h = H::new();
+    h.open(h.plain);
+    let state = h.editor.state().clone();
+    for _ in 0..16 {
+        h.page_mut().capture(&state).unwrap();
+    }
+    let draft = h.page().draft.clone();
+    assert!(h.page_mut().capture(&state).is_err());
+    assert_eq!(h.page().draft, draft);
+}
+
+#[test]
+fn recapture_takes_the_current_values_as_one_step() {
+    let (mut h, id) = H::with_snapshot();
+    let before = h.page().draft.clone();
+    // Nothing changed: no step.
+    h.click(&format!("design:snap:recapture:{id}"));
+    assert_eq!(h.page().draft, before);
+    h.editor.set_param(3, "cutoff_hz", 800.0);
+    h.click(&format!("design:snap:recapture:{id}"));
+    let cutoff = h.keys(h.plain)[0];
+    assert_eq!(h.page().draft.snapshots[0].values[&cutoff], 800.0);
+    h.click("design:undo");
+    assert_eq!(h.page().draft, before);
+}
+
+#[test]
+fn rename_trims_refuses_bad_names_and_is_one_step() {
+    let (mut h, id) = H::with_snapshot();
+    let before = h.page().draft.clone();
+    assert!(h.page_mut().rename(id, "   ").is_err());
+    assert!(h.page_mut().rename(id, &"x".repeat(41)).is_err());
+    assert_eq!(h.page().draft, before);
+    h.page_mut().rename(id, "  Drop  ").unwrap();
+    assert_eq!(h.page().draft.snapshots[0].name, "Drop");
+    assert!(h.page_mut().undo());
+    assert_eq!(h.page().draft, before);
+}
+
+#[test]
+fn morph_beats_and_clock_are_one_step_and_the_clock_must_be_a_clock() {
+    let (mut h, id) = H::with_snapshot();
+    let clock = h.editor.add_module("clock", Default::default());
+    let state = h.editor.state().clone();
+    let before = h.page().draft.clone();
+    assert!(h.page_mut().set_morph(&state, id, 4.0, Some(3)).is_err());
+    assert_eq!(h.page().draft, before);
+    h.page_mut()
+        .set_morph(&state, id, 40.0, Some(clock))
+        .unwrap();
+    let s = &h.page().draft.snapshots[0];
+    assert_eq!((s.morph_beats, s.clock), (16.0, Some(clock)));
+    assert!(h.page_mut().undo());
+    assert_eq!(h.page().draft, before);
+}
+
+#[test]
+fn deleting_a_snapshot_drops_its_buttons_in_the_same_step() {
+    let (mut h, id) = H::with_snapshot();
+    h.click(&format!("design:button:snapshot:{id}"));
+    h.click("design:block:snapshots");
+    let kinds = |h: &H| -> Vec<Kind> {
+        h.page()
+            .draft
+            .panel
+            .placements
+            .values()
+            .map(|p| p.kind)
+            .collect()
+    };
+    assert_eq!(kinds(&h).len(), 2, "{:?}", h.page().note);
+    assert!(kinds(&h).contains(&Kind::Snapshots));
+    let before = h.page().draft.clone();
+    h.click(&format!("design:snap:delete:{id}"));
+    assert!(h.page().draft.snapshots.is_empty());
+    assert_eq!(kinds(&h), vec![Kind::Snapshots]);
+    h.click("design:undo");
+    assert_eq!(h.page().draft, before);
+}
+
+#[test]
+fn applied_snapshots_recall_from_the_list() {
+    let (mut h, id) = H::with_snapshot();
+    // Recall is offered only once Apply has written the snapshot.
+    h.editor.set_param(3, "cutoff_hz", 800.0);
+    h.click(&format!("design:snap:recall:{id}"));
+    assert_eq!(h.cutoff(), 800.0);
+    h.click("design:apply");
+    assert_eq!(h.editor.state().composites[&h.plain].snapshots.len(), 1);
+    h.click(&format!("design:snap:recall:{id}"));
+    assert_eq!(h.cutoff(), 3000.0);
+}
