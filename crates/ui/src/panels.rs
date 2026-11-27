@@ -46,6 +46,7 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
                 | Kind::Icons
                 | Kind::Display
                 | Kind::Button
+                | Kind::Snapshots
         ) {
             return Err(format!(
                 "Binding {id}: {:?} elements are not supported yet",
@@ -66,27 +67,20 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
         if p.kind == Kind::Button {
             // `Panel::validate` has checked the source shape and `composite::validate` that a
             // face target is a nested button.
-            match &p.source {
-                Some(Source::Module {
-                    id: leaf,
-                    action: Some(action),
-                }) => {
-                    let m = state.modules.get(leaf).ok_or_else(|| {
-                        format!("Binding {id}: the button's module {leaf} is missing")
-                    })?;
-                    if !offers(&m.kind, action) {
-                        return Err(format!(
-                            "Binding {id}: {} modules have no {action} button",
-                            m.kind
-                        ));
-                    }
-                }
-                Some(Source::Snapshot { .. }) => {
+            if let Some(Source::Module {
+                id: leaf,
+                action: Some(action),
+            }) = &p.source
+            {
+                let m = state.modules.get(leaf).ok_or_else(|| {
+                    format!("Binding {id}: the button's module {leaf} is missing")
+                })?;
+                if !offers(&m.kind, action) {
                     return Err(format!(
-                        "Binding {id}: snapshot buttons are not supported yet"
-                    ))
+                        "Binding {id}: {} modules have no {action} button",
+                        m.kind
+                    ));
                 }
-                _ => {}
             }
         }
         if let Some(e) = c.controls.get(&id) {
@@ -164,10 +158,18 @@ fn offers(kind: &str, action: &str) -> bool {
         _ => false,
     }
 }
-/// The leaf and action a press of button `key` on composite `id`'s face ends on, following face
-/// targets into nested composites; None when a link of the chain is gone.
-pub fn resolve(state: &PatchState, id: CompositeId, key: u64) -> Option<(ModuleId, String)> {
-    chain(state, placement(state, id, key)?)
+/// Where a button's chain of face targets ends.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum End {
+    /// A module action, fired as the module face fires it.
+    Action(ModuleId, String),
+    /// Snapshot `.1` of composite `.0`.
+    Snapshot(CompositeId, u64),
+}
+/// Where a press of button `key` on composite `id`'s face ends, following face targets into
+/// nested composites; None when a link of the chain is gone.
+pub fn resolve(state: &PatchState, id: CompositeId, key: u64) -> Option<End> {
+    chain(state, id, placement(state, id, key)?)
 }
 fn placement(state: &PatchState, id: CompositeId, key: u64) -> Option<&Placement> {
     state
@@ -178,9 +180,9 @@ fn placement(state: &PatchState, id: CompositeId, key: u64) -> Option<&Placement
         .placements
         .get(&key)
 }
-/// The leaf and action button `p` ends on. `p` need not be in the document: the design page
-/// draws its draft's buttons.
-fn chain<'a>(state: &'a PatchState, mut p: &'a Placement) -> Option<(ModuleId, String)> {
+/// Where button `p` on composite `id`'s face ends. `p` need not be in the document: the design
+/// page draws its draft's buttons.
+fn chain<'a>(state: &'a PatchState, mut id: CompositeId, mut p: &'a Placement) -> Option<End> {
     // Every hop goes strictly deeper and nesting is at most 8, so a valid chain ends by then.
     for _ in 0..=8 {
         if p.kind != Kind::Button {
@@ -190,25 +192,43 @@ fn chain<'a>(state: &'a PatchState, mut p: &'a Placement) -> Option<(ModuleId, S
             Source::Module {
                 id: leaf,
                 action: Some(action),
-            } => return Some((*leaf, action.clone())),
-            Source::Face { composite, key } => p = placement(state, *composite, *key)?,
+            } => return Some(End::Action(*leaf, action.clone())),
+            Source::Face { composite, key } => {
+                id = *composite;
+                p = placement(state, id, *key)?;
+            }
+            Source::Snapshot { id: snap } => {
+                let c = state.composites.get(&id)?;
+                return c
+                    .snapshots
+                    .iter()
+                    .any(|s| s.id == *snap)
+                    .then_some(End::Snapshot(id, *snap));
+            }
             _ => return None,
         }
     }
     None
 }
 /// Presses button `key` on composite `id`'s face: the action its chain ends on, fired as a module
-/// face fires it (host-clock refusal and cue timing included). A broken chain does nothing.
-pub fn press(editor: &PatchEditor, view: &mut UiState, id: CompositeId, key: u64) {
-    if let Some((leaf, action)) = resolve(editor.state(), id, key) {
-        crate::perform::fire(editor, view, leaf, &action);
+/// face fires it (host-clock refusal and cue timing included), or the snapshot it ends on,
+/// recalled. A broken chain does nothing.
+pub fn press(editor: &mut PatchEditor, view: &mut UiState, id: CompositeId, key: u64) {
+    match resolve(editor.state(), id, key) {
+        Some(End::Action(leaf, action)) => crate::perform::fire(editor, view, leaf, &action),
+        Some(End::Snapshot(c, snap)) => {
+            crate::snapshots::recall(editor, view, c, snap);
+        }
+        None => {}
     }
 }
-/// `(lit, queued)` of button `p`: the state of the cue or bank its chain ends on, as the module
-/// face shows it.
-pub fn lit(view: &UiState, state: &PatchState, p: &Placement) -> (bool, bool) {
-    let Some((leaf, action)) = chain(state, p) else {
-        return (false, false);
+/// `(lit, queued)` of button `p` on composite `id`'s face: the state of the cue or bank its
+/// chain ends on, as the module face shows it, or whether its snapshot was the last recalled.
+pub fn lit(view: &UiState, state: &PatchState, id: CompositeId, p: &Placement) -> (bool, bool) {
+    let (leaf, action) = match chain(state, id, p) {
+        Some(End::Action(leaf, action)) => (leaf, action),
+        Some(End::Snapshot(c, snap)) => return (view.last_snapshot.get(&c) == Some(&snap), false),
+        None => return (false, false),
     };
     let bank_of = |s: ModuleId| {
         view.seq_banks
@@ -236,16 +256,33 @@ pub fn lit(view: &UiState, state: &PatchState, p: &Placement) -> (bool, bool) {
 }
 /// The name button `p` prints: its label, else the name of the button it targets, else its
 /// action's name; empty when its chain is broken.
-pub fn button_name<'a>(state: &'a PatchState, mut p: &'a Placement) -> String {
+pub fn button_name(state: &PatchState, p: &Placement) -> String {
+    name_in(state, None, p)
+}
+/// `button_name` of button `p` on composite `id`'s face, which also names a snapshot it ends on.
+pub fn face_button_name(state: &PatchState, id: CompositeId, p: &Placement) -> String {
+    name_in(state, Some(id), p)
+}
+fn name_in<'a>(state: &'a PatchState, mut id: Option<CompositeId>, mut p: &'a Placement) -> String {
     for _ in 0..=8 {
         if let Some(label) = &p.label {
             return label.clone();
         }
         match &p.source {
             Some(Source::Face { composite, key }) => match placement(state, *composite, *key) {
-                Some(next) => p = next,
+                Some(next) => {
+                    id = Some(*composite);
+                    p = next;
+                }
                 None => break,
             },
+            Some(Source::Snapshot { id: snap }) => {
+                return id
+                    .and_then(|id| state.composites.get(&id))
+                    .and_then(|c| c.snapshots.iter().find(|s| s.id == *snap))
+                    .map(|s| s.name.clone())
+                    .unwrap_or_default()
+            }
             Some(Source::Module {
                 id: leaf,
                 action: Some(action),

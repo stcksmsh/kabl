@@ -56,6 +56,7 @@ use wheel::OwnedScroll;
 pub mod record;
 pub mod routing;
 mod seq_editor;
+pub mod snapshots;
 pub mod sound_preview;
 pub mod style;
 pub mod tables;
@@ -244,6 +245,12 @@ pub struct UiState {
     pub page_pinned: HashSet<ModuleId>,
     /// Bank launches and cancels for `main.rs` to send to the audio thread (runtime only).
     pub launches: Vec<Command>,
+    /// Snapshot recalls to morph, for `control::deliver` (runtime only).
+    pub morphs: Vec<snapshots::MorphRequest>,
+    /// The snapshot last recalled on each composite: the one its buttons and strip light.
+    pub last_snapshot: HashMap<kabl_core::CompositeId, u64>,
+    /// The `seq` of the last recall's morph parts.
+    pub(crate) morph_seq: u32,
     /// Last state of each MIDI button (channel, CC): high = pressed.
     pub(crate) button_high: HashMap<(u8, u8), bool>,
     /// Egui time before which button presses only set state (after a (re)connect).
@@ -506,6 +513,9 @@ impl Default for UiState {
             edit_page: HashMap::new(),
             page_pinned: HashSet::new(),
             launches: Vec::new(),
+            morphs: Vec::new(),
+            last_snapshot: HashMap::new(),
+            morph_seq: 0,
             bank_rename: None,
             cue_rename: None,
             button_high: HashMap::new(),
@@ -5996,13 +6006,34 @@ fn draw_authored_face(
             continue;
         }
         if p.kind == Kind::Button {
-            // A pad in the cue-pad look, lit as the cue or bank its chain ends on.
-            let (on, queued) = panels::lit(view, editor.state(), p);
-            let name = panels::button_name(editor.state(), p);
+            // A pad in the cue-pad look, lit as the cue, bank or snapshot its chain ends on.
+            let (on, queued) = panels::lit(view, editor.state(), id, p);
+            let name = panels::face_button_name(editor.state(), id, p);
             let now = ui.input(|i| i.time);
             let hit = format!("composite:{id}:button:{key}");
             if pad(view, ui, &painter, z, hit, screen, &name, on, queued, now).clicked() {
                 panels::press(editor, view, id, key);
+            }
+            continue;
+        }
+        if p.kind == Kind::Snapshots {
+            // One pad per snapshot in list order, the last recalled lit.
+            let snaps: Vec<(u64, String)> =
+                c.snapshots.iter().map(|s| (s.id, s.name.clone())).collect();
+            let gap = 6.0 * z;
+            let w = (screen.width() - gap * (snaps.len().max(1) - 1) as f32)
+                / snaps.len().max(1) as f32;
+            let now = ui.input(|i| i.time);
+            for (i, (snap, name)) in snaps.into_iter().enumerate() {
+                let r = Rect::from_min_size(
+                    screen.min + vec2((w + gap) * i as f32, 0.0),
+                    vec2(w, screen.height()),
+                );
+                let on = view.last_snapshot.get(&id) == Some(&snap);
+                let hit = format!("composite:{id}:snapshot:{key}.{snap}");
+                if pad(view, ui, &painter, z, hit, r, &name, on, false, now).clicked() {
+                    snapshots::recall(editor, view, id, snap);
+                }
             }
             continue;
         }

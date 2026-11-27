@@ -27,6 +27,7 @@ use kabl_engine::patch_engine::Command;
 use kabl_engine::runtime::{runtime_changes, Feedback, ParamSet, RuntimeTarget, ToAudio};
 use kabl_modules::builtins::Transport;
 
+use crate::snapshots::MorphRequest;
 use crate::{perform, PatchEditor, UiState};
 
 /// Messages the control queue holds.
@@ -161,6 +162,19 @@ impl Delivery {
     /// Brings the audio side to `doc`. `fresh`: a Load (compiled, no state carried);
     /// `stopped`: its clocks start stopped.
     pub fn sync(&mut self, doc: &PatchState, fresh: bool, stopped: bool) -> Outcome {
+        self.sync_skipping(doc, fresh, stopped, &[])
+    }
+
+    /// `sync`, holding no value for a target in `skip` when it sends values (a snapshot
+    /// recall's morph moves those, FACES.md section 3.2). `sent` still records them, so a later
+    /// diff does not send them either. A compile ignores `skip`: the graph plays the document.
+    pub fn sync_skipping(
+        &mut self,
+        doc: &PatchState,
+        fresh: bool,
+        stopped: bool,
+        skip: &[RuntimeTarget],
+    ) -> Outcome {
         let changes = match &self.sent {
             _ if self.compiling.is_some() || self.next_compile.is_some() => None,
             Some(sent) if !fresh => runtime_changes(sent, doc),
@@ -170,6 +184,11 @@ impl Delivery {
             Some(v) if v.is_empty() => Outcome::Nothing,
             Some(v) if self.held.len() + v.len() <= MAX_HELD => {
                 for (target, value) in &v {
+                    if skip.contains(target) {
+                        // An older value still waiting would land the target before its morph.
+                        self.held.remove(target);
+                        continue;
+                    }
                     self.rev += 1;
                     let s = ParamSet {
                         rev: self.rev,
@@ -450,9 +469,28 @@ impl Drop for Delivery {
 }
 
 /// Delivers what the editor and the UI state ask for: document changes (when the editor is
-/// dirty), then queued launches, previews, inspection and transport commands. A command the
-/// queue refuses is reported, never counted as done.
+/// dirty), then snapshot morphs (when the changes went as values; otherwise the recall jumps),
+/// then queued launches, previews, inspection and transport commands. A command the queue
+/// refuses is reported, never counted as done.
 pub fn deliver(editor: &mut PatchEditor, ui_state: &mut UiState, d: &mut Delivery) -> Outcome {
+    // A recall morphs only when every one of its parts fits behind what already waits; one
+    // that does not is not skipped, so `sync` sends its values (a jump). Nothing else queues
+    // an action between here and the parts.
+    let mut room = match d.tx {
+        Some(_) => MAX_HELD_ACTIONS - d.held_actions.len(),
+        None => 0,
+    };
+    let morphs: Vec<MorphRequest> = std::mem::take(&mut ui_state.morphs)
+        .into_iter()
+        .filter(|r| {
+            let fits = r.parts.len() <= room;
+            if fits {
+                room -= r.parts.len();
+            }
+            fits
+        })
+        .collect();
+    let skip: Vec<RuntimeTarget> = morphs.iter().flat_map(|r| r.targets.clone()).collect();
     let out = if editor.take_dirty() {
         if let Some(s) = ui_state.open_scope.take() {
             match d.scope {
@@ -462,7 +500,15 @@ pub fn deliver(editor: &mut PatchEditor, ui_state: &mut UiState, d: &mut Deliver
         }
         let fresh = std::mem::take(&mut ui_state.loaded);
         let stopped = std::mem::take(&mut ui_state.load_stopped);
-        d.sync(editor.state(), fresh, stopped)
+        let out = d.sync_skipping(editor.state(), fresh, stopped, &skip);
+        // On the compile path the graph already plays the targets: the recalls jump.
+        if matches!(out, Outcome::Nothing | Outcome::Values(_)) {
+            for c in morphs.into_iter().flat_map(|r| r.parts) {
+                let queued = d.command(Command::Morph(c));
+                debug_assert!(queued, "room was checked before sync");
+            }
+        }
+        out
     } else {
         Outcome::Nothing
     };
