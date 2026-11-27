@@ -2,8 +2,8 @@
 use crate::wheel::OwnedScroll;
 use crate::{composites, PatchEditor, UiState};
 use kabl_core::{
-    panel::{Artwork, Kind, Panel},
-    Composite, CompositeId, PortRef,
+    panel::{Artwork, Kind, Panel, Placement, Source},
+    Composite, CompositeId, ModuleId, PatchState, PortRef,
 };
 use kabl_modules::{registry, Taper};
 use std::{collections::BTreeMap, path::Path};
@@ -45,6 +45,7 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
                 | Kind::Toggle
                 | Kind::Icons
                 | Kind::Display
+                | Kind::Button
         ) {
             return Err(format!(
                 "Binding {id}: {:?} elements are not supported yet",
@@ -53,13 +54,39 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
         }
         if p.kind == Kind::Display {
             // `Panel::validate` has checked the source is a module without an action.
-            if let Some(kabl_core::panel::Source::Module { id: leaf, .. }) = p.source {
+            if let Some(Source::Module { id: leaf, .. }) = p.source {
                 let m = state.modules.get(&leaf).ok_or_else(|| {
                     format!("Binding {id}: the display's module {leaf} is missing")
                 })?;
                 if !crate::displays::has_display(&m.kind) {
                     return Err(format!("Binding {id}: {} modules have no display", m.kind));
                 }
+            }
+        }
+        if p.kind == Kind::Button {
+            // `Panel::validate` has checked the source shape and `composite::validate` that a
+            // face target is a nested button.
+            match &p.source {
+                Some(Source::Module {
+                    id: leaf,
+                    action: Some(action),
+                }) => {
+                    let m = state.modules.get(leaf).ok_or_else(|| {
+                        format!("Binding {id}: the button's module {leaf} is missing")
+                    })?;
+                    if !offers(&m.kind, action) {
+                        return Err(format!(
+                            "Binding {id}: {} modules have no {action} button",
+                            m.kind
+                        ));
+                    }
+                }
+                Some(Source::Snapshot { .. }) => {
+                    return Err(format!(
+                        "Binding {id}: snapshot buttons are not supported yet"
+                    ))
+                }
+                _ => {}
             }
         }
         if let Some(e) = c.controls.get(&id) {
@@ -116,6 +143,119 @@ pub(crate) fn glyphs(state: &kabl_core::PatchState, target: &PortRef) -> bool {
         .modules
         .get(id)
         .is_some_and(|m| crate::displays::has_glyphs(&m.kind, param))
+}
+/// Whether `kind` modules have the button `action` (`perform::button_actions`). A cue button is
+/// checked by number only: deleting the cue leaves a button that says "no such cue" when pressed
+/// instead of a patch whose composites can no longer be edited.
+fn offers(kind: &str, action: &str) -> bool {
+    let index = |prefix: &str, range: std::ops::Range<usize>| {
+        action
+            .strip_prefix(prefix)
+            .and_then(|n| n.parse::<usize>().ok())
+            .is_some_and(|i| range.contains(&i))
+    };
+    match kind {
+        "cues" => action == "cancel" || index("cue.", 1..kabl_modules::builtins::CUES + 1),
+        "seq" => index("bank.", 0..kabl_modules::builtins::seq::BANKS),
+        "clock" => matches!(action, "run" | "restart"),
+        _ => false,
+    }
+}
+/// The leaf and action a press of button `key` on composite `id`'s face ends on, following face
+/// targets into nested composites; None when a link of the chain is gone.
+pub fn resolve(state: &PatchState, id: CompositeId, key: u64) -> Option<(ModuleId, String)> {
+    chain(state, placement(state, id, key)?)
+}
+fn placement(state: &PatchState, id: CompositeId, key: u64) -> Option<&Placement> {
+    state
+        .composites
+        .get(&id)?
+        .panel
+        .as_ref()?
+        .placements
+        .get(&key)
+}
+/// The leaf and action button `p` ends on. `p` need not be in the document: the design page
+/// draws its draft's buttons.
+fn chain<'a>(state: &'a PatchState, mut p: &'a Placement) -> Option<(ModuleId, String)> {
+    // Every hop goes strictly deeper and nesting is at most 8, so a valid chain ends by then.
+    for _ in 0..=8 {
+        if p.kind != Kind::Button {
+            return None;
+        }
+        match p.source.as_ref()? {
+            Source::Module {
+                id: leaf,
+                action: Some(action),
+            } => return Some((*leaf, action.clone())),
+            Source::Face { composite, key } => p = placement(state, *composite, *key)?,
+            _ => return None,
+        }
+    }
+    None
+}
+/// Presses button `key` on composite `id`'s face: the action its chain ends on, fired as a module
+/// face fires it (host-clock refusal and cue timing included). A broken chain does nothing.
+pub fn press(editor: &PatchEditor, view: &mut UiState, id: CompositeId, key: u64) {
+    if let Some((leaf, action)) = resolve(editor.state(), id, key) {
+        crate::perform::fire(editor, view, leaf, &action);
+    }
+}
+/// `(lit, queued)` of button `p`: the state of the cue or bank its chain ends on, as the module
+/// face shows it.
+pub fn lit(view: &UiState, state: &PatchState, p: &Placement) -> (bool, bool) {
+    let Some((leaf, action)) = chain(state, p) else {
+        return (false, false);
+    };
+    let bank_of = |s: ModuleId| {
+        view.seq_banks
+            .get(&s)
+            .copied()
+            .unwrap_or((crate::banks::startup(state, s), None))
+    };
+    match action.split_once('.') {
+        Some(("cue", n)) => {
+            let all = crate::cues::cues(state, leaf);
+            let standing =
+                crate::cues::standing_all(&all, &bank_of, view.last_cue.get(&leaf).copied());
+            n.parse::<usize>()
+                .ok()
+                .and_then(|n| all.iter().position(|c| c.n == n))
+                .map_or((false, false), |i| standing[i])
+        }
+        Some(("bank", b)) => {
+            let b = b.parse::<usize>().ok();
+            let (playing, queued) = bank_of(leaf);
+            (b == Some(playing), b.is_some() && queued == b)
+        }
+        _ => (false, false),
+    }
+}
+/// The name button `p` prints: its label, else the name of the button it targets, else its
+/// action's name; empty when its chain is broken.
+pub fn button_name<'a>(state: &'a PatchState, mut p: &'a Placement) -> String {
+    for _ in 0..=8 {
+        if let Some(label) = &p.label {
+            return label.clone();
+        }
+        match &p.source {
+            Some(Source::Face { composite, key }) => match placement(state, *composite, *key) {
+                Some(next) => p = next,
+                None => break,
+            },
+            Some(Source::Module {
+                id: leaf,
+                action: Some(action),
+            }) => {
+                return crate::perform::button_actions(state, *leaf)
+                    .into_iter()
+                    .find_map(|(a, name)| (a == *action).then_some(name))
+                    .unwrap_or_else(|| action.clone())
+            }
+            _ => break,
+        }
+    }
+    String::new()
 }
 /// The module parameter a control exposure aliases.
 pub(crate) fn param_info(

@@ -513,8 +513,8 @@ fn a_display_of_a_leaf_with_one_is_accepted() {
     assert_eq!(face_with(Kind::Display), Ok(()));
 }
 #[test]
-fn buttons_are_not_supported_yet() {
-    assert!(refusal(Kind::Button).ends_with("Button elements are not supported yet"));
+fn a_button_action_its_module_does_not_offer_is_refused() {
+    assert!(refusal(Kind::Button).ends_with("modules have no trigger button"));
 }
 #[test]
 fn cue_pads_are_not_supported_yet() {

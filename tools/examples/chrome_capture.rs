@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 63] = [
+const SCENES: [&str; 65] = [
     "rack",
     "perform",
     "sounds",
@@ -79,6 +79,8 @@ const SCENES: [&str; 63] = [
     "face-display",
     "face-display-min",
     "design-page-displays",
+    "face-buttons",
+    "design-page-buttons",
 ];
 
 struct Job {
@@ -298,6 +300,10 @@ impl App {
                 }
                 e
             }
+            // The button scenes need a clock and sequencers: the performance patch.
+            Err(_) if j.scene.contains("-buttons") => PatchEditor::from_log(
+                kabl_core::load(&patches().join("performance")).expect("performance"),
+            ),
             Err(_) => mockup_patch(j.scene == "wavetable-editor"),
         };
         let mut ui = UiState::default();
@@ -735,6 +741,78 @@ impl App {
                 c.panel = Some(Box::new(panel));
                 kabl_ui::composites::set(&mut self.editor, id, c).unwrap();
             }
+        }
+        // The button scenes, last in SCENES: "Top" holds the performance patch's clock, a cues
+        // module whose cue 1, "Intro", sets both sequencers to bank B, and "Mid", which holds the
+        // bass and "Deep", which holds the arp. Deep's face has the arp's bank B button; Top's has
+        // the cue, the bass's bank B, Deep's button through Mid and the clock's Run. The bass
+        // plays bank B, so its button is the one lit.
+        if j.scene.contains("-buttons") {
+            use kabl_core::panel::{Kind, Panel, Placement, Source};
+            let (clock, bass, arp) = (1, 3, 4);
+            let cues = self
+                .editor
+                .add_module("cues", kabl_core::Vec2 { x: 30.0, y: 10.0 });
+            let n = kabl_ui::cues::add(&mut self.editor, cues, &|_| 0).unwrap();
+            kabl_ui::cues::rename(&mut self.editor, cues, n, "Intro");
+            for seq in [bass, arp] {
+                kabl_ui::cues::set_target(&mut self.editor, cues, n, seq, Some(1));
+            }
+            let composites = kabl_ui::composites::encapsulate;
+            let deep = composites(&mut self.editor, [arp].into(), Default::default(), "Deep");
+            let deep = deep.unwrap();
+            let mid = composites(&mut self.editor, [bass].into(), [deep].into(), "Mid").unwrap();
+            let top = composites(&mut self.editor, [clock, cues].into(), [mid].into(), "Top");
+            let top = top.unwrap();
+            let button = |action: (u64, &str)| Source::Module {
+                id: action.0,
+                action: Some(action.1.into()),
+            };
+            let mut place = |id, sources: Vec<Source>| {
+                let mut c = self.editor.state().composites[&id].clone();
+                let mut panel = Panel {
+                    width: 570.0,
+                    ..Panel::default()
+                };
+                let mut keys = Vec::new();
+                for (i, source) in sources.into_iter().enumerate() {
+                    panel.placements.insert(
+                        c.next_interface,
+                        Placement {
+                            kind: Kind::Button,
+                            x: 12.0 + 138.0 * i as f32,
+                            y: 66.0,
+                            width: 132.0,
+                            height: 48.0,
+                            source: Some(source),
+                            label: None,
+                            icons: Vec::new(),
+                        },
+                    );
+                    keys.push(c.next_interface);
+                    c.next_interface += 1;
+                }
+                c.panel = Some(Box::new(panel));
+                kabl_ui::composites::set(&mut self.editor, id, c).unwrap();
+                keys
+            };
+            let arp_b = place(deep, vec![button((arp, "bank.1"))])[0];
+            if j.scene == "face-buttons" {
+                place(
+                    top,
+                    vec![
+                        button((cues, "cue.1")),
+                        button((bass, "bank.1")),
+                        Source::Face {
+                            composite: deep,
+                            key: arp_b,
+                        },
+                        button((clock, "run")),
+                    ],
+                );
+            }
+            ui.seq_banks.insert(bass, (1, None));
+            ui.seq_banks.insert(arp, (0, None));
         }
         if j.scene.starts_with("face-icons") {
             use kabl_core::panel::{Kind, Panel, Placement};
@@ -1280,7 +1358,7 @@ impl eframe::App for App {
             // "Voice".
             let mut all = self.editor.state().composites.iter();
             let last = scene == "design-page-toggle" || scene.contains("-icons");
-            let (&id, c) = if last || scene.contains("-display") {
+            let (&id, c) = if last || scene.contains("-display") || scene.contains("-buttons") {
                 all.next_back()
             } else {
                 all.next()
@@ -1296,9 +1374,22 @@ impl eframe::App for App {
                 page.add_display(state, leaf).unwrap();
             }
         }
+        // Deep's button and the cue placed from the Buttons list.
+        if self.f == 6 && scene == "design-page-buttons" {
+            let state = self.editor.state();
+            let page = self.ui.panels.page.as_mut().unwrap();
+            for (source, _) in kabl_ui::design_page::buttons(state, page.id) {
+                use kabl_core::panel::Source;
+                let cue = matches!(&source, Source::Module { action: Some(a), .. } if a == "cue.1");
+                if cue || matches!(source, Source::Face { .. }) {
+                    page.add_button(state, source).unwrap();
+                }
+            }
+        }
         // The design page with every exposure placed and the cutoff knob selected; the red-drop
         // scene then drops a jack onto the knob.
-        if self.f == 6 && scene.starts_with("design-page") && scene != "design-page-displays" {
+        let other = ["design-page-displays", "design-page-buttons"];
+        if self.f == 6 && scene.starts_with("design-page") && !other.contains(&scene) {
             let state = self.editor.state();
             let page = self.ui.panels.page.as_mut().unwrap();
             let c = &state.composites[&page.id];
@@ -1345,6 +1436,11 @@ impl eframe::App for App {
                 1.0
             };
             self.ui.pan = egui::vec2(-860.0, -240.0) * self.ui.zoom;
+        }
+        // The "Top" face, first in the rack, at zoom 1.
+        if self.f == 6 && scene == "face-buttons" {
+            self.ui.zoom = 1.0;
+            self.ui.pan = egui::Vec2::ZERO;
         }
         // The display scenes' audio, rendered offline: the engine is built once the scene is set
         // up, then each frame takes the taps the faces ask for, renders a frame's worth of blocks
@@ -1477,6 +1573,18 @@ impl eframe::App for App {
                 pos: at,
                 button: egui::PointerButton::Secondary,
                 pressed: self.f == 8,
+                modifiers: egui::Modifiers::NONE,
+            });
+        }
+        // The palette scrolled down to the Buttons list's nested entries.
+        if self.f == 8 && self.jobs[self.i].scene == "design-page-buttons" {
+            // The clock's Run / Stop entry, module 1 of the performance patch.
+            let at = self.ui.hits["design:button:1.run"].center();
+            self.inject.push(egui::Event::PointerMoved(at));
+            self.inject.push(egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: egui::vec2(0.0, -2000.0),
+                phase: egui::TouchPhase::Move,
                 modifiers: egui::Modifiers::NONE,
             });
         }

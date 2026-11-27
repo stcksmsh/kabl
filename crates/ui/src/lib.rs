@@ -5985,6 +5985,17 @@ fn draw_authored_face(
             );
             continue;
         }
+        if p.kind == Kind::Button {
+            // A pad in the cue-pad look, lit as the cue or bank its chain ends on.
+            let (on, queued) = panels::lit(view, editor.state(), p);
+            let name = panels::button_name(editor.state(), p);
+            let now = ui.input(|i| i.time);
+            let hit = format!("composite:{id}:button:{key}");
+            if pad(view, ui, &painter, z, hit, screen, &name, on, queued, now).clicked() {
+                panels::press(editor, view, id, key);
+            }
+            continue;
+        }
         let local = ui.new_child(egui::UiBuilder::new().max_rect(screen).id_salt((
             "face-control",
             id,
