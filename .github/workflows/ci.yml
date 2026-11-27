@@ -215,6 +215,71 @@ jobs:
       - name: Tests
         run: cargo test --locked -p kabl-ui -p kabl-clap -p kabl-standalone
 
+  windows-installer:
+    # Inno Setup installer and portable zip from release builds and the windows-vst3 bundle,
+    # then a silent install, a launch, an upgrade and an uninstall on this runner
+    # (packaging/windows/README.md). The release builds run here because the windows job
+    # already takes about 25 of its 45 minutes.
+    needs: windows-vst3
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.100.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Release build
+        # Separate invocations: with one, --bin applies to every -p and drops the plugin's cdylib.
+        # kabl.exe only packs the factory sounds for stage.sh; it is not shipped.
+        shell: bash
+        run: |
+          cargo build --locked --release -p kabl-ui --bin kabl-ui
+          cargo build --locked --release -p kabl-clap
+          cargo build --locked --release -p kabl-standalone --bin kabl
+      - uses: actions/download-artifact@v4
+        with:
+          name: kabl-windows-vst3
+          path: target/win-vst3
+      - name: Stage the package and zip it
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          echo "KABL_VERSION=$version" >> "$GITHUB_ENV"
+          packaging/windows/installer/stage.sh target/release target/win-vst3 target/dist
+      - name: Build the installer with Inno Setup
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --version=6.4.3 -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "choco install innosetup exited with $LASTEXITCODE" }
+          }
+          if (-not (Test-Path $iscc)) { throw "Inno Setup 6 is not installed at $iscc" }
+          & $iscc "/DAppVersion=$env:KABL_VERSION" "/DStageDir=$PWD\target\dist\kabl-$env:KABL_VERSION-windows-x64" "/DOutputDir=$PWD\target\dist" packaging\windows\installer\kabl.iss
+          if ($LASTEXITCODE -ne 0) { throw "iscc exited with $LASTEXITCODE" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kabl-windows-installer
+          path: target/dist/kabl-*-windows-x64-setup.exe
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kabl-windows-zip
+          path: target/dist/kabl-*-windows-x64.zip
+          if-no-files-found: error
+      - name: Silent install puts every file in place
+        run: ./packaging/windows/installer/test-install.ps1 -Check install -Setup "target\dist\kabl-$env:KABL_VERSION-windows-x64-setup.exe"
+      - name: Zip holds exactly the installed files
+        run: ./packaging/windows/installer/test-install.ps1 -Check zip -Zip "target\dist\kabl-$env:KABL_VERSION-windows-x64.zip"
+      - name: Installed kabl-ui starts on Mesa's software OpenGL and finds the factory sounds
+        # The Mesa build windows-vst3 uses: the runner's own OpenGL is GDI Generic 1.1.
+        shell: bash
+        run: |
+          curl -fsSL -o mesa.7z https://github.com/pal1000/mesa-dist-win/releases/download/26.2.6/mesa3d-26.2.6-release-mingw.7z
+          echo "da0f71d9181b672c1918f3c342f11118c687f6059a46b16502845160733cc388  mesa.7z" | sha256sum -c -
+          7z x -omesa mesa.7z > /dev/null
+          pwsh -File packaging/windows/installer/test-install.ps1 -Check launch -Mesa "$(cygpath -w "$PWD/mesa/x64")"
+      - name: Upgrade, then uninstall keeps user data
+        run: ./packaging/windows/installer/test-install.ps1 -Check upgrade -Setup "target\dist\kabl-$env:KABL_VERSION-windows-x64-setup.exe"
+
   windows-vst3:
     runs-on: windows-latest
     timeout-minutes: 60
