@@ -209,21 +209,26 @@ fn package() -> composites::Package {
     for (keys, display) in columns {
         let left = x;
         for &key in keys {
+            // Wide enough to print "Snare Decay" whole.
+            let width = if key == 14 { 74.0 } else { 70.0 };
             panel
                 .placements
-                .insert(key, placement(Kind::Knob, x, 132.0, 70.0, 110.0));
-            x += 78.0;
+                .insert(key, placement(Kind::Knob, x, 132.0, width, 110.0));
+            x += width + 6.0;
         }
         if let Some(d) = display {
-            displays.push((d, left, x - 8.0 - left));
+            displays.push((d, left, x - 6.0 - left));
         }
-        x += 8.0;
+        x += 14.0;
     }
+    let mut x = 8.0;
     for key in 1..=10u64 {
-        let x = 8.0 + (key - 1) as f32 * 82.0;
+        // Wide enough to print "OUT Hats/Bus" whole.
+        let width = if key == 5 { 84.0 } else { 78.0 };
         panel
             .placements
-            .insert(key, placement(Kind::Jack, x, 250.0, 76.0, 58.0));
+            .insert(key, placement(Kind::Jack, x, 250.0, width, 58.0));
+        x += width + 2.0;
     }
     let mut log = e.log().clone();
     let id = composites::encapsulate_with(

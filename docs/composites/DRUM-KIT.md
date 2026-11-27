@@ -71,8 +71,9 @@ Every control uses its parameter's own range and curve, so no control needs a ma
 (the hit's envelope from the voice's own parameters, with a playhead while audio runs) and its
 knobs below: Kick (Tune, Decay, Drive), Snare (Decay, Level), Clap · Hats (Clap Level, Hat
 Level, under the hat's closed/open display), Tom (Tune, Level), then Bus Tone. The ten jacks
-run along the bottom in interface order. Displays are 60 points high and the jacks 76 wide, the
-sizes that fit three rows in the face's height; clap has no display of its own because a
+run along the bottom in interface order. Displays are 60 points high, the height that fits
+three rows in the face. Knobs are 70 wide and jacks 78, except Snare Decay (74) and Hats/Bus
+(84), which are widened so their labels print whole. Clap has no display of its own because a
 display is at least 120 points wide and the five columns fill the width. No artwork.
 
 ## Differences from the catalogue proposal
@@ -100,6 +101,8 @@ scenes `drum-kit-rack`, `drum-kit-face` and `drum-kit-design`.
   parameter, range and default, as listed above.
 - `drum_kit_alone_plays_when_clocked`: clock → Drum Kit → out sounds; without the clock it is
   silent.
+- `every_drum_kit_voice_triggers`: with only one grid row's trigger cable left, for each of
+  kick, snare, clap, closed hat, open hat and tom, the kit still sounds.
 - `drum_kit_plays_inside_a_parent_composite`: the same patch wrapped in a parent composite
   renders the same samples.
 

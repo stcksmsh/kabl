@@ -207,6 +207,51 @@ fn drum_kit_alone_plays_when_clocked() {
     );
 }
 
+/// Every grid row plays its voice: with only that row's trigger cable left, the kit still
+/// sounds, so a kit where only the kick fires cannot pass.
+#[test]
+fn every_drum_kit_voice_triggers() {
+    let mut e = PatchEditor::seed_from(&PatchState::default());
+    clocked_kit(&mut e);
+    let grid = e
+        .state()
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "drum.grid")
+        .map(|(id, _)| *id)
+        .unwrap();
+    let triggers: Vec<_> = e
+        .state()
+        .cables
+        .iter()
+        .filter(|(_, c)| c.from.module_id() == Some(grid))
+        .map(|(id, c)| (*id, c.clone()))
+        .collect();
+    let rows: BTreeSet<_> = triggers
+        .iter()
+        .map(|(_, c)| match &c.from {
+            PortRef::Module { port, .. } => port.clone(),
+            _ => panic!("a grid row is a jack"),
+        })
+        .collect();
+    assert_eq!(
+        rows,
+        BTreeSet::from(["kick", "snare", "clap", "chat", "ohat", "tom"].map(String::from))
+    );
+    for (keep, cable) in &triggers {
+        let mut one = e.state().clone();
+        one.cables
+            .retain(|id, _| id == keep || !triggers.iter().any(|(t, _)| t == id));
+        let audio = render(&one);
+        assert!(
+            rms(&audio) > 1e-3,
+            "{:?} alone plays: RMS {}",
+            cable.from,
+            rms(&audio)
+        );
+    }
+}
+
 /// The same patch with the clock, the output and Drum Kit wrapped in a parent composite renders
 /// the same beat.
 #[test]

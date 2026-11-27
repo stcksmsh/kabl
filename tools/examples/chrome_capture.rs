@@ -130,14 +130,14 @@ fn patches() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../patches")
 }
 
-/// A clock at 120 BPM into the factory `kabl.drum-kit` v1 into the output, the card below the
-/// clock.
+/// A clock at 120 BPM into the factory `kabl.drum-kit` v1 into the output: the clock left of
+/// the card and the output under it, so no cable crosses the face.
 fn drum_kit_patch() -> PatchEditor {
     use kabl_ui::composites;
     let mut e = PatchEditor::new();
     let clock = e.add_module("clock", kabl_core::Vec2 { x: 24.0, y: 20.0 });
     e.set_param(clock, "bpm", 120.0);
-    let out = e.add_module("out", kabl_core::Vec2 { x: 904.0, y: 20.0 });
+    let out = e.add_module("out", kabl_core::Vec2 { x: 210.0, y: 420.0 });
     let bank = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../composites");
     let entry = composites::factory_entries(&bank)
         .into_iter()
@@ -146,7 +146,7 @@ fn drum_kit_patch() -> PatchEditor {
     let pkg = composites::read_factory(&entry).expect("read kabl.drum-kit v1");
     let id = composites::insert(&mut e, &pkg).expect("insert Drum Kit");
     let mut c = e.state().composites[&id].clone();
-    c.pos = kabl_core::Vec2 { x: 24.0, y: 200.0 };
+    c.pos = kabl_core::Vec2 { x: 210.0, y: 20.0 };
     composites::set(&mut e, id, c).expect("move Drum Kit");
     let port = |e: &PatchEditor, label: &str| {
         e.state().composites[&id]
@@ -1479,11 +1479,11 @@ impl eframe::App for App {
             };
             self.ui.pan = egui::vec2(-860.0, -240.0) * self.ui.zoom;
         }
-        // The Drum Kit face at zoom 1, near the top left; its design page.
+        // The Drum Kit face at zoom 1, at the top left; its design page.
         if self.f == 6 && scene == "drum-kit-face" {
             self.ui.zoom = 1.0;
             self.ui.drawer_open = false;
-            self.ui.pan = egui::vec2(0.0, -160.0);
+            self.ui.pan = egui::Vec2::ZERO;
         }
         if self.f == 6 && scene == "drum-kit-design" {
             let (&id, c) = self.editor.state().composites.iter().next().unwrap();
