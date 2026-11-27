@@ -15,7 +15,7 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 
 ## Next
 1. Kosta runs docs/ACCEPTANCE-V1.md on rc.2 (his pick, 11-25); fix findings (check each against master first).
-2. Windows/VST3 for 1.0 (OD-W4..W9 decided): W8 editor DPI/focus (main risk), W9 Inno Setup installer, W10 release job (+ VST logo guidelines check), WA Kosta VM pass. ASIO: first check the ASIO SDK licence against GPL-3.0-or-later (unverified), then W11a (standalone ASIO, required for 1.0).
+2. Windows/VST3 for 1.0 (OD-W4..W9 decided): W8 editor (in flight), W9 Inno Setup installer, W10 release job (+ VST logo guidelines check), WA Kosta VM pass. ASIO: first check the ASIO SDK licence against GPL-3.0-or-later (unverified), then W11a (standalone ASIO, required for 1.0).
 3. Faces slices 8-11 (FACES §9) in order; 8 and L6 touch crates/clap (after W8). Briefs ready: faces 8 (brief-faces-morph.md).
 4. CB5 Analog Voice, then L6, then L7+L8 as one slice (D5), all required for 1.0. W11a ASIO (licence OK: GPLv3 option; Windows binary effectively GPLv3-only).
 5. Before tagging v1.0.0: rc.3 from master + short re-check of first run / Perform / design page (proposed, Kosta to confirm).
@@ -27,7 +27,7 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 - rc.3 for a short re-check before v1.0.0 (proposed).
 
 ## Decisions (Kosta)
-- 11-26 night: D5 = lessons 4+5 built around composites and show they are optional (L7 joins L8 after CB3+CB5); composites merge without waiting (OD-C judged after); ASIO GPLv3-only Windows binary OK; gate-tampered disabled until production (#265). Coordinator (delegated): VST3 bundle layout; validator allows one failure (Process Format 1234567.8 Hz, CLAP refuses >768 kHz).
+- 11-26 night: D5 (lesson-order decision): lessons 4+5 built around composites and show they are optional (L7 joins L8 after CB3+CB5); composites merge without waiting (OD-C judged after); ASIO GPLv3-only Windows binary OK; gate-tampered disabled until production (#265). Coordinator (delegated): VST3 bundle layout; validator allows one failure (Process Format 1234567.8 Hz, CLAP refuses >768 kHz).
 - 11-26: OD-W4 Inno Setup + zip; OD-W5 freeze VST3 id bda9c239b42389589c969403a7b9d23e; OD-W6 use the VST compatible logo (W10 checks Steinberg guidelines); OD-W7 ship kabl.clap; OD-W8 ASIO in the first Windows release (standalone; W11a required); OD-W9 native MSVC; macOS 1.1; faces, composites, lessons all in 1.0.
 - 11-26: merge policy is `[merge] coordinator = "auto"` in .nonslop.toml.
 - 11-25: 1.0 includes Windows + VST3 (Ableton). Vertical face slider is the default (horizontal stays in Settings). Settings note: option A (quiet when no audio / on open, #258). Acceptance on rc.2, not rc.3.
