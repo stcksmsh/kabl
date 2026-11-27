@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 83] = [
+const SCENES: [&str; 85] = [
     "rack",
     "perform",
     "sounds",
@@ -83,6 +83,8 @@ const SCENES: [&str; 83] = [
     "design-page-buttons",
     "face-snapshots",
     "design-page-snapshots",
+    "face-blocks",
+    "perform-face-pin",
     "drum-kit-rack",
     "drum-kit-face",
     "drum-kit-design",
@@ -329,7 +331,10 @@ impl App {
             }
             Err(_) if j.scene.starts_with("sequenced-part") => factory_patch("sequenced-part"),
             // The button scenes need a clock and sequencers: the performance patch.
-            Err(_) if j.scene.contains("-buttons") || j.scene == "face-snapshots" => {
+            Err(_)
+                if j.scene.contains("-buttons")
+                    || ["face-snapshots", "face-blocks", "perform-face-pin"].contains(&j.scene) =>
+            {
                 PatchEditor::from_log(
                     kabl_core::load(&patches().join("performance")).expect("performance"),
                 )
@@ -777,7 +782,9 @@ impl App {
         // bass and "Deep", which holds the arp. Deep's face has the arp's bank B button; Top's has
         // the cue, the bass's bank B, Deep's button through Mid and the clock's Run. The bass
         // plays bank B, so its button is the one lit.
-        if j.scene.contains("-buttons") || j.scene == "face-snapshots" {
+        if j.scene.contains("-buttons")
+            || ["face-snapshots", "face-blocks", "perform-face-pin"].contains(&j.scene)
+        {
             use kabl_core::panel::{Kind, Panel, Placement, Source};
             let (clock, bass, arp) = (1, 3, 4);
             let cues = self
@@ -897,6 +904,73 @@ impl App {
                 c.panel = Some(Box::new(panel));
                 kabl_ui::composites::set(&mut self.editor, top, c).unwrap();
                 ui.last_snapshot.insert(top, snaps[1]);
+            }
+            // "face-blocks": Top's face with the bass's gate length (two composites down) as a
+            // "Bass gate" knob and the clock's transport, the bass's banks and the cue pads as
+            // whole blocks. "perform-face-pin": the same face with that knob pinned as its
+            // "Pin to Perform" does, and the Perform panel open on the pin.
+            if j.scene == "face-blocks" || j.scene == "perform-face-pin" {
+                let gate = kabl_core::PortRef::Param {
+                    id: bass,
+                    param: "gate_len".into(),
+                };
+                kabl_ui::composites::add_exposure(&mut self.editor, top, gate.clone(), true)
+                    .unwrap();
+                let mut c = self.editor.state().composites[&top].clone();
+                let key = *c.controls.iter().find(|(_, e)| e.target == gate).unwrap().0;
+                c.controls.get_mut(&key).unwrap().label = "Bass gate".into();
+                let mut panel = Panel {
+                    width: 840.0,
+                    ..Panel::default()
+                };
+                let block = |kind, id, x, y, width, height| Placement {
+                    kind,
+                    x,
+                    y,
+                    width,
+                    height,
+                    source: Some(Source::Module { id, action: None }),
+                    label: None,
+                    icons: Vec::new(),
+                };
+                panel.placements.insert(
+                    key,
+                    Placement {
+                        source: None,
+                        ..block(Kind::Knob, 0, 12.0, 72.0, 84.0, 110.0)
+                    },
+                );
+                for (kind, id, x, y, w, h) in [
+                    (Kind::Transport, clock, 108.0, 72.0, 240.0, 36.0),
+                    (Kind::Banks, bass, 108.0, 120.0, 372.0, 18.0),
+                    (Kind::CuePads, cues, 492.0, 72.0, 336.0, 150.0),
+                ] {
+                    panel
+                        .placements
+                        .insert(c.next_interface, block(kind, id, x, y, w, h));
+                    c.next_interface += 1;
+                }
+                c.panel = Some(Box::new(panel));
+                kabl_ui::composites::set(&mut self.editor, top, c).unwrap();
+                if j.scene == "perform-face-pin" {
+                    let order = kabl_ui::perform::pins(self.editor.state())
+                        .last()
+                        .map_or(0.0, |p| p.order.floor() + 1.0);
+                    self.editor.edit(vec![
+                        kabl_core::Op::SetParam {
+                            target: kabl_core::ParamTarget::Module {
+                                id: bass,
+                                param: "pin.gate_len".into(),
+                            },
+                            value: order,
+                        },
+                        kabl_core::Op::SetLabel {
+                            id: bass,
+                            key: "pin.gate_len".into(),
+                            text: Some("Bass gate".into()),
+                        },
+                    ]);
+                }
             }
         }
         if j.scene.starts_with("face-icons") {
@@ -1018,8 +1092,11 @@ impl App {
                 ui.pick_page(id, pg);
             }
         }
-        ui.perform_open = j.scene == "perform";
-        ui.perform_tall = j.scene == "perform";
+        ui.perform_open = j.scene == "perform" || j.scene == "perform-face-pin";
+        ui.perform_tall = j.scene == "perform" || j.scene == "perform-face-pin";
+        if j.scene == "perform-face-pin" {
+            ui.pin_reveal = Some((3, "gate_len".into()));
+        }
         let state = self.editor.state();
         let ids = |kind: &str| -> Vec<kabl_core::ModuleId> {
             state
@@ -1580,7 +1657,15 @@ impl eframe::App for App {
             page.draft.panel.placements.remove(&key);
         }
         // The "Top" face, first in the rack, at zoom 1.
-        if self.f == 6 && (scene == "face-buttons" || scene == "face-snapshots") {
+        if self.f == 6
+            && [
+                "face-buttons",
+                "face-snapshots",
+                "face-blocks",
+                "perform-face-pin",
+            ]
+            .contains(&scene)
+        {
             self.ui.zoom = 1.0;
             self.ui.pan = egui::Vec2::ZERO;
         }

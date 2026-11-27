@@ -30,6 +30,10 @@ const STRIP: (f32, f32) = (270.0, 48.0);
 const SLIDER: (f32, f32) = (120.0, 168.0);
 /// A new display's footprint.
 const DISPLAY: (f32, f32) = (168.0, 96.0);
+/// New whole-block footprints on the 6-point grid, at least `panels::block`'s least sizes.
+const CUE_PADS: (f32, f32) = (336.0, 150.0);
+const BANKS: (f32, f32) = (372.0, 18.0);
+const TRANSPORT: (f32, f32) = (240.0, 36.0);
 /// A new button's footprint: room for a cue name at the pad's type size.
 const BUTTON: (f32, f32) = (132.0, 48.0);
 
@@ -153,6 +157,53 @@ pub fn displays(state: &PatchState, id: CompositeId) -> Vec<(ModuleId, String)> 
             Some((leaf, leaf_name(state, id, leaf)))
         })
         .collect()
+}
+
+/// The whole blocks composite `id`'s face may show: each leaf's cue pads, banks or transport
+/// in module order, named as `displays` names leaves, then `· Cue pads` and so on.
+pub fn blocks(state: &PatchState, id: CompositeId) -> Vec<(Kind, ModuleId, String)> {
+    kabl_core::composite::leaves(state, id)
+        .into_iter()
+        .filter_map(|leaf| {
+            let (kind, what) = match state.modules.get(&leaf)?.kind.as_str() {
+                "cues" => (Kind::CuePads, "Cue pads"),
+                "seq" => (Kind::Banks, "Banks"),
+                "clock" => (Kind::Transport, "Transport"),
+                _ => return None,
+            };
+            Some((
+                kind,
+                leaf,
+                format!("{} · {what}", leaf_name(state, id, leaf)),
+            ))
+        })
+        .collect()
+}
+
+/// One palette row: a button named `name`, recorded as `hit`, with a "placed" chip when
+/// `placed`; whether it was clicked.
+fn row(
+    ui: &mut egui::Ui,
+    st: &crate::style::Style,
+    view: &mut UiState,
+    name: impl Into<String>,
+    placed: bool,
+    hit: String,
+) -> bool {
+    ui.horizontal(|ui| {
+        let r = ui.add(
+            kit::Button::new(st, name)
+                .g4(32.0)
+                .ghost()
+                .min_width(if placed { 160.0 } else { 236.0 }),
+        );
+        view.record(hit, r.rect);
+        if placed {
+            g4::chip_label(ui, st, "placed", true, Some(st.roles.good));
+        }
+        r.clicked()
+    })
+    .inner
 }
 
 /// Leaf `leaf`'s name seen from composite `id`: `Module #N`, after the composites between.
@@ -479,15 +530,7 @@ impl Page {
 
     /// The element showing leaf `leaf`'s display.
     pub fn display_of(&self, leaf: ModuleId) -> Option<u64> {
-        self.draft.panel.placements.iter().find_map(|(&k, p)| {
-            (p.kind == Kind::Display
-                && p.source
-                    == Some(Source::Module {
-                        id: leaf,
-                        action: None,
-                    }))
-            .then_some(k)
-        })
+        self.block_of(Kind::Display, leaf)
     }
 
     /// Places a button pressing `source` under a fresh key at the first free spot; selects the
@@ -538,6 +581,53 @@ impl Page {
             .placements
             .iter()
             .find_map(|(&k, p)| (p.kind == Kind::Snapshots).then_some(k))
+    }
+
+    /// Places leaf `leaf`'s whole `kind` block under a fresh key at the first free spot;
+    /// selects the element already showing it instead, if there is one.
+    pub fn add_block(
+        &mut self,
+        state: &PatchState,
+        kind: Kind,
+        leaf: ModuleId,
+    ) -> Result<(), String> {
+        if let Some(key) = self.block_of(kind, leaf) {
+            self.selected = Some(key);
+            return Ok(());
+        }
+        let (width, height) = match kind {
+            Kind::CuePads => CUE_PADS,
+            Kind::Banks => BANKS,
+            _ => TRANSPORT,
+        };
+        let key = self.draft.next_interface;
+        let new = Placement {
+            kind,
+            x: 0.0,
+            y: 0.0,
+            width,
+            height,
+            source: Some(Source::Module {
+                id: leaf,
+                action: None,
+            }),
+            label: None,
+            icons: Vec::new(),
+        };
+        self.put(state, key, new, key + 1)
+    }
+
+    /// The element showing leaf `leaf`'s whole `kind` block (or its display).
+    pub fn block_of(&self, kind: Kind, leaf: ModuleId) -> Option<u64> {
+        self.draft.panel.placements.iter().find_map(|(&k, p)| {
+            (p.kind == kind
+                && p.source
+                    == Some(Source::Module {
+                        id: leaf,
+                        action: None,
+                    }))
+            .then_some(k)
+        })
     }
 
     /// The button element pressing `source`.
@@ -1207,43 +1297,19 @@ fn palette(
                 }
                 kit::section(ui, st, "Displays");
                 for (leaf, name) in displays(editor.state(), page.id) {
-                    let placed = page.display_of(leaf).is_some();
-                    ui.horizontal(|ui| {
-                        let r = ui.add(
-                            kit::Button::new(st, name)
-                                .g4(32.0)
-                                .ghost()
-                                .min_width(if placed { 160.0 } else { 236.0 }),
-                        );
-                        view.record(format!("design:display:{leaf}"), r.rect);
-                        if placed {
-                            g4::chip_label(ui, st, "placed", true, Some(st.roles.good));
-                        }
-                        if r.clicked() {
-                            // A refusal keeps the draft and shows its reason in `page.note`.
-                            let _ = page.add_display(editor.state(), leaf);
-                        }
-                    });
+                    let hit = format!("design:display:{leaf}");
+                    if row(ui, st, view, name, page.display_of(leaf).is_some(), hit) {
+                        // A refusal keeps the draft and shows its reason in `page.note`.
+                        let _ = page.add_display(editor.state(), leaf);
+                    }
                 }
                 kit::section(ui, st, "Buttons");
                 for (source, name) in buttons(editor.state(), page.id) {
-                    let placed = page.button_of(&source).is_some();
-                    ui.horizontal(|ui| {
-                        let r = ui.add(
-                            kit::Button::new(st, name)
-                                .g4(32.0)
-                                .ghost()
-                                .min_width(if placed { 160.0 } else { 236.0 }),
-                        );
-                        view.record(button_hit(&source), r.rect);
-                        if placed {
-                            g4::chip_label(ui, st, "placed", true, Some(st.roles.good));
-                        }
-                        if r.clicked() {
-                            // A refusal keeps the draft and shows why.
-                            page.note = page.add_button(editor.state(), source).err();
-                        }
-                    });
+                    let (placed, hit) = (page.button_of(&source).is_some(), button_hit(&source));
+                    if row(ui, st, view, name, placed, hit) {
+                        // A refusal keeps the draft and shows why.
+                        page.note = page.add_button(editor.state(), source).err();
+                    }
                 }
                 let snaps: Vec<(u64, String)> = page
                     .draft
@@ -1253,40 +1319,22 @@ fn palette(
                     .collect();
                 for (id, name) in snaps {
                     let source = Source::Snapshot { id };
-                    let placed = page.button_of(&source).is_some();
-                    ui.horizontal(|ui| {
-                        let r = ui.add(
-                            kit::Button::new(st, format!("Snapshot · {name}"))
-                                .g4(32.0)
-                                .ghost()
-                                .min_width(if placed { 160.0 } else { 236.0 }),
-                        );
-                        view.record(button_hit(&source), r.rect);
-                        if placed {
-                            g4::chip_label(ui, st, "placed", true, Some(st.roles.good));
-                        }
-                        if r.clicked() {
-                            page.note = page.add_button(editor.state(), source).err();
-                        }
-                    });
+                    let (placed, hit) = (page.button_of(&source).is_some(), button_hit(&source));
+                    if row(ui, st, view, format!("Snapshot · {name}"), placed, hit) {
+                        page.note = page.add_button(editor.state(), source).err();
+                    }
                 }
                 kit::section(ui, st, "Blocks");
-                let placed = page.strip().is_some();
-                ui.horizontal(|ui| {
-                    let r = ui.add(
-                        kit::Button::new(st, "Snapshot strip")
-                            .g4(32.0)
-                            .ghost()
-                            .min_width(if placed { 160.0 } else { 236.0 }),
-                    );
-                    view.record("design:block:snapshots".into(), r.rect);
-                    if placed {
-                        g4::chip_label(ui, st, "placed", true, Some(st.roles.good));
+                let hit = "design:block:snapshots".to_string();
+                if row(ui, st, view, "Snapshot strip", page.strip().is_some(), hit) {
+                    page.note = page.add_strip(editor.state()).err();
+                }
+                for (kind, leaf, name) in blocks(editor.state(), page.id) {
+                    let hit = format!("design:block:{leaf}.{kind:?}");
+                    if row(ui, st, view, name, page.block_of(kind, leaf).is_some(), hit) {
+                        page.note = page.add_block(editor.state(), kind, leaf).err();
                     }
-                    if r.clicked() {
-                        page.note = page.add_strip(editor.state()).err();
-                    }
-                });
+                }
             });
     });
 }

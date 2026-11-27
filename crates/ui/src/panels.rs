@@ -35,24 +35,6 @@ pub fn validate(state: &kabl_core::PatchState) -> Result<(), String> {
 pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Result<(), String> {
     panel.validate(c)?;
     for (&id, p) in &panel.placements {
-        // Stored and checked by `Panel::validate`; each kind is lifted here once it draws.
-        if !matches!(
-            p.kind,
-            Kind::Knob
-                | Kind::Selector
-                | Kind::Jack
-                | Kind::Slider
-                | Kind::Toggle
-                | Kind::Icons
-                | Kind::Display
-                | Kind::Button
-                | Kind::Snapshots
-        ) {
-            return Err(format!(
-                "Binding {id}: {:?} elements are not supported yet",
-                p.kind
-            ));
-        }
         if p.kind == Kind::Display {
             // `Panel::validate` has checked the source is a module without an action.
             if let Some(Source::Module { id: leaf, .. }) = p.source {
@@ -62,6 +44,28 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
                 if !crate::displays::has_display(&m.kind) {
                     return Err(format!("Binding {id}: {} modules have no display", m.kind));
                 }
+            }
+        }
+        if let Some((module, min)) = block(p.kind) {
+            // `Panel::validate` has checked the source is a module without an action.
+            if let Some(Source::Module { id: leaf, .. }) = p.source {
+                let m = state
+                    .modules
+                    .get(&leaf)
+                    .ok_or_else(|| format!("Binding {id}: the block's module {leaf} is missing"))?;
+                if m.kind != module {
+                    return Err(format!(
+                        "Binding {id}: {:?} blocks need a {module} module",
+                        p.kind
+                    ));
+                }
+            }
+            // The module face's drawing has fixed parts that would spill over a neighbour.
+            if p.width < min.0 || p.height < min.1 {
+                return Err(format!(
+                    "Binding {id}: {:?} blocks need at least {} x {} points",
+                    p.kind, min.0, min.1
+                ));
             }
         }
         if p.kind == Kind::Button {
@@ -130,6 +134,16 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
         }
     }
     Ok(())
+}
+/// The module kind a whole-block element shows and the least footprint its drawing needs.
+pub(crate) fn block(kind: Kind) -> Option<(&'static str, (f32, f32))> {
+    match kind {
+        // Two rows of 50-point pads and the status line under them.
+        Kind::CuePads => Some(("cues", (240.0, 150.0))),
+        Kind::Banks => Some(("seq", (crate::BANKS_W, 18.0))),
+        Kind::Transport => Some(("clock", (120.0, 32.0))),
+        _ => None,
+    }
 }
 /// Whether the parameter `target` names has built-in icon glyphs.
 pub(crate) fn glyphs(state: &kabl_core::PatchState, target: &PortRef) -> bool {

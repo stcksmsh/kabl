@@ -576,7 +576,87 @@ pub fn pin_source(state: &PatchState, pin: &Pin) -> String {
     if let Some(src) = mixer_source(state, pin.id, &pin.key) {
         s.push_str(&format!(" · from {src}"));
     }
+    // The composites the module sits in, outermost first.
+    let mut path = Vec::new();
+    let mut at = state
+        .composites
+        .iter()
+        .find(|(_, c)| c.members.contains(&pin.id))
+        .map(|(&c, _)| c);
+    while let Some(c) = at.and_then(|c| state.composites.get(&c)) {
+        path.push(c.name.as_str());
+        at = c.parent;
+    }
+    if !path.is_empty() {
+        path.reverse();
+        s = format!("{} · {s}", path.join(" / "));
+    }
     s
+}
+
+/// Right-click on composite `id`'s face control `key`, drawn over `rect`, which sets `param` of
+/// leaf `leaf`: "Pin to Perform" pins that param as the module menu does, named by the
+/// exposure's `label`. A pinned param shows checked and unpins, so it is never pinned twice.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn face_menu(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &egui::Ui,
+    rect: egui::Rect,
+    id: kabl_core::CompositeId,
+    key: u64,
+    leaf: ModuleId,
+    param: &'static str,
+    label: &str,
+) {
+    // Hover only: the control drawn over the same rect keeps every click and drag.
+    let resp = ui.interact(
+        rect,
+        egui::Id::new(("face-menu", id, key)),
+        egui::Sense::hover(),
+    );
+    let open = resp.contains_pointer() && ui.input(|i| i.pointer.secondary_clicked());
+    let st = ui_state.style.clone();
+    egui::Popup::menu(&resp)
+        .open_memory(open.then_some(egui::SetOpenCommand::Bool(true)))
+        .at_pointer_fixed()
+        .frame(crate::kit::popover_frame(&st))
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClick)
+        .width(220.0)
+        .show(|ui| {
+            let mut on = is_pinned(editor.state(), leaf, param);
+            let r = crate::kit::toggle(ui, &st, &mut on, "Pin to Perform");
+            ui_state.record("menu:face-pin".into(), r.rect);
+            if !r.clicked() {
+                return;
+            }
+            if is_pinned(editor.state(), leaf, param) {
+                toggle_pin(editor, leaf, param);
+                return;
+            }
+            let k = format!("{PIN_PREFIX}{param}");
+            let order = pins(editor.state())
+                .last()
+                .map_or(0.0, |p| p.order.floor() + 1.0);
+            let mut ops = vec![kabl_core::Op::SetParam {
+                target: ParamTarget::Module {
+                    id: leaf,
+                    param: k.clone(),
+                },
+                value: order,
+            }];
+            let label = label.trim();
+            if !label.is_empty() {
+                ops.push(kabl_core::Op::SetLabel {
+                    id: leaf,
+                    key: k,
+                    text: Some(label.to_string()),
+                });
+            }
+            editor.edit(ops);
+            ui_state.perform_open = true;
+            ui_state.pin_reveal = Some((leaf, param.to_string()));
+        });
 }
 
 /// Renames a pin (empty = back to the control's own name). One undo step, no audio rebuild.
