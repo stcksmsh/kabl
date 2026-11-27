@@ -17,3 +17,11 @@ a transparent background, so the UI can tint it from the theme (`kit::logo`):
 
 The orange app icon (tile `#F2A33A`, mark `#1C1206`) lives in `packaging/linux/logo/`; orange
 is used only there and for the splash. The window icon is its 256 px PNG.
+
+`crates/ui/assets/windows/kabl.ico` (frames 16, 24, 32, 48, 64, 128, 256; the 256 frame is PNG-compressed)
+is built once from the orange app-icon PNGs above and committed; `kabl.rc` embeds it into
+`kabl-ui.exe` at build time (`build.rs`, `embed-resource`). Regenerate from the repository root with:
+
+    cd packaging/linux/logo/hicolor && convert 16x16/apps/kabl.png 24x24/apps/kabl.png 32x32/apps/kabl.png \
+      48x48/apps/kabl.png 64x64/apps/kabl.png 128x128/apps/kabl.png 256x256/apps/kabl.png \
+      ../../../../crates/ui/assets/windows/kabl.ico

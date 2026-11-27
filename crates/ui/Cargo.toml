@@ -39,6 +39,7 @@ dbus = "0.9.12"
 
 [build-dependencies]
 kabl-core = { path = "../core" }
+embed-resource = "3.0.12"
 
 [features]
 # Geometry checker (tests/geometry.rs) fails on errors instead of only reporting them.
