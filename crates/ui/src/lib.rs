@@ -455,6 +455,13 @@ pub struct UiState {
     /// Param waiting for the next MIDI CC to map to it.
     pub learn: Option<(ModuleId, String)>,
     pub takeover: perform::TakeoverMap,
+    /// Macro knob profiles by input port (`style::Prefs::knob_profiles`), and "Set up macro
+    /// knobs" while it waits for knobs (exclusive with `learn`).
+    pub knob_profiles: std::collections::BTreeMap<String, perform::KnobProfile>,
+    pub knob_setup: Option<perform::KnobSetup>,
+    /// The last setup ended with every knob skipped, so nothing was saved (shown until the
+    /// menu closes or a new setup starts).
+    pub knob_nothing_saved: bool,
     /// The performance panel shows more rows (taller), at the rack's expense.
     pub perform_tall: bool,
     /// Pin being renamed: (module, pin key, text so far).
@@ -651,6 +658,9 @@ impl Default for UiState {
             perform_open: false,
             learn: None,
             takeover: Default::default(),
+            knob_profiles: Default::default(),
+            knob_setup: None,
+            knob_nothing_saved: false,
             pin_reveal: None,
             renaming: None,
             perform_tall: false,
@@ -1024,6 +1034,7 @@ impl UiState {
         // A remembered folder that is gone is dropped: its place starts in home again.
         self.folders = p.folders.clone();
         self.folders.retain(|_, d| d.is_dir());
+        self.knob_profiles = p.knob_profiles.clone();
         self.prefs_saved = Some(p);
         self.prefs_dir = Some(dir);
         // A plugin loads the user's prefs and never takes over the devices: its first frame with
@@ -1062,17 +1073,65 @@ impl UiState {
                     .map(|p| p.devices.clone())
                     .unwrap_or_default(),
             },
+            knob_profiles: self.knob_profiles.clone(),
         };
         if self.prefs_saved.as_ref() != Some(&p) {
             // A plugin does not own the devices: it keeps what the standalone app wrote since.
             if self.devices.is_none() {
                 p.devices = style::Prefs::load(dir).devices;
             }
+            // Profiles this window did not change keep what another window wrote since.
+            if self.prefs_saved.as_ref().map(|s| &s.knob_profiles) == Some(&p.knob_profiles) {
+                p.knob_profiles = style::Prefs::load(dir).knob_profiles;
+                self.knob_profiles.clone_from(&p.knob_profiles);
+            }
             if let Err(e) = p.save(dir) {
                 log::warn!("could not remember the theme in {}: {e}", dir.display());
             }
             self.prefs_saved = Some(p);
         }
+    }
+
+    /// The knob profile key of the connected MIDI input: its port name, or
+    /// `perform::ANY_CONTROLLER` without one (the plugin).
+    pub fn knob_key(&self) -> String {
+        self.midi_input
+            .clone()
+            .unwrap_or_else(|| perform::ANY_CONTROLLER.into())
+    }
+
+    /// Starts "Set up macro knobs" for the connected input; a pending MIDI learn is cancelled.
+    pub fn start_knob_setup(&mut self) {
+        self.learn = None;
+        self.knob_setup = Some(perform::KnobSetup::new(self.knob_key()));
+        self.knob_nothing_saved = false;
+    }
+
+    /// Saves a knob setup once every knob has been asked for, replacing its key's profile.
+    /// With every knob skipped the stored profile stays, as on Cancel: an empty one would hide
+    /// the "any controller" profile.
+    pub fn finish_knob_setup(&mut self) {
+        if self.knob_setup.as_ref().is_some_and(|s| s.done()) {
+            let s = self.knob_setup.take().expect("checked");
+            let profile = s.profile();
+            self.knob_nothing_saved = profile.is_empty();
+            if !profile.is_empty() {
+                self.set_knob_profile(&s.key, Some(profile));
+            }
+        }
+    }
+
+    /// Saves (`Some`) or forgets (`None`) the knob profile of `key`, on top of what is on disk
+    /// so another window's profiles are kept.
+    pub fn set_knob_profile(&mut self, key: &str, profile: Option<perform::KnobProfile>) {
+        if let Some(dir) = &self.prefs_dir {
+            self.knob_profiles = style::Prefs::load(dir).knob_profiles;
+        }
+        match profile {
+            Some(p) => self.knob_profiles.insert(key.into(), p),
+            None => self.knob_profiles.remove(key),
+        };
+        self.save_prefs();
     }
 
     /// Remembers `dir` as the last folder of `place`.
@@ -1251,6 +1310,8 @@ pub fn show_with(
         ui_state.choose = None;
     } else if esc && ui_state.learn.is_some() {
         ui_state.learn = None;
+    } else if esc && ui_state.knob_setup.is_some() {
+        ui_state.knob_setup = None;
     } else if esc
         && ui_state.explain.is_open()
         && ui_state.browser.dialog.is_none()
@@ -2114,7 +2175,9 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
             }
         }
         ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+            let mut menu_open = false;
             let menu = kit::icon_menu(ui, st, kit::Ic::Gear, |ui| {
+                menu_open = true;
                 kit::paragraph(ui, st, style::Role::Caption, kit::Tone::Text2, "Theme");
                 kit::segmented(ui, st, |ui| {
                     use desktop::ThemeMode as T;
@@ -2251,6 +2314,10 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
                 kit::gap(ui, st, 1);
                 kit::rule(ui, st);
                 kit::gap(ui, st, 1);
+                perform_view::macro_knobs(ui_state, ui, st);
+                kit::gap(ui, st, 1);
+                kit::rule(ui, st);
+                kit::gap(ui, st, 1);
                 kit::paragraph(
                     ui,
                     st,
@@ -2281,6 +2348,11 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
             })
             .tip(st, "Theme and view settings");
             ui_state.record("view-menu".into(), menu.rect);
+            // The setup prompt lives in this menu: closing it cancels the setup.
+            if !menu_open {
+                ui_state.knob_setup = None;
+                ui_state.knob_nothing_saved = false;
+            }
         });
     });
 }
