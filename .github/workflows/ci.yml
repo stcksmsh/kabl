@@ -277,6 +277,18 @@ jobs:
         # frozen parameter ids, automatable and in their units, and CC 1, CC 64, pitch bend and
         # CC 74 through IMidiMapping, measured in kabl's audio output. Exits non-zero on any FAIL.
         run: build-vst3/vst3-host/bin/Release/kabl-vst3-host.exe build-vst3/out/kabl.vst3 packaging/windows/vst3/host/midi-fixture.json
+      - name: VST3 editor opens and closes 20 times on Mesa's software OpenGL
+        # The runner's own OpenGL is GDI Generic 1.1, so the step above stops its editor checks
+        # before attached(). Mesa's llvmpipe opengl32.dll beside a copy of the host gives the
+        # host and kabl an OpenGL 3.2 context, so this run opens real editor windows.
+        run: |
+          curl -fsSL -o mesa.7z https://github.com/pal1000/mesa-dist-win/releases/download/26.2.6/mesa3d-26.2.6-release-msvc.7z
+          echo "b2e00615feaba45942343c265cc8c5f576142ca682c1ac6661922d4b72492877  mesa.7z" | sha256sum -c -
+          7z x -omesa mesa.7z > /dev/null
+          mkdir build-vst3/mesa-host
+          cp build-vst3/vst3-host/bin/Release/kabl-vst3-host.exe mesa/x64/*.dll build-vst3/mesa-host/
+          GALLIUM_DRIVER=llvmpipe build-vst3/mesa-host/kabl-vst3-host.exe build-vst3/out/kabl.vst3 packaging/windows/vst3/host/midi-fixture.json | tee build-vst3/mesa-host.txt
+          grep -q '3.2 core context: yes' build-vst3/mesa-host.txt
       - uses: actions/upload-artifact@v4
         with:
           name: kabl-windows-vst3
