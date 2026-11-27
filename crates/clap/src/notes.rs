@@ -4,6 +4,7 @@
 //! strip holds and the other way round.
 
 use crate::Instrument;
+use clap_sys::events::{clap_event_note, CLAP_EVENT_NOTE_ON};
 use kabl_engine::keyboard::{KeyEvent, MidiEvent, Source};
 use kabl_engine::timeline::Timeline;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -41,6 +42,22 @@ pub fn merge(rx: &mut rtrb::Consumer<KeyEvent>, timeline: &mut Timeline, frames:
         };
         timeline.push(0, frames, MidiEvent::new(Source::Controller, 0, e));
     }
+}
+
+/// A CLAP note on or off on port 0 as MIDI bytes. Wildcard keys or channels (-1) name no
+/// single note and are dropped; a note on keeps a velocity of at least 1, since velocity 0
+/// would make it a note off.
+pub(crate) fn clap_note_bytes(kind: u16, note: &clap_event_note) -> Option<[u8; 3]> {
+    if note.port_index != 0 || !(0..16).contains(&note.channel) || !(0..128).contains(&note.key) {
+        return None;
+    }
+    let velocity = (note.velocity.clamp(0.0, 1.0) * 127.0).round() as u8;
+    let (status, velocity) = if kind == CLAP_EVENT_NOTE_ON {
+        (0x90, velocity.max(1))
+    } else {
+        (0x80, velocity)
+    };
+    Some([status | note.channel as u8, note.key as u8, velocity])
 }
 
 impl Instrument {

@@ -431,6 +431,19 @@ unsafe extern "C" fn process_bridge(
                             overflow = true;
                         }
                     }
+                    // The port declares the MIDI dialect only, but clap-wrapper's VST3 side turns
+                    // every VST3 note into a CLAP note event regardless, so notes from a VST3
+                    // host arrive here. They join the MIDI stream as the bytes they stand for.
+                    CLAP_EVENT_NOTE_ON | CLAP_EVENT_NOTE_OFF
+                        if header.size as usize >= std::mem::size_of::<clap_event_note>() =>
+                    {
+                        let event = unsafe { &*event.cast::<clap_event_note>() };
+                        if let Some(bytes) = crate::notes::clap_note_bytes(header.type_, event) {
+                            if midi.push((header.time, bytes)).is_err() {
+                                overflow = true;
+                            }
+                        }
+                    }
                     CLAP_EVENT_PARAM_VALUE | CLAP_EVENT_PARAM_MOD => {
                         let minimum = if header.type_ == CLAP_EVENT_PARAM_VALUE {
                             std::mem::size_of::<clap_event_param_value>()
@@ -799,6 +812,10 @@ pub static clap_entry: clap_plugin_entry = clap_plugin_entry {
     deinit: Some(deinit),
     get_factory: Some(get_factory),
 };
+
+#[cfg(test)]
+#[path = "vst3_tests.rs"]
+mod vst3_tests;
 
 #[cfg(test)]
 mod tests {
