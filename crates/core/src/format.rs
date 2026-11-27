@@ -25,8 +25,8 @@ use crate::op::Entry;
 /// only when its log contains one and stays v8 otherwise; both load.
 ///
 /// v10 adds composite faces: new panel element kinds, `Placement::{source, label, icons}`,
-/// `Panel::compact_width` and `Composite::snapshots`. A file is written as v10 only when its
-/// log uses one of them.
+/// `Panel::compact_width`, `Composite::snapshots` and controls on cable parameters. A file is
+/// written as v10 only when its log uses one of them.
 pub const CURRENT_SCHEMA_VERSION: u32 = 10;
 const OLDEST_SCHEMA_VERSION: u32 = 8;
 

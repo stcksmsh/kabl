@@ -2,7 +2,8 @@
 //! keyboard voice behind most Bass, Lead, Pad and Voice presets. Two `osc.va` into a mixer
 //! into a drive into a ladder filter whose cutoff its own envelope sweeps, into a VCA its amp
 //! envelope opens, into a level trim. Pitch feeds both oscillators and Gate both envelopes
-//! (fan-in, G3), and Env Amount is the envelope's route into the cutoff: a cable parameter (G1).
+//! (fan-in, G3), and Env Amount is the envelope's route into the cutoff: a cable parameter (G1),
+//! both a port and a knob on the face.
 //!
 //! Two oscillators: the largest family of the catalogue's core (25 of 52 patches), and the
 //! count every one- and three-oscillator patch is closest to. A one-oscillator patch is this card
@@ -111,7 +112,7 @@ fn package() -> composites::Package {
         x.also.push(b);
         x
     };
-    // Interface keys: ports 1..=8, then controls 9..=27, in the order listed.
+    // Interface keys: ports 1..=8, then controls 9..=28, in the order listed.
     let ports = [
         fan("Pitch", jack(osc1, "pitch"), jack(osc2, "pitch")),
         fan("Gate", jack(fenv, "gate"), jack(aenv, "gate")),
@@ -148,11 +149,21 @@ fn package() -> composites::Package {
         expose("Amp Sustain", param(aenv, "sustain")),
         expose("Amp Release", param(aenv, "release_ms")),
         expose("Level", param(level, "gain_db")),
+        // The same route amount as the Env Amount port: the knob sets it, the port modulates it.
+        // Labels are unique across ports and controls, so the knob is "Env Amt".
+        expose(
+            "Env Amt",
+            PortRef::CableParam {
+                cable: fenv_cable,
+                param: "amount".into(),
+            },
+        ),
     ];
     // Two rows of knobs in signal order. The top row is the oscillators (Wave 1 over Wave 2 as
     // glyphs, then Octave 1, Octave 2 and Mix 2), Drive, the filter (Cutoff, Resonance) and the
     // filter envelope; the bottom row is the jacks, Level, and the amp envelope right under the
-    // filter's, so the two envelopes read as a pair. Unison and Detune are off the face, under
+    // filter's, so the two envelopes read as a pair, with Env Amount between Level and the amp
+    // envelope, under Resonance and next to the envelope it scales. Unison and Detune are off the face, under
     // "More controls": Unison's sixteen steps need a 288-point selector (18 points a choice),
     // and Detune only spreads unison voices. There is no room for displays at the face's fixed
     // height. Knobs, not sliders: a face slider follows the player's orientation setting. Knob
@@ -183,8 +194,9 @@ fn package() -> composites::Package {
     ] {
         put(key, Kind::Knob, x, 64.0, 70.0);
     }
-    // Level, under Cutoff | Amp Attack .. Release.
+    // Level, under Cutoff | Env Amount, under Resonance | Amp Attack .. Release.
     put(27, Kind::Knob, 378.0, 186.0, 70.0);
+    put(28, Kind::Knob, 450.0, 186.0, 70.0);
     for (y, first) in [(64.0, 19), (186.0, 23)] {
         for (i, (x, w)) in [(526.0, 70.0), (598.0, 70.0), (670.0, 78.0), (750.0, 80.0)]
             .into_iter()

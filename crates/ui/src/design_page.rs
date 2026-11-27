@@ -231,6 +231,14 @@ fn button_hit(source: &Source) -> String {
 /// The kinds exposure `key` may take on the face (FACES.md section 2), its default first.
 fn kinds_for(state: &PatchState, c: &Composite, key: u64) -> Result<Vec<Kind>, String> {
     Ok(match kind_for(state, c, key)? {
+        // A route's amount has only the knob (`panels::check`).
+        Kind::Knob
+            if c.controls
+                .get(&key)
+                .is_some_and(|e| matches!(e.target, PortRef::CableParam { .. })) =>
+        {
+            vec![Kind::Knob]
+        }
         Kind::Knob => vec![Kind::Knob, Kind::Slider],
         Kind::Selector => {
             let e = &c.controls[&key];

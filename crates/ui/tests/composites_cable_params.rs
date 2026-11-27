@@ -195,10 +195,14 @@ fn encapsulate_with_takes_the_cable_amount_as_a_port() {
         "{err}"
     );
 
-    // Composite faces only draw knobs for module parameters, so it is not a control yet.
+    // The same amount can also be a control, drawn on the face as a knob.
     let mut log = f.log.clone();
-    let err = curated(&mut log, &f, &[exposure("Env Knob", amount(f.route))]).unwrap_err();
-    assert!(err.contains("is not a parameter"), "{err}");
+    let id = curated(&mut log, &f, &[exposure("Env Knob", amount(f.route))]).unwrap();
+    let c = &log.state().composites[&id];
+    assert_eq!(
+        c.controls.values().map(|e| &e.target).collect::<Vec<_>>(),
+        vec![&amount(f.route)]
+    );
 }
 
 #[test]

@@ -67,6 +67,13 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
         return Err("Composite label/cable data limit".into());
     }
     kabl_engine::compile::validate_composites(p)?;
+    // A face draws a cable parameter only as a route's amount.
+    for e in p.composites.values().flat_map(|c| c.controls.values()) {
+        if matches!(e.target, PortRef::CableParam { .. }) {
+            crate::panels::param_info(p, &e.target)
+                .map_err(|err| format!("Control \"{}\": {err}", e.label))?;
+        }
+    }
     crate::panels::validate(p)?;
     // Presentation clock/cue references do not enter the compiler's graph.
     for (&id, m) in &p.modules {
@@ -285,8 +292,7 @@ fn crossings(p: &PatchState, inside: &BTreeSet<ModuleId>) -> Vec<(kabl_core::Cab
 /// targets, a repeated label or target, a boundary crossing no port covers and a pinned
 /// parameter no control covers. A port lists every input one outside source feeds in its
 /// `target` and `also` (fan-in). A cable parameter belongs to the module its cable ends on; it
-/// can be a port but not yet a control, because composite faces only draw knobs for module
-/// parameters.
+/// can be a port, a control (a route's `amount`, drawn as a knob) or both.
 pub fn encapsulate_with(
     log: &mut PatchLog,
     name: &str,
@@ -322,7 +328,7 @@ pub fn encapsulate_with(
                     end(t)
                 ));
             }
-            if control && (!matches!(e.target, PortRef::Param { .. }) || !e.also.is_empty()) {
+            if control && (!e.target.is_route() || !e.also.is_empty()) {
                 return Err(format!(
                     "Control \"{}\": {} is not a parameter",
                     e.label,
@@ -516,7 +522,7 @@ fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
         .collect();
     snapshot.cables.retain(|id, _| keep.contains(id));
     // A route into a cable that crosses the boundary stays behind with that cable, and so does
-    // a port bound to that cable's parameter.
+    // a port or control bound to that cable's parameter.
     loop {
         let ids: BTreeSet<kabl_core::CableId> = snapshot.cables.keys().copied().collect();
         let before = ids.len();
@@ -530,7 +536,7 @@ fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
     let ids: BTreeSet<kabl_core::CableId> = snapshot.cables.keys().copied().collect();
     for c in snapshot.composites.values_mut() {
         let mut gone = Vec::new();
-        for (&key, e) in c.ports.iter_mut() {
+        for (&key, e) in c.ports.iter_mut().chain(c.controls.iter_mut()) {
             if !e.retain_targets(
                 |t| !matches!(t, PortRef::CableParam { cable, .. } if !ids.contains(cable)),
             ) {
@@ -539,8 +545,12 @@ fn snapshot(p: &PatchState, root: CompositeId) -> Result<Package, String> {
         }
         for key in gone {
             c.ports.remove(&key);
+            c.controls.remove(&key);
             if let Some(panel) = &mut c.panel {
                 panel.placements.remove(&key);
+            }
+            for s in &mut c.snapshots {
+                s.values.remove(&key);
             }
         }
     }
