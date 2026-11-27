@@ -5,17 +5,15 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 
 ## Done
 - Up to 11-27 morning: see git history (state #272, #278). Highlights: W6 VST3 #264, W7 #267, W8 editor #274, CB2-CB5 #268 #271 #273 #275, L5 #269, faces slices 1-7.
-- 11-27 day: state #278, cable-param controls #277 (Env Amt knob on Analog Voice), W9 Windows installer #276 (Inno Setup + zip; CI install/launch/upgrade/uninstall; kabl.exe not shipped).
+- 11-27 day: state #278, cable-param controls #277 (Env Amt knob on Analog Voice), W9 Windows installer #276 (Inno Setup + zip; CI install/launch/upgrade/uninstall; kabl.exe not shipped), faces slice 8 engine morph #279 (ca337fe5), W9b #280 (4dba6cba: windows_subsystem; notices union linux+windows-msvc).
 
 ## In flight (builders die on restart: resume from the pushed branch, never redispatch from scratch)
-- #279 faces slice 8 engine morph (`claude/faces-morph`, head 75aea8da): verify ok, review clean (2 must-fix rounds fixed), CI was running. Merge when green.
-- #280 W9b (`claude/w9b-console-notices`, head ea95eab3): windows_subsystem for release kabl-ui; gen-notices unions linux+windows-msvc graphs (+20 crates); exit 1 on crate with no licence. verify ok, review clean, CI was running. Merge when green.
-- W9c icon (`claude/w9c-icon`): builder running; brief .claude/tmp/coord1126/brief-w9c-icon.md. Adds embed-resource, kabl.ico, kabl.iss SetupIconFile. Must merge master after #280 and regenerate notices. Touches kabl.iss = not a gate file; ok to auto-merge.
+- #282 W9c icon (`claude/w9c-icon`, builder a2748066): embed-resource, kabl.ico (16..256, frames byte-checked in CI exe), kabl.iss SetupIconFile; windows-installer green. Builder merging master + regenerating notices (licenses job). Then verify, review, CI, merge.
 - #203 promo v2: parked.
 - Every merge moves master: update-branch the other open PRs, re-verify, delta re-review (patch-id check), CI.
 
 ## Next
-1. Faces slice 9 snapshots: brief READY at .claude/tmp/coord1126/brief-faces-snapshots.md (needs #279 merged; run `nonslop slice new` then dispatch opus).
+1. Faces slice 9 snapshots: brief READY at .claude/tmp/coord1126/brief-faces-snapshots.md (#279 merged; after #282 frees the builder slot: `nonslop slice new`, dispatch opus).
 2. Faces slices 10 (whole blocks + Pin to Perform), 11 (compact face): briefs to write from FACES §9.
 3. Windows: W8b (host resize on DPI change + Live keyboard passthrough: public baseview method + vendor/nice-plug egui change), W10 release job (+ VST logo guidelines check), W11a standalone ASIO (required for 1.0), WA Kosta VM pass (list in PR #276 body / packaging/windows/README.md).
 4. L6 (lessons 6, 8; clap automation hook), then L7+L8 as one slice.
