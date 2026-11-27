@@ -478,8 +478,9 @@ fn new_kinds_have_minimum_sizes() {
 
 #[test]
 fn a_compact_width_is_in_rack_units_from_180_and_below_the_width() {
+    // 360 leaves every parent element on the compact face.
     with(PARENT, |c| {
-        c.panel.as_mut().unwrap().compact_width = Some(300.0)
+        c.panel.as_mut().unwrap().compact_width = Some(360.0)
     })
     .unwrap();
     for w in [150.0, 600.0, 310.0, f32::NAN] {
@@ -488,6 +489,71 @@ fn a_compact_width_is_in_rack_units_from_180_and_below_the_width() {
         });
         assert!(e.contains("Compact width"), "{w}: {e}");
     }
+}
+
+#[test]
+fn a_placement_crossing_the_fold_is_refused() {
+    // The cue pads span 200..320: a fold at 300 crosses them.
+    let e = refused(PARENT, |c| {
+        c.panel.as_mut().unwrap().compact_width = Some(300.0)
+    });
+    assert!(e.contains("crosses the compact face's edge"), "{e}");
+    // Ending exactly on the fold is compact; starting on it is the expanded part.
+    with(PARENT, |c| {
+        c.panel.as_mut().unwrap().compact_width = Some(330.0);
+        placements(c).get_mut(&3).unwrap().width = 130.0;
+    })
+    .unwrap();
+    with(PARENT, |c| {
+        c.panel.as_mut().unwrap().compact_width = Some(180.0);
+        placements(c).get_mut(&2).unwrap().x = 180.0;
+        placements(c).get_mut(&3).unwrap().x = 240.0;
+    })
+    .unwrap();
+}
+
+#[test]
+fn a_jack_past_the_fold_is_refused() {
+    let edit = |c: &mut Composite, x: f32| {
+        c.ports.insert(
+            6,
+            Exposure {
+                label: "Out".into(),
+                target: PortRef::Module {
+                    id: FILTER,
+                    port: "out".into(),
+                },
+                also: Vec::new(),
+            },
+        );
+        c.next_interface = 7;
+        let panel = c.panel.as_mut().unwrap();
+        panel.width = 360.0;
+        panel.compact_width = Some(240.0);
+        let jack = Placement {
+            y: 200.0,
+            ..placement(Kind::Jack, x, 54.0, 58.0, None)
+        };
+        panel.placements.insert(6, jack);
+    };
+    with(CHILD, |c| edit(c, 180.0)).unwrap();
+    let e = refused(CHILD, |c| edit(c, 246.0));
+    assert!(e.contains("a jack must be on the compact face"), "{e}");
+}
+
+#[test]
+fn a_compact_placement_over_the_expand_chip_is_refused() {
+    // Fold at 360: the chip spans x 298..352, y 310..332.
+    let e = refused(PARENT, |c| {
+        c.panel.as_mut().unwrap().compact_width = Some(360.0);
+        let p = placements(c).get_mut(&2).unwrap();
+        (p.x, p.y) = (290.0, 280.0);
+    });
+    assert!(e.contains("covers the expand chip"), "{e}");
+    with(PARENT, |c| {
+        c.panel.as_mut().unwrap().compact_width = Some(360.0)
+    })
+    .unwrap();
 }
 
 // --- composite::validate ---

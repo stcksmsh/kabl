@@ -404,6 +404,9 @@ pub struct UiState {
     perform_full_seen: bool,
     /// Modules showing their advanced controls. View only: never saved, never undone.
     pub expanded: BTreeSet<ModuleId>,
+    /// Composites showing their whole face past the compact one. View only, and never open
+    /// together with a module's advanced controls.
+    pub expanded_composites: BTreeSet<kabl_core::CompositeId>,
     /// The More controls dialog's tab: 0 Controls, 1 Face layout.
     pub more_tab: usize,
     /// Advanced controls float over the neighbours instead of pushing them (setting).
@@ -621,6 +624,7 @@ impl Default for UiState {
             drawer_auto_closed: false,
             perform_full_seen: false,
             expanded: BTreeSet::new(),
+            expanded_composites: BTreeSet::new(),
             more_tab: 0,
             float_expansion: false,
             skins: true,
@@ -715,6 +719,7 @@ impl UiState {
             self.selected_composite = None;
             self.moving = None;
             self.expanded.clear();
+            self.expanded_composites.clear();
             self.fitted = false;
         }
         while self
@@ -769,6 +774,17 @@ impl UiState {
             self.selected_module = None;
         }
         self.expanded.retain(|id| state.modules.contains_key(id));
+        // One face or module open at a time: whichever path opened a module closes the composite.
+        if !self.expanded.is_empty() {
+            self.expanded_composites.clear();
+        }
+        self.expanded_composites.retain(|id| {
+            state
+                .composites
+                .get(id)
+                .and_then(|c| c.panel.as_ref())
+                .is_some_and(|p| p.compact_width.is_some())
+        });
         if self
             .learn
             .as_ref()
@@ -2721,7 +2737,8 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     let mut drawn = Drawn::default();
     ui_state.deferred.clear();
     ui_state.text_rects.clear();
-    draw_composites(editor, ui_state, ui, xf, &mut drawn);
+    let open = ui_state.expanded_composites.clone();
+    draw_composites(editor, ui_state, ui, xf, &mut drawn, &open, false);
     for m in &lay.mods {
         if ui_state
             .moving
@@ -2755,6 +2772,7 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
             draw_module(editor, ui_state, ui, &painter, th, xf, m, now, &mut drawn);
         }
     }
+    draw_composites(editor, ui_state, ui, xf, &mut drawn, &open, true);
     // Floating areas' visible screen rects, for drop targeting.
     let floats: Vec<(ModuleId, Rect)> = lay
         .mods
@@ -2900,7 +2918,10 @@ fn show_rack(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
                             let c = editor.state().composites[&id].clone();
                             let face = Rect::from_min_size(
                                 live,
-                                vec2(c.panel.as_ref().map_or(240., |p| p.width), PANEL_H),
+                                vec2(
+                                    c.panel.as_ref().map_or(240., |p| p.shown_width(false)),
+                                    PANEL_H,
+                                ),
                             );
                             if c.panel.is_some() {
                                 draw_authored_face(
@@ -5722,11 +5743,21 @@ fn draw_composites(
     ui: &mut egui::Ui,
     xf: Xf,
     drawn: &mut Drawn,
+    open: &BTreeSet<kabl_core::CompositeId>,
+    top: bool,
 ) {
     let snapshot = editor.state().clone();
     let lay = composite_layout(&snapshot, view);
-    for (id, face) in lay.faces {
+    for (id, mut face) in lay.faces {
+        // Faces `open` at frame start draw after the modules, over their right-hand
+        // neighbours; a chip clicked this frame takes effect next frame.
+        if open.contains(&id) != top {
+            continue;
+        }
         let c = &snapshot.composites[&id];
+        if let Some(p) = c.panel.as_ref().filter(|_| top) {
+            face.set_width(p.shown_width(true));
+        }
         let rect = xf.r(face);
         rack_editor::body(view, ui, rack_editor::Item::Composite(id), face, xf);
         view.record(format!("composite:{id}:body"), rect);
@@ -5922,6 +5953,8 @@ fn draw_authored_face(
     use kabl_core::panel::{Kind, Source};
     let panel = c.panel.as_ref().unwrap();
     let mut th = theme::panel_theme(&view.style, "filter.svf");
+    // The caller passes the compact slot or the whole face; the design page always the whole.
+    let folded = face.width() < panel.width;
     let rect = xf.r(face);
     let z = xf.zoom;
     let painter = ui.painter_at(rect.intersect(ui.clip_rect()));
@@ -5970,16 +6003,17 @@ fn draw_authored_face(
                 Color32::WHITE
             };
             th.ink2 = th.ink;
+            // Folded, the artwork is cut at the compact edge, not squeezed into it.
             painter.image(
                 tex.id(),
-                rect,
+                xf.r(Rect::from_min_size(face.min, vec2(panel.width, PANEL_H))),
                 Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)),
                 Color32::WHITE,
             );
         }
     }
     // A quiet printed header/footer also provide guaranteed contrast over arbitrary art.
-    let header = xf.r(Rect::from_min_size(face.min, vec2(panel.width, 60.0)));
+    let header = xf.r(Rect::from_min_size(face.min, vec2(face.width(), 60.0)));
     painter.rect_filled(header, 0.0, th.panel);
     let title = if c.name.chars().count() > 32 {
         format!("{}…", c.name.chars().take(31).collect::<String>())
@@ -6033,9 +6067,16 @@ fn draw_authored_face(
     if r.clicked() {
         panels::open(view, id, c);
     }
+    // The rack shows the expand chip in its reserved rect when anything is past the fold.
+    let more = panel
+        .placements
+        .values()
+        .filter(|p| panel.folded(p))
+        .count();
+    let chip = panel.compact_width.filter(|_| more > 0);
     let fallback = xf.r(Rect::from_min_size(
         pos2(face.left() + 8.0, face.bottom() - 28.0),
-        vec2(panel.width - 16.0, 22.0),
+        vec2(chip.map_or(face.width() - 16.0, |w| w - 78.0), 22.0),
     ));
     painter.rect_filled(fallback, 3.0, th.panel);
     let r = ui.interact(fallback, Id::new(("face-fallback", id)), Sense::click());
@@ -6044,10 +6085,12 @@ fn draw_authored_face(
         &painter,
         fallback.center(),
         egui::Align2::CENTER_CENTER,
-        if missing {
-            "No artwork · Public controls / repair"
-        } else {
-            "More controls / help"
+        match (missing, chip.is_some()) {
+            (true, false) => "No artwork · Public controls / repair",
+            (false, false) => "More controls / help",
+            // Beside the chip, a compact face has room for one word.
+            (true, true) => "Repair",
+            (false, true) => "Help",
         },
         11.0 * z,
         th.ink,
@@ -6055,6 +6098,54 @@ fn draw_authored_face(
     );
     if r.clicked() {
         view.panels.fallback = Some(id);
+    }
+    if let Some(w) = chip {
+        let at = face.min + vec2(w - kabl_core::panel::CHIP_X, kabl_core::panel::CHIP_Y);
+        let size = kabl_core::panel::CHIP;
+        let r = xf.r(Rect::from_min_size(at, vec2(size.0, size.1)));
+        let resp = ui.interact(r, Id::new(("face-more", id)), Sense::click());
+        view.record(format!("composite:{id}:more"), r);
+        // The module chip's look: outlined pill, accent on hover.
+        let roles = &view.style.roles;
+        painter.rect_stroke(
+            r,
+            CornerRadius::same((r.height() / 2.0) as u8),
+            Stroke::new(
+                1.0,
+                if resp.hovered() {
+                    roles.accent
+                } else {
+                    face_edge(&view.style)
+                },
+            ),
+            egui::StrokeKind::Inside,
+        );
+        let label = if folded {
+            format!("+{more}")
+        } else {
+            "Less".into()
+        };
+        text(
+            &painter,
+            r.center(),
+            egui::Align2::CENTER_CENTER,
+            &label,
+            11.0 * z,
+            roles.text2,
+            true,
+        );
+        let resp = resp.on_hover_text(if folded {
+            "Show the whole face"
+        } else {
+            "Show the compact face"
+        });
+        if resp.clicked() {
+            if folded {
+                view.expand_composite(id);
+            } else {
+                view.expanded_composites.remove(&id);
+            }
+        }
     }
     for (&key, e) in &c.ports {
         if !panel.placements.contains_key(&key) {
@@ -6065,7 +6156,11 @@ fn draw_authored_face(
             }
         }
     }
-    for (&key, p) in &panel.placements {
+    for (&key, p) in panel
+        .placements
+        .iter()
+        .filter(|(_, p)| !folded || !panel.folded(p))
+    {
         let footprint = Rect::from_min_size(face.min + vec2(p.x, p.y), vec2(p.width, p.height));
         let screen = xf.r(footprint);
         if p.kind == Kind::Display {
