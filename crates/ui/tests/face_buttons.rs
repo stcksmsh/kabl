@@ -311,7 +311,7 @@ fn a_button_two_composites_down_fires_the_innermost_action() {
     for key in [k.top[1], k.top[5]] {
         assert_eq!(
             panels::resolve(e.state(), top, key),
-            Some((cue_module, "cue.1".into()))
+            Some(panels::End::Action(cue_module, "cue.1".into()))
         );
     }
     let mut h = H::with(e);
@@ -348,7 +348,8 @@ fn a_clock_button_under_the_host_clock_is_refused_as_on_the_module_face() {
 fn lit_state_follows_the_cue_and_the_bank_directly_and_through_a_chain() {
     let (e, [top, ..], _, k) = fixture();
     let mut view = UiState::default();
-    let lit = |view: &UiState, key| panels::lit(view, e.state(), placement(e.state(), top, key));
+    let lit =
+        |view: &UiState, key| panels::lit(view, e.state(), top, placement(e.state(), top, key));
     let [cue, cue_chain, bass_b, arp_b_chain, run, _] = k.top;
     // Both sequencers at their startup bank A: no cue of B, no bank B.
     for key in [cue, cue_chain, bass_b, arp_b_chain, run] {
@@ -388,6 +389,7 @@ fn a_chain_whose_nested_button_is_gone_does_nothing_and_does_not_panic() {
         panels::lit(
             &UiState::default(),
             &dangling,
+            top,
             placement(&dangling, top, k.top[1])
         ),
         (false, false)

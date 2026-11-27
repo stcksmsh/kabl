@@ -56,6 +56,7 @@ use wheel::OwnedScroll;
 pub mod record;
 pub mod routing;
 mod seq_editor;
+pub mod snapshots;
 pub mod sound_preview;
 pub mod style;
 pub mod tables;
@@ -137,6 +138,54 @@ impl UiState {
     pub fn live_macro(&self, id: ModuleId, k: u8) -> Option<MacroLive> {
         let (m, at) = self.macro_live.get(&(id, k))?;
         (at.elapsed() < std::time::Duration::from_millis(400)).then_some(*m)
+    }
+
+    /// Takes one morph report from the audio thread: `target` is at `value`, heading to `to`,
+    /// `progress` of the way (1 = arrived, held). A macro's goes to `macro_live`, any other
+    /// param's to `param_live`.
+    pub fn accept_morph(
+        &mut self,
+        target: kabl_engine::runtime::RuntimeTarget,
+        value: f32,
+        to: f32,
+        progress: f32,
+        at: std::time::Instant,
+    ) {
+        let live = MacroLive {
+            value,
+            to,
+            progress,
+        };
+        match target {
+            kabl_engine::runtime::RuntimeTarget::Param {
+                id,
+                kind: "macro",
+                index,
+            } => {
+                self.macro_live.insert((id, index as u8), (live, at));
+            }
+            t => {
+                self.param_live.insert(t, (live, at));
+            }
+        }
+    }
+
+    /// Where a new morph of `target` starts when the engine, not the document, holds its value,
+    /// while the audio thread's reports keep coming. A macro a cue moved or holds plays the
+    /// cue's value while the document keeps the hand's; any other param's morph leaves the
+    /// document at its target, so its report counts only until it arrives.
+    pub fn morph_from(&self, target: &kabl_engine::runtime::RuntimeTarget) -> Option<f32> {
+        if let kabl_engine::runtime::RuntimeTarget::Param {
+            id,
+            kind: "macro",
+            index,
+        } = *target
+        {
+            return self.live_macro(id, index as u8).map(|m| m.value);
+        }
+        let (m, at) = self.param_live.get(target)?;
+        (at.elapsed() < std::time::Duration::from_millis(400) && m.progress < 1.0)
+            .then_some(m.value)
     }
 
     /// Where param `p` of `id` is now: a macro a cue is driving reads as the cue moved it,
@@ -244,6 +293,12 @@ pub struct UiState {
     pub page_pinned: HashSet<ModuleId>,
     /// Bank launches and cancels for `main.rs` to send to the audio thread (runtime only).
     pub launches: Vec<Command>,
+    /// Snapshot recalls to morph, for `control::deliver` (runtime only).
+    pub morphs: Vec<snapshots::MorphRequest>,
+    /// The snapshot last recalled on each composite: the one its buttons and strip light.
+    pub last_snapshot: HashMap<kabl_core::CompositeId, u64>,
+    /// The `seq` of the last recall's morph parts.
+    pub(crate) morph_seq: u32,
     /// Last state of each MIDI button (channel, CC): high = pressed.
     pub(crate) button_high: HashMap<(u8, u8), bool>,
     /// Egui time before which button presses only set state (after a (re)connect).
@@ -263,6 +318,9 @@ pub struct UiState {
     /// Macros a cue is moving or holding, as the audio thread reports them: `(macro module,
     /// output)` to what was last reported and when. The stored knob value is the hand's.
     pub macro_live: HashMap<(ModuleId, u8), (MacroLive, std::time::Instant)>,
+    /// Other params a snapshot morph is moving or holding, reported the same way: where a new
+    /// recall's morph of them starts.
+    pub param_live: HashMap<kabl_engine::runtime::RuntimeTarget, (MacroLive, std::time::Instant)>,
     /// The cue last launched on each `cues` module: the one a macro-only cue (no sequencer to
     /// show it playing) counts as current, and the one "Store macros" writes to.
     pub last_cue: HashMap<ModuleId, usize>,
@@ -506,6 +564,9 @@ impl Default for UiState {
             edit_page: HashMap::new(),
             page_pinned: HashSet::new(),
             launches: Vec::new(),
+            morphs: Vec::new(),
+            last_snapshot: HashMap::new(),
+            morph_seq: 0,
             bank_rename: None,
             cue_rename: None,
             button_high: HashMap::new(),
@@ -515,6 +576,7 @@ impl Default for UiState {
             clock_running: HashMap::new(),
             clock_pos: HashMap::new(),
             macro_live: HashMap::new(),
+            param_live: HashMap::new(),
             last_cue: HashMap::new(),
             live: displays::Live::default(),
             wants: displays::Wants::default(),
@@ -5996,13 +6058,34 @@ fn draw_authored_face(
             continue;
         }
         if p.kind == Kind::Button {
-            // A pad in the cue-pad look, lit as the cue or bank its chain ends on.
-            let (on, queued) = panels::lit(view, editor.state(), p);
-            let name = panels::button_name(editor.state(), p);
+            // A pad in the cue-pad look, lit as the cue, bank or snapshot its chain ends on.
+            let (on, queued) = panels::lit(view, editor.state(), id, p);
+            let name = panels::face_button_name(editor.state(), id, p);
             let now = ui.input(|i| i.time);
             let hit = format!("composite:{id}:button:{key}");
             if pad(view, ui, &painter, z, hit, screen, &name, on, queued, now).clicked() {
                 panels::press(editor, view, id, key);
+            }
+            continue;
+        }
+        if p.kind == Kind::Snapshots {
+            // One pad per snapshot in list order, the last recalled lit.
+            let snaps: Vec<(u64, String)> =
+                c.snapshots.iter().map(|s| (s.id, s.name.clone())).collect();
+            let gap = 6.0 * z;
+            let w = (screen.width() - gap * (snaps.len().max(1) - 1) as f32)
+                / snaps.len().max(1) as f32;
+            let now = ui.input(|i| i.time);
+            for (i, (snap, name)) in snaps.into_iter().enumerate() {
+                let r = Rect::from_min_size(
+                    screen.min + vec2((w + gap) * i as f32, 0.0),
+                    vec2(w, screen.height()),
+                );
+                let on = view.last_snapshot.get(&id) == Some(&snap);
+                let hit = format!("composite:{id}:snapshot:{key}.{snap}");
+                if pad(view, ui, &painter, z, hit, r, &name, on, false, now).clicked() {
+                    snapshots::recall(editor, view, id, snap);
+                }
             }
             continue;
         }

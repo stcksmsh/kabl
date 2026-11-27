@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 81] = [
+const SCENES: [&str; 83] = [
     "rack",
     "perform",
     "sounds",
@@ -81,6 +81,8 @@ const SCENES: [&str; 81] = [
     "design-page-displays",
     "face-buttons",
     "design-page-buttons",
+    "face-snapshots",
+    "design-page-snapshots",
     "drum-kit-rack",
     "drum-kit-face",
     "drum-kit-design",
@@ -327,9 +329,11 @@ impl App {
             }
             Err(_) if j.scene.starts_with("sequenced-part") => factory_patch("sequenced-part"),
             // The button scenes need a clock and sequencers: the performance patch.
-            Err(_) if j.scene.contains("-buttons") => PatchEditor::from_log(
-                kabl_core::load(&patches().join("performance")).expect("performance"),
-            ),
+            Err(_) if j.scene.contains("-buttons") || j.scene == "face-snapshots" => {
+                PatchEditor::from_log(
+                    kabl_core::load(&patches().join("performance")).expect("performance"),
+                )
+            }
             Err(_) => mockup_patch(j.scene == "wavetable-editor"),
         };
         let mut ui = UiState::default();
@@ -773,7 +777,7 @@ impl App {
         // bass and "Deep", which holds the arp. Deep's face has the arp's bank B button; Top's has
         // the cue, the bass's bank B, Deep's button through Mid and the clock's Run. The bass
         // plays bank B, so its button is the one lit.
-        if j.scene.contains("-buttons") {
+        if j.scene.contains("-buttons") || j.scene == "face-snapshots" {
             use kabl_core::panel::{Kind, Panel, Placement, Source};
             let (clock, bass, arp) = (1, 3, 4);
             let cues = self
@@ -839,6 +843,61 @@ impl App {
             }
             ui.seq_banks.insert(bass, (1, None));
             ui.seq_banks.insert(arp, (0, None));
+            // "face-snapshots": Top's tempo exposed, three snapshots of it in a strip, a button
+            // for the first, and the second lit as the last recalled.
+            if j.scene == "face-snapshots" {
+                let bpm = kabl_core::PortRef::Param {
+                    id: clock,
+                    param: "bpm".into(),
+                };
+                kabl_ui::composites::add_exposure(&mut self.editor, top, bpm.clone(), true)
+                    .unwrap();
+                let mut c = self.editor.state().composites[&top].clone();
+                let key = *c.controls.iter().find(|(_, e)| e.target == bpm).unwrap().0;
+                let mut snaps = Vec::new();
+                for (name, v) in [("Slow", 90.0), ("Groove", 120.0), ("Drive", 140.0)] {
+                    c.snapshots.push(kabl_core::composite::Snapshot {
+                        id: c.next_interface,
+                        name: name.into(),
+                        values: [(key, v)].into(),
+                        morph_beats: 4.0,
+                        clock: Some(clock),
+                    });
+                    snaps.push(c.next_interface);
+                    c.next_interface += 1;
+                }
+                let mut panel = Panel {
+                    width: 570.0,
+                    ..Panel::default()
+                };
+                for (kind, source, x, width) in [
+                    (Kind::Snapshots, None, 12.0, 408.0),
+                    (
+                        Kind::Button,
+                        Some(Source::Snapshot { id: snaps[0] }),
+                        426.0,
+                        132.0,
+                    ),
+                ] {
+                    panel.placements.insert(
+                        c.next_interface,
+                        Placement {
+                            kind,
+                            x,
+                            y: 66.0,
+                            width,
+                            height: 48.0,
+                            source,
+                            label: None,
+                            icons: Vec::new(),
+                        },
+                    );
+                    c.next_interface += 1;
+                }
+                c.panel = Some(Box::new(panel));
+                kabl_ui::composites::set(&mut self.editor, top, c).unwrap();
+                ui.last_snapshot.insert(top, snaps[1]);
+            }
         }
         if j.scene.starts_with("face-icons") {
             use kabl_core::panel::{Kind, Panel, Placement};
@@ -1450,6 +1509,29 @@ impl eframe::App for App {
                 page.selected = Some(keys[2]);
             }
         }
+        // Three snapshots of the cutoff in the list, one renamed with a morph length, the
+        // strip and the first one's button on the face.
+        if self.f == 6 && scene == "design-page-snapshots" {
+            let c = self.editor.state().composites.values().next().unwrap();
+            let svf = c.controls.values().next().unwrap().target.clone();
+            let mut snaps = Vec::new();
+            for hz in [400.0, 1200.0, 3000.0] {
+                if let kabl_core::PortRef::Param { id, param } = &svf {
+                    self.editor.set_param(*id, param, hz);
+                }
+                let state = self.editor.state();
+                let page = self.ui.panels.page.as_mut().unwrap();
+                snaps.push(page.capture(state).unwrap());
+            }
+            let state = self.editor.state();
+            let page = self.ui.panels.page.as_mut().unwrap();
+            page.rename(snaps[2], "Open").unwrap();
+            page.set_morph(state, snaps[2], 4.0, None).unwrap();
+            page.add_strip(state).unwrap();
+            page.add_button(state, kabl_core::panel::Source::Snapshot { id: snaps[0] })
+                .unwrap();
+            page.selected = None;
+        }
         if self.f == 6 && scene.starts_with("design-page-icons") {
             self.ui.panels.path = "icons/shape-4.png".into();
         }
@@ -1498,7 +1580,7 @@ impl eframe::App for App {
             page.draft.panel.placements.remove(&key);
         }
         // The "Top" face, first in the rack, at zoom 1.
-        if self.f == 6 && scene == "face-buttons" {
+        if self.f == 6 && (scene == "face-buttons" || scene == "face-snapshots") {
             self.ui.zoom = 1.0;
             self.ui.pan = egui::Vec2::ZERO;
         }

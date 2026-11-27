@@ -529,6 +529,6 @@ fn transport_is_not_supported_yet() {
     assert!(refusal(Kind::Transport).ends_with("Transport elements are not supported yet"));
 }
 #[test]
-fn snapshot_strips_are_not_supported_yet() {
-    assert!(refusal(Kind::Snapshots).ends_with("Snapshots elements are not supported yet"));
+fn snapshot_strips_are_accepted() {
+    assert_eq!(face_with(Kind::Snapshots), Ok(()));
 }
