@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 74] = [
+const SCENES: [&str; 77] = [
     "rack",
     "perform",
     "sounds",
@@ -90,6 +90,9 @@ const SCENES: [&str; 74] = [
     "sequenced-part-sub-rack",
     "sequenced-part-sub-face",
     "sequenced-part-sub-design",
+    "glue-bus-rack",
+    "glue-bus-face",
+    "glue-bus-design",
 ];
 
 struct Job {
@@ -138,7 +141,8 @@ fn patches() -> PathBuf {
 
 /// A clock at 120 BPM into the factory composite `kabl.<name>` v1 (Drum Kit, a Sequenced
 /// Part) into the output: the clock left of the card and the output under or beside it, so no
-/// cable crosses a face.
+/// cable crosses a face. Glue Bus has no clock: the clock plays Drum Kit, and Glue Bus sits under
+/// it with In and Duck In along its top, fed by Drum Kit's Out and Kick.
 fn factory_patch(name: &str) -> PatchEditor {
     use kabl_ui::composites;
     let mut e = PatchEditor::new();
@@ -152,18 +156,25 @@ fn factory_patch(name: &str) -> PatchEditor {
         kabl_core::Vec2 { x: 1060.0, y: 20.0 }
     };
     let out = e.add_module("out", out_pos);
-    let bank = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../composites");
-    let def = format!("kabl.{name}");
-    let entry = composites::factory_entries(&bank)
-        .into_iter()
-        .find(|f| f.definition.id == def && f.definition.version == 1)
-        .expect("the definition is in the bank");
-    let pkg = composites::read_factory(&entry).expect("read the definition");
-    let id = composites::insert(&mut e, &pkg).expect("insert the composite");
-    let mut c = e.state().composites[&id].clone();
-    c.pos = kabl_core::Vec2 { x: 210.0, y: 20.0 };
-    composites::set(&mut e, id, c).expect("move the composite");
-    let port = |e: &PatchEditor, label: &str| {
+    let insert = |e: &mut PatchEditor, name: &str, pos| {
+        let bank = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../composites");
+        let def = format!("kabl.{name}");
+        let entry = composites::factory_entries(&bank)
+            .into_iter()
+            .find(|f| f.definition.id == def && f.definition.version == 1)
+            .expect("the definition is in the bank");
+        let pkg = composites::read_factory(&entry).expect("read the definition");
+        let id = composites::insert(e, &pkg).expect("insert the composite");
+        let mut c = e.state().composites[&id].clone();
+        c.pos = pos;
+        composites::set(e, id, c).expect("move the composite");
+        id
+    };
+    let glue = name == "glue-bus";
+    let card = if glue { "drum-kit" } else { name };
+    let id = insert(&mut e, card, kabl_core::Vec2 { x: 210.0, y: 20.0 });
+    let bus = glue.then(|| insert(&mut e, name, GLUE_BUS_POS));
+    let port_of = |e: &PatchEditor, id, label: &str| {
         e.state().composites[&id]
             .ports
             .values()
@@ -172,16 +183,26 @@ fn factory_patch(name: &str) -> PatchEditor {
             .target
             .clone()
     };
+    let port = |e: &PatchEditor, label: &str| port_of(e, id, label);
     let jack = |id, port: &str| kabl_core::PortRef::Module {
         id,
         port: port.into(),
     };
-    let (gate, reset, mix) = (port(&e, "Clock"), port(&e, "Reset"), port(&e, "Out"));
+    let (gate, reset, mut mix) = (port(&e, "Clock"), port(&e, "Reset"), port(&e, "Out"));
     e.connect(jack(clock, "gate"), gate);
     e.connect(jack(clock, "reset"), reset);
+    if let Some(bus) = bus {
+        e.connect(mix, port_of(&e, bus, "In"));
+        e.connect(port(&e, "Kick"), port_of(&e, bus, "Duck In"));
+        mix = port_of(&e, bus, "Out");
+    }
     e.connect(mix, jack(out, "in"));
     e
 }
+
+/// Glue Bus under Drum Kit, its In and Duck In jacks 90 points right of Drum Kit's Out and Kick:
+/// a cable hanging straight down would cross the jack's label.
+const GLUE_BUS_POS: kabl_core::Vec2 = kabl_core::Vec2 { x: 300.0, y: 420.0 };
 
 /// The Perform mockup as a patch: a clock, four macros (Bite, Wash, Drive, Space on CC 20 to 23,
 /// each moving two controls), three sequencers (Bass, Drums, Lead) and eight scenes, so the
@@ -357,6 +378,7 @@ impl App {
                 e
             }
             Err(_) if j.scene.starts_with("drum-kit") => factory_patch("drum-kit"),
+            Err(_) if j.scene.starts_with("glue-bus") => factory_patch("glue-bus"),
             Err(_) if j.scene.starts_with("sequenced-part-sub") => {
                 factory_patch("sequenced-part-sub")
             }
@@ -1498,15 +1520,21 @@ impl eframe::App for App {
             };
             self.ui.pan = egui::vec2(-860.0, -240.0) * self.ui.zoom;
         }
-        // The Drum Kit and Sequenced Part faces at zoom 1, at the top left; their design pages.
-        let factory = scene.starts_with("drum-kit") || scene.starts_with("sequenced-part");
+        // The Drum Kit, Sequenced Part and Glue Bus faces at zoom 1, at the top left; their
+        // design pages. Glue Bus is the last card of its scene.
+        let glue = scene.starts_with("glue-bus");
+        let factory = scene.starts_with("drum-kit") || scene.starts_with("sequenced-part") || glue;
         if self.f == 6 && factory && scene.ends_with("-face") {
             self.ui.zoom = 1.0;
             self.ui.drawer_open = false;
             self.ui.pan = egui::Vec2::ZERO;
+            // Glue Bus's rack row, under Drum Kit's, starts 370 points further down.
+            if glue {
+                self.ui.pan = egui::vec2(0.0, -370.0);
+            }
         }
         if self.f == 6 && factory && scene.ends_with("-design") {
-            let (&id, c) = self.editor.state().composites.iter().next().unwrap();
+            let (&id, c) = self.editor.state().composites.iter().next_back().unwrap();
             kabl_ui::panels::open(&mut self.ui, id, c);
         }
         // The "Top" face, first in the rack, at zoom 1.
