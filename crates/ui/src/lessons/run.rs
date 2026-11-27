@@ -46,6 +46,10 @@ pub struct Active {
     /// Steps completed this session, one per step. A done step asks for nothing again, so
     /// going back to it with Previous does not mean undoing and redoing the edit.
     pub done: Vec<bool>,
+    /// Steps whose conditions already held when the lesson started (or followed into its
+    /// sound). Those are not marked done before they are reached: only conditions that come to
+    /// hold count early, so "plug the cable back" is not done by a cable never unplugged.
+    pub met_at_start: Vec<bool>,
 }
 
 /// Learn tab state. View only.
@@ -190,6 +194,44 @@ pub fn holds(c: &Cond, editor: &PatchEditor, ui: &UiState, base: &Baseline) -> b
             ui.compare.can_undo_restore(editor)
                 && editor.log().undo_entry().map(|e| e.seq) != base.undo_seq
         }
+        Cond::PreviewPlayed => ui.browser.clips.playing().is_some(),
+        Cond::NotesPlayed => ui.keys.any() || ui.status_voices.is_some_and(|(n, _)| n > 0),
+        Cond::Favorited => library_doc(ui).is_some_and(|id| {
+            ui.library
+                .as_ref()
+                .is_some_and(|l| l.prefs.favorites.contains(id))
+        }),
+        Cond::SavedAsUser => {
+            library_doc(ui).is_some_and(|id| id.starts_with("user:"))
+                && !browser::is_modified(editor, ui)
+        }
+        Cond::ExplainOpen { id, key } => matches!(
+            &ui.explain.subject,
+            Some(explain::Subject::Control { id: i, key: k }) if i == id && k == key
+        ),
+        Cond::Pinned { id, param } => crate::perform::is_pinned(state, *id, param),
+        Cond::ReachesOutput { id, kind } => {
+            kind_ok(state, *id, kind) && matches!(explain::path_to_output(state, *id), Ok(Some(_)))
+        }
+        Cond::CableRemoved {
+            from,
+            port,
+            to,
+            input,
+        } => state.modules.contains_key(from)
+            && state.modules.contains_key(to)
+            && !state.cables.values().any(|c| {
+                matches!(&c.from, PortRef::Module { id, port: p } if id == from && p == port)
+                    && matches!(&c.to, PortRef::Module { id, port: p } if id == to && p == input)
+            }),
+    }
+}
+
+/// The library id of the open document, if it is a library sound.
+fn library_doc(ui: &UiState) -> Option<&str> {
+    match &ui.doc.as_ref()?.origin {
+        DocOrigin::Library(id) => Some(id),
+        _ => None,
     }
 }
 
@@ -242,14 +284,36 @@ pub fn frame(editor: &PatchEditor, ui: &mut UiState, now: f64) {
             log::debug!(target: "lesson", "start cancelled lesson={}", l.id);
         }
     }
-    let Some(a) = ui.lessons.active.as_mut() else {
+    let Some(a) = ui.lessons.active.as_ref() else {
         return;
     };
     if !a.detached && a.editor != editor.instance() {
-        a.detached = true;
-        log::debug!(target: "lesson", "detached lesson={}", all()[a.lesson].id);
+        let l = &all()[a.lesson];
+        // A sound the lesson itself asks for (an `opened` condition) carries it on.
+        let asked = library_doc(ui).is_some_and(|id| {
+            l.steps
+                .iter()
+                .flat_map(|s| &s.done)
+                .any(|c| matches!(c, Cond::Opened(s) if s == id))
+        });
+        let met = asked.then(|| met_now(l, editor, ui, &Baseline::of(editor)));
+        if let Some(a) = ui.lessons.active.as_mut() {
+            match met {
+                Some(met) => {
+                    a.editor = editor.instance();
+                    a.base = Baseline::of(editor);
+                    a.origin = a.base.clone();
+                    a.met_at_start = met;
+                    log::debug!(target: "lesson", "followed lesson={} into its sound", l.id);
+                }
+                None => {
+                    a.detached = true;
+                    log::debug!(target: "lesson", "detached lesson={}", l.id);
+                }
+            }
+        }
     }
-    if a.detached {
+    if ui.lessons.active.as_ref().is_none_or(|a| a.detached) {
         return;
     }
     // Borrowed, not cloned: this runs every frame and `Active` holds a whole patch.
@@ -259,7 +323,7 @@ pub fn frame(editor: &PatchEditor, ui: &mut UiState, now: f64) {
     let step = a.step;
     let l = &all()[a.lesson];
     let early: Vec<usize> = (step + 1..l.steps.len())
-        .filter(|&k| !a.done[k] && meets(&l.steps[k], editor, ui, &a.origin))
+        .filter(|&k| !a.done[k] && !a.met_at_start[k] && meets(&l.steps[k], editor, ui, &a.origin))
         .collect();
     if !early.is_empty() {
         if let Some(a) = ui.lessons.active.as_mut() {
@@ -300,6 +364,11 @@ pub(super) fn complete(l: &Lesson, a: &Active, editor: &PatchEditor, ui: &UiStat
         .is_some_and(|s| meets(s, editor, ui, &a.base))
 }
 
+/// For each step of `l`: its conditions all hold now.
+fn met_now(l: &Lesson, editor: &PatchEditor, ui: &UiState, base: &Baseline) -> Vec<bool> {
+    l.steps.iter().map(|s| meets(s, editor, ui, base)).collect()
+}
+
 /// `s` has conditions and all of them hold against `base`.
 fn meets(s: &Step, editor: &PatchEditor, ui: &UiState, base: &Baseline) -> bool {
     !s.done.is_empty() && s.done.iter().all(|c| holds(c, editor, ui, base))
@@ -316,6 +385,7 @@ fn activate(editor: &PatchEditor, ui: &mut UiState, i: usize) {
         .map_or(0, |p| p.step);
     let step = if step < l.steps.len() { step } else { 0 };
     let base = Baseline::of(editor);
+    let met_at_start = met_now(l, editor, ui, &base);
     ui.lessons.active = Some(Active {
         lesson: i,
         step,
@@ -326,6 +396,7 @@ fn activate(editor: &PatchEditor, ui: &mut UiState, i: usize) {
         completed_at: None,
         armed: false,
         done: vec![false; l.steps.len()],
+        met_at_start,
     });
     ui.compare.capture(editor, "the lesson start");
     log::debug!(target: "lesson", "active lesson={} step={step}", l.id);

@@ -1,0 +1,55 @@
+# Lesson 1 (docs/pivot/firstrun-learning-design.md §4 row 1). Starts on Laundromat, a Piece,
+# and moves to Glass Elevator, a Keys sound (Macro #1). Format: docs/learning/LESSON-FORMAT.md
+id = "find-and-play"
+title = "Find and play sounds"
+summary = "Preview sounds, open one, play it, make it a favorite, and save your own version."
+start = { sound = "factory:presets/laundromat" }
+
+[[step]]
+title = "Preview a sound"
+text = """
+Open Sounds in the top bar. Press ▶ on any sound to hear a short preview. \
+Nothing in your patch changes."""
+plugin_text = """
+Stop your host's transport, then open Sounds in the top bar and press ▶ on \
+any sound to hear a short preview. Nothing in your patch changes."""
+anchor = "browser"
+done = ["preview_played"]
+
+[[step]]
+title = "Open one"
+text = """
+In Sounds, pick the Keys shelf, select Glass Elevator and press Open."""
+done = [{ opened = "factory:presets/glass-elevator" }]
+
+[[step]]
+title = "Play it"
+text = """
+Play a few notes: the keys A to K on your computer keyboard, the key strip \
+at the bottom, or your MIDI keyboard."""
+plugin_text = """
+Play a few notes into this track from your host or your MIDI keyboard, or \
+use the key strip at the bottom."""
+done = ["notes_played"]
+
+[[step]]
+title = "Keep it, change it"
+text = """
+Press the star next to Glass Elevator in Sounds to make it a favorite. Then on \
+Perform turn Tine, Ring, Tremolo or Space and listen while you play."""
+done = [
+  "favorited",
+  { any_param_moved = { id = 1, kind = "macro", params = ["m1", "m2", "m3", "m4"], by = 0.05 } },
+]
+
+[[step]]
+title = "Save your version"
+text = """
+Choose Save As in the sound menu and name it My first variation. If that \
+name is taken, Replace it or pick another name."""
+done = ["saved_as_user"]
+
+[end]
+unguided = """
+Find your sound under Your Sounds, and your favorite under Favorites. \
+Preview a Piece and press Start to hear it run."""

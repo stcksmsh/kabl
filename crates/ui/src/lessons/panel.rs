@@ -189,7 +189,7 @@ pub fn panel(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui
     } else {
         let s = &l.steps[step];
         ui.label(egui::RichText::new(format!("Step {} of {n}", step + 1)).small());
-        para(ui, &s.text);
+        para(ui, s.text_for(ui_state.devices.is_none()));
         if step_done {
             weak(ui, "Done. Next when you are ready.");
         }

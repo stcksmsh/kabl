@@ -1,0 +1,49 @@
+# Lesson 3 (docs/pivot/firstrun-learning-design.md §4 row 3) on the Filter movement recipe;
+# its last step is included from lessons/r2-filter-movement.toml. Format:
+# docs/learning/LESSON-FORMAT.md
+id = "signal-flow"
+title = "Signal flow"
+summary = "Follow the sound from oscillator to output, break the chain, and fix it."
+start = { sound = "factory:recipes/filter-movement" }
+
+[[step]]
+title = "Listen at the start"
+text = """
+Sound starts at Osc #2 and flows down the cables to Output #5. Play the \
+test note: the inspector shows the raw, buzzy saw at the oscillator."""
+inspect = { id = 2, kind = "osc.va", port = "out" }
+play_note = 4.0
+done = [{ inspecting = { id = 2, port = "out" } }]
+
+[[step]]
+title = "Listen further down"
+text = """
+Inspect VCA #4's output. After Filter #3 the saw is darker, and the VCA \
+lets it through only while a note is held."""
+inspect = { id = 4, kind = "vca", port = "out" }
+play_note = 4.0
+done = [{ inspecting = { id = 4, port = "out" } }]
+
+[[step]]
+title = "Break the chain"
+text = """
+Drag the cable from VCA #4 to Output #5 off its input. Play: silence. \
+Press Why no sound? to see where the sound stops."""
+show = { module = { id = 4, kind = "vca" } }
+play_note = 4.0
+done = [{ cable_removed = { from = 4, port = "out", to = 5, input = "in" } }]
+
+[[step]]
+title = "Fix it"
+text = """
+Press Undo (Ctrl+Z) to plug the cable back. Play: the sound is back."""
+play_note = 4.0
+done = [{ reaches_output = { id = 4, kind = "vca" } }]
+
+[[step]]
+include = { lesson = "filter-movement", step = 2 }
+
+[end]
+unguided = """
+On your own: inspect Filter #3's output while the route is on, and watch \
+the brightness rise and fall."""
