@@ -334,6 +334,13 @@ int main(int argc, char* argv[])
     require(component->activateBus(kEvent, kInput, 0, true) == kResultOk, "activate the event input");
     require(component->setActive(true) == kResultOk, "setActive");
     require(host.data.prepare(*component, kBlock, kSample32), "process buffers");
+    // HostProcessData allocates its buffers uninitialised, and kabl mixes its audio input
+    // into the output when the patch does not use `audio.in`. A host feeds that input
+    // silence; leftover heap contents would play as noise (or NaN) on top of the oscillator.
+    for (int32 bus = 0; bus < host.data.numInputs; ++bus)
+        for (int32 channel = 0; channel < host.data.inputs[bus].numChannels; ++channel)
+            if (float* samples = host.data.inputs[bus].channelBuffers32[channel])
+                std::fill(samples, samples + kBlock, 0.0f);
     host.data.processMode = kRealtime;
     host.context.sampleRate = kRate;
     host.processor->setProcessing(true);
@@ -386,6 +393,8 @@ int main(int argc, char* argv[])
     host.render(200);
     const double released = rms(host.last(20));
     check(released < 0.01 * level, fmt("pedal up releases it: rms %.6f", released));
+    const auto broken = std::count_if(host.left.begin(), host.left.end(), [](float v) { return !std::isfinite(v); });
+    check(broken == 0, fmt("every output sample is finite: %.0f are not", static_cast<double>(broken)));
 
     host.processor->setProcessing(false);
     component->setActive(false);
