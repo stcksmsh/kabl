@@ -645,7 +645,7 @@ impl NiceEguiApp for RackApp {
         }
         self.gui = None;
     }
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut nice_plug_egui::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut nice_plug_egui::Frame) {
         let old = {
             let _control = self.shared.control.lock().unwrap();
             self.shared.native_value(0, false)
@@ -802,6 +802,12 @@ impl NiceEguiApp for RackApp {
         } = &mut *c;
         kabl_ui::show(editor, view, ui);
         notes::send(ui_notes, view);
+        // Keys kabl uses stay with kabl, the rest go only to the host. On Linux the window keeps
+        // every key: X11 has no way to hand one on to the host.
+        if cfg!(any(windows, target_os = "macos")) {
+            let owner = kabl_ui::keys::Owner::of(view, ui.ctx());
+            frame.set_key_owner(move |key, modifiers| owner.keeps(key, modifiers));
+        }
         for (i, previous) in before.iter().enumerate() {
             let after = c.lanes[i]
                 .target

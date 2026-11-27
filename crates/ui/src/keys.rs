@@ -269,6 +269,97 @@ pub fn watch(ui_state: &mut UiState) {
     }
 }
 
+/// Which keys kabl uses, as of the end of a frame. A plugin window asks `keeps` as each key
+/// arrives, before kabl's next frame runs, so a key kabl uses stays with kabl and any other goes
+/// only to the host (Space to its transport, its shortcuts).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Owner {
+    /// A text field has focus: every key is kabl's.
+    text: bool,
+    /// Another widget (a knob, a slider) has focus: it takes the arrows.
+    focused: bool,
+    /// The computer keys play notes (`input`'s `free`).
+    notes: bool,
+    /// A opens the add-module menu (computer keys off).
+    add_menu: bool,
+    /// The browser list takes Up and Down.
+    browser_list: bool,
+    /// A browser row is selected: Space previews it, Enter loads it.
+    browser_row: bool,
+    /// The design page is open: it takes the arrows, Delete and its own undo.
+    design: bool,
+    /// The rack's undo and redo are live.
+    undo: bool,
+    /// A menu is open: Delete removes the module of its module menu.
+    popup: bool,
+    /// No browser dialog is open: Ctrl+S saves.
+    save: bool,
+}
+
+impl Owner {
+    pub fn of(ui_state: &UiState, ctx: &egui::Context) -> Self {
+        let text = crate::routing::wants_text_input(ctx);
+        let dialog = ui_state.browser.dialog.is_some();
+        let popup = egui::Popup::is_any_open(ctx);
+        let focused = ctx.memory(|m| m.focused().is_some());
+        let browser_list = ui_state.browser_open && !dialog && !focused;
+        Owner {
+            text,
+            focused,
+            notes: ui_state.keys.computer && !dialog && !text && !popup,
+            add_menu: !ui_state.keys.computer && !text,
+            browser_list,
+            browser_row: browser_list && ui_state.browser.selected.is_some(),
+            design: ui_state.panels.page.is_some(),
+            undo: !dialog && ui_state.moving.is_none(),
+            popup,
+            save: !dialog,
+        }
+    }
+
+    /// Whether kabl uses `key` (`None`: a key egui has no name for) with `modifiers` held.
+    pub fn keeps(&self, key: Option<Key>, modifiers: egui::Modifiers) -> bool {
+        if self.text {
+            return true;
+        }
+        let Some(key) = key else {
+            return false;
+        };
+        let plain = modifiers.is_none();
+        let arrow = matches!(
+            key,
+            Key::ArrowLeft | Key::ArrowRight | Key::ArrowUp | Key::ArrowDown
+        );
+        if arrow && (plain || modifiers == egui::Modifiers::SHIFT) && self.focused {
+            return true;
+        }
+        if modifiers.command && !modifiers.alt {
+            return match key {
+                Key::Z => self.undo || self.design,
+                Key::Y => !modifiers.shift && (self.undo || self.design),
+                Key::S => !modifiers.shift && self.save,
+                _ => false,
+            };
+        }
+        if !plain {
+            return false;
+        }
+        let note = matches!(key, Key::Z | Key::X) || LAYOUT.iter().any(|&(k, _)| k == key);
+        match key {
+            _ if note && self.notes => true,
+            Key::A => self.add_menu,
+            // Dialogs, menus, toasts, drags, lessons and the dock all close or cancel on it.
+            Key::Escape => true,
+            Key::Space => self.browser_row,
+            Key::Enter => self.browser_row,
+            Key::ArrowUp | Key::ArrowDown => self.browser_list || self.design,
+            Key::ArrowLeft | Key::ArrowRight => self.design,
+            Key::Delete => self.design || self.popup,
+            _ => false,
+        }
+    }
+}
+
 fn is_black(note: u8) -> bool {
     matches!(note % 12, 1 | 3 | 6 | 8 | 10)
 }

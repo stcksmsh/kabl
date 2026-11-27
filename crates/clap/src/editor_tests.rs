@@ -90,31 +90,141 @@ fn kabl_keeps_keys_only_while_a_text_field_has_focus() {
 }
 
 #[test]
-fn ignored_keys_go_to_the_host_and_key_ups_follow_their_key_downs() {
+fn a_press_goes_one_way_and_its_repeats_and_key_up_follow_it() {
     use nice_plug_egui::baseview::key_route::{KeyMessage::*, KeyRoute};
-    use nice_plug_egui::baseview::EventStatus::{Captured, Ignored};
 
     const SPACE: u8 = 0x20;
     const A: u8 = 0x41;
+    let host = || true;
+    let kabl = || false;
+    let unasked = || -> bool { panic!("only a new press is decided") };
     let mut route = KeyRoute::default();
 
-    // An ignored key goes to the host, and so does its key-up.
-    assert!(route.to_host(Down, SPACE, Some(Ignored)));
-    assert!(route.to_host(Down, SPACE, Some(Ignored)), "auto-repeat");
-    assert!(route.to_host(Up, SPACE, None));
-    // A used key stays with kabl, and so does its key-up.
-    assert!(!route.to_host(Down, A, Some(Captured)));
-    assert!(!route.to_host(Up, A, None));
-    // Characters, and keys the window made no event of, stay with kabl.
-    assert!(!route.to_host(Char, A, None));
-    assert!(!route.to_host(Down, A, None));
+    // Space goes to the host; a text field gains focus while it is held (kabl would now keep a
+    // new press): the repeats and the key-up still go to the host.
+    assert!(route.to_host(Down, SPACE, host));
+    assert!(route.to_host(Repeat, SPACE, unasked));
+    assert!(route.to_host(Repeat, SPACE, kabl));
+    assert!(route.to_host(Up, SPACE, kabl));
+    // The reverse: A typed into the field, which then loses focus. All of it stays with kabl.
+    assert!(!route.to_host(Down, A, kabl));
+    assert!(!route.to_host(Repeat, A, host));
+    assert!(!route.to_host(Up, A, host));
+    // A key-up whose key-down was never seen stays with kabl, and so do characters.
+    assert!(!route.to_host(Up, SPACE, host));
+    assert!(!route.to_host(Char, A, host));
+    // A repeat of a press held before the window had it is a new press.
+    assert!(route.to_host(Repeat, SPACE, host));
+    assert!(route.to_host(Up, SPACE, kabl));
 
-    // A text field gains focus while Space is held: its key-up still goes where the down went.
-    assert!(route.to_host(Down, SPACE, Some(Ignored)));
-    assert!(route.to_host(Up, SPACE, Some(Captured)));
-    // It loses focus while A is held: A's key-up stays with kabl.
-    assert!(!route.to_host(Down, A, Some(Captured)));
-    assert!(!route.to_host(Up, A, Some(Ignored)));
-    // A key-up whose key-down was never seen stays with kabl.
-    assert!(!route.to_host(Up, SPACE, Some(Ignored)));
+    // The window loses focus while Space (host) is held: a later unmatched key-up is not
+    // forwarded to the host.
+    assert!(route.to_host(Down, SPACE, host));
+    route.clear();
+    assert!(!route.to_host(Up, SPACE, host));
+}
+
+/// The plugin window's key path, as on Windows: kabl's `Owner` (from its last frame) decides
+/// each new press in egui-baseview (`key_to_host`), which only hands egui the keys kabl keeps
+/// and tells the keyboard hook the others are ignored; the hook's `KeyRoute` then retargets
+/// exactly those to the host. Key-ups and repeats follow their key-down on both levels.
+#[test]
+fn kabl_keys_reach_only_kabl_and_host_keys_only_the_host() {
+    use kabl_ui::keys::Owner;
+    use kabl_ui::UiState;
+    use nice_plug_egui::baseview::key_route::{KeyMessage, KeyRoute};
+    use nice_plug_egui::baseview::EventStatus;
+    use nice_plug_egui::key_to_host;
+    use nice_plug_egui::keyboard_types::{Code, Key, KeyState, KeyboardEvent};
+
+    #[derive(Default)]
+    struct Window {
+        app: KeyRoute<Code>,
+        hook: KeyRoute<u8>,
+    }
+    #[derive(Debug, PartialEq)]
+    enum To {
+        Kabl,
+        Host,
+    }
+    impl Window {
+        /// One key message through egui-baseview and the hook.
+        fn send(&mut self, owner: Owner, message: KeyMessage, key: &str, code: Code) -> To {
+            let mut event = KeyboardEvent::key_down(Key::Character(key.into()), code);
+            event.state = if message == KeyMessage::Up {
+                KeyState::Up
+            } else {
+                KeyState::Down
+            };
+            event.repeat = message == KeyMessage::Repeat;
+            let keeps = move |k: Option<egui::Key>, m: egui::Modifiers| owner.keeps(k, m);
+            let modifiers = egui::Modifiers::NONE;
+            // egui-baseview: a key for the host returns Ignored before egui sees it.
+            let status = if key_to_host(&mut self.app, &event, modifiers, &keeps) {
+                EventStatus::Ignored
+            } else {
+                EventStatus::Captured
+            };
+            let vk = key.to_ascii_uppercase().as_bytes()[0];
+            let to_host = self
+                .hook
+                .to_host(message, vk, || status == EventStatus::Ignored);
+            // Delivered to egui exactly when the hook keeps it from the host.
+            assert_eq!(to_host, status == EventStatus::Ignored, "{key} {message:?}");
+            if to_host {
+                To::Host
+            } else {
+                To::Kabl
+            }
+        }
+        fn focus_lost(&mut self) {
+            self.app.clear();
+            self.hook.clear();
+        }
+    }
+    use KeyMessage::{Down, Repeat, Up};
+
+    let ctx = egui::Context::default();
+    let mut ui = UiState::default();
+    let rack = Owner::of(&ui, &ctx);
+    ui.browser_open = true;
+    ui.browser.selected = Some("factory:init-keyboard".into());
+    let browser = Owner::of(&ui, &ctx);
+    ctx.memory_mut(|m| m.request_focus(egui::Id::new("a text field")));
+    let typing = Owner::of(&ui, &ctx);
+    ctx.memory_mut(|m| m.surrender_focus(egui::Id::new("a text field")));
+    ui.browser_open = false;
+    ui.keys.computer = true;
+    let notes = Owner::of(&ui, &ctx);
+
+    let mut w = Window::default();
+    // Space: the host's with the browser closed (Live's transport), kabl's preview in it.
+    for m in [Down, Repeat, Up] {
+        assert_eq!(w.send(rack, m, " ", Code::Space), To::Host, "{m:?}");
+    }
+    for m in [Down, Repeat, Up] {
+        assert_eq!(w.send(browser, m, " ", Code::Space), To::Kabl, "{m:?}");
+    }
+    // With computer keys off, W is the host's; with them on, kabl plays it once and the host
+    // never sees it, auto-repeat included.
+    for m in [Down, Repeat, Up] {
+        assert_eq!(w.send(rack, m, "w", Code::KeyW), To::Host, "{m:?}");
+    }
+    for m in [Down, Repeat, Repeat, Up] {
+        assert_eq!(w.send(notes, m, "w", Code::KeyW), To::Kabl, "{m:?}");
+    }
+
+    // Space held while a text field gains focus: its repeats and key-up stay with the host.
+    assert_eq!(w.send(rack, Down, " ", Code::Space), To::Host);
+    assert_eq!(w.send(typing, Repeat, " ", Code::Space), To::Host);
+    assert_eq!(w.send(typing, Up, " ", Code::Space), To::Host);
+    // Space typed into a field that loses focus while it is held: all of it stays with kabl.
+    assert_eq!(w.send(typing, Down, " ", Code::Space), To::Kabl);
+    assert_eq!(w.send(rack, Repeat, " ", Code::Space), To::Kabl);
+    assert_eq!(w.send(rack, Up, " ", Code::Space), To::Kabl);
+
+    // The window loses focus with Space (host) held: a later stray key-up is not the host's.
+    assert_eq!(w.send(rack, Down, " ", Code::Space), To::Host);
+    w.focus_lost();
+    assert_eq!(w.send(rack, Up, " ", Code::Space), To::Kabl);
 }

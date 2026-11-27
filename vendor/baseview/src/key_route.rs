@@ -1,51 +1,63 @@
-//! Where the Windows keyboard hook sends a key message after the window handler has seen it.
+//! Whether a key message goes to the window or on to the host, decided once per press.
 //!
-//! The hook takes key messages addressed to baseview windows before the host's message loop
-//! can, because some hosts (Ableton Live in particular) would otherwise keep them. Messages the
-//! handler did not use go on to the host. The decision is kept apart from the hook so it can be
-//! tested on every platform.
+//! The Windows keyboard hook takes key messages addressed to baseview windows before the host's
+//! message loop can, because some hosts (Ableton Live in particular) would otherwise keep them.
+//! Messages the handler did not use go on to the host. The decision is kept apart from the hook
+//! so it can be tested on every platform, and so a window handler can route its own events the
+//! same way.
 
-use crate::EventStatus;
+use std::collections::HashMap;
+use std::hash::Hash;
 
-/// The kind of key message the hook took.
+/// The kind of key message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyMessage {
-    /// `WM_KEYDOWN` or `WM_SYSKEYDOWN`.
+    /// The first key-down of a press (`WM_KEYDOWN` or `WM_SYSKEYDOWN`).
     Down,
+    /// An auto-repeated key-down.
+    Repeat,
     /// `WM_KEYUP` or `WM_SYSKEYUP`.
     Up,
     /// `WM_CHAR` or `WM_SYSCHAR`.
     Char,
 }
 
-/// Remembers which key-downs went to the host, by virtual-key code, so their key-ups follow.
+/// Remembers, per key, where each press went, so its repeats and its key-up follow it.
 #[derive(Debug, Clone)]
-pub struct KeyRoute {
-    passed: [bool; 256],
+pub struct KeyRoute<K> {
+    to_host: HashMap<K, bool>,
 }
 
-impl Default for KeyRoute {
+impl<K> Default for KeyRoute<K> {
     fn default() -> Self {
-        Self { passed: [false; 256] }
+        Self { to_host: HashMap::new() }
     }
 }
 
-impl KeyRoute {
-    /// Whether the message goes on to the host, given what the handler made of it (`None`: the
-    /// handler got no event).
+impl<K: Eq + Hash> KeyRoute<K> {
+    /// Whether the message goes on to the host. `decide` answers that for a new press and is
+    /// asked only then: on a key-down, or on a repeat of a press this route never saw.
     ///
-    /// A key-down goes to the host only when the handler ignored it. A key-up goes where its
-    /// key-down went, so neither side is left with a stuck key. Characters stay with the window:
+    /// Repeats and the key-up go where the press went, whatever the window's state is by then,
+    /// so neither side is left with a stuck or doubled key. A key-up of a press this route
+    /// never saw (or forgot in `clear`) stays with the window. Characters stay with the window:
     /// the hook only sees those the window's own key-downs produced.
-    pub fn to_host(&mut self, message: KeyMessage, vk: u8, status: Option<EventStatus>) -> bool {
-        let slot = &mut self.passed[vk as usize];
+    pub fn to_host(&mut self, message: KeyMessage, key: K, decide: impl FnOnce() -> bool) -> bool {
         match message {
             KeyMessage::Down => {
-                *slot = status == Some(EventStatus::Ignored);
-                *slot
+                let to_host = decide();
+                self.to_host.insert(key, to_host);
+                to_host
             }
-            KeyMessage::Up => std::mem::take(slot),
+            KeyMessage::Repeat => *self.to_host.entry(key).or_insert_with(decide),
+            KeyMessage::Up => self.to_host.remove(&key).unwrap_or(false),
             KeyMessage::Char => false,
         }
+    }
+
+    /// Forgets every press, for when the window loses focus: the key-ups of keys still held
+    /// then go to whatever window has focus.
+    pub fn clear(&mut self) {
+        self.to_host.clear();
     }
 }
