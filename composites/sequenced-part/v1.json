@@ -1,0 +1,569 @@
+{
+  "schema": 3,
+  "root": 1,
+  "patch": {
+    "composites": {
+      "1": {
+        "name": "Sequenced Part",
+        "help": "Open internals to inspect the real modules and routes. Editing affects this instance only.",
+        "definition": {
+          "id": "kabl.sequenced-part",
+          "version": 1
+        },
+        "parent": null,
+        "members": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "pos": {
+          "x": 24.0,
+          "y": 20.0
+        },
+        "ports": {
+          "1": {
+            "label": "Clock",
+            "target": {
+              "Module": {
+                "id": 1,
+                "port": "clock"
+              }
+            }
+          },
+          "2": {
+            "label": "Reset",
+            "target": {
+              "Module": {
+                "id": 1,
+                "port": "reset"
+              }
+            }
+          },
+          "3": {
+            "label": "Out",
+            "target": {
+              "Module": {
+                "id": 6,
+                "port": "lp"
+              }
+            }
+          },
+          "4": {
+            "label": "Pitch out",
+            "target": {
+              "Module": {
+                "id": 1,
+                "port": "pitch"
+              }
+            }
+          },
+          "5": {
+            "label": "Gate out",
+            "target": {
+              "Module": {
+                "id": 1,
+                "port": "gate"
+              }
+            }
+          },
+          "6": {
+            "label": "Gate mod",
+            "target": {
+              "Param": {
+                "id": 1,
+                "param": "gate_len"
+              }
+            }
+          },
+          "7": {
+            "label": "Tone mod",
+            "target": {
+              "Param": {
+                "id": 6,
+                "param": "cutoff_hz"
+              }
+            }
+          },
+          "8": {
+            "label": "Level mod",
+            "target": {
+              "Param": {
+                "id": 5,
+                "param": "gain_db"
+              }
+            }
+          }
+        },
+        "controls": {
+          "9": {
+            "label": "Steps",
+            "target": {
+              "Param": {
+                "id": 1,
+                "param": "length"
+              }
+            }
+          },
+          "10": {
+            "label": "Gate",
+            "target": {
+              "Param": {
+                "id": 1,
+                "param": "gate_len"
+              }
+            }
+          },
+          "11": {
+            "label": "Transpose",
+            "target": {
+              "Param": {
+                "id": 1,
+                "param": "transpose"
+              }
+            }
+          },
+          "12": {
+            "label": "Wave",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "waveform"
+              }
+            }
+          },
+          "13": {
+            "label": "Unison",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "unison"
+              }
+            }
+          },
+          "14": {
+            "label": "Detune",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "detune"
+              }
+            }
+          },
+          "15": {
+            "label": "Attack",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "attack_ms"
+              }
+            }
+          },
+          "16": {
+            "label": "Decay",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "decay_ms"
+              }
+            }
+          },
+          "17": {
+            "label": "Sustain",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "sustain"
+              }
+            }
+          },
+          "18": {
+            "label": "Release",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "release_ms"
+              }
+            }
+          },
+          "19": {
+            "label": "Level",
+            "target": {
+              "Param": {
+                "id": 5,
+                "param": "gain_db"
+              }
+            }
+          },
+          "20": {
+            "label": "Tone",
+            "target": {
+              "Param": {
+                "id": 6,
+                "param": "cutoff_hz"
+              }
+            }
+          }
+        },
+        "next_interface": 22,
+        "panel": {
+          "width": 840.0,
+          "placements": {
+            "1": {
+              "kind": "jack",
+              "x": 8.0,
+              "y": 250.0,
+              "width": 80.0,
+              "height": 58.0
+            },
+            "2": {
+              "kind": "jack",
+              "x": 90.0,
+              "y": 250.0,
+              "width": 80.0,
+              "height": 58.0
+            },
+            "3": {
+              "kind": "jack",
+              "x": 172.0,
+              "y": 250.0,
+              "width": 80.0,
+              "height": 58.0
+            },
+            "4": {
+              "kind": "jack",
+              "x": 254.0,
+              "y": 250.0,
+              "width": 80.0,
+              "height": 58.0
+            },
+            "5": {
+              "kind": "jack",
+              "x": 336.0,
+              "y": 250.0,
+              "width": 80.0,
+              "height": 58.0
+            },
+            "6": {
+              "kind": "jack",
+              "x": 418.0,
+              "y": 250.0,
+              "width": 80.0,
+              "height": 58.0
+            },
+            "7": {
+              "kind": "jack",
+              "x": 500.0,
+              "y": 250.0,
+              "width": 80.0,
+              "height": 58.0
+            },
+            "8": {
+              "kind": "jack",
+              "x": 582.0,
+              "y": 250.0,
+              "width": 80.0,
+              "height": 58.0
+            },
+            "9": {
+              "kind": "selector",
+              "x": 8.0,
+              "y": 64.0,
+              "width": 576.0,
+              "height": 55.0
+            },
+            "10": {
+              "kind": "knob",
+              "x": 672.0,
+              "y": 64.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "11": {
+              "kind": "knob",
+              "x": 752.0,
+              "y": 64.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "12": {
+              "kind": "icons",
+              "x": 8.0,
+              "y": 124.0,
+              "width": 84.0,
+              "height": 60.0
+            },
+            "13": {
+              "kind": "selector",
+              "x": 8.0,
+              "y": 188.0,
+              "width": 288.0,
+              "height": 55.0
+            },
+            "14": {
+              "kind": "knob",
+              "x": 304.0,
+              "y": 128.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "15": {
+              "kind": "knob",
+              "x": 384.0,
+              "y": 128.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "16": {
+              "kind": "knob",
+              "x": 456.0,
+              "y": 128.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "17": {
+              "kind": "knob",
+              "x": 528.0,
+              "y": 128.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "18": {
+              "kind": "knob",
+              "x": 600.0,
+              "y": 128.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "19": {
+              "kind": "knob",
+              "x": 672.0,
+              "y": 186.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "20": {
+              "kind": "knob",
+              "x": 752.0,
+              "y": 186.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "21": {
+              "kind": "display",
+              "x": 96.0,
+              "y": 124.0,
+              "width": 200.0,
+              "height": 60.0,
+              "source": {
+                "module": {
+                  "id": 2,
+                  "action": null
+                }
+              },
+              "label": "Oscillator"
+            }
+          },
+          "light": null,
+          "dark": null
+        }
+      }
+    },
+    "modules": {
+      "1": {
+        "kind": "seq",
+        "pos": {
+          "x": 24.0,
+          "y": 20.0
+        },
+        "params": {
+          "g1": 0.0,
+          "g10": 0.0,
+          "g11": 1.0,
+          "g12": 0.0,
+          "g13": 1.0,
+          "g14": 0.0,
+          "g15": 0.0,
+          "g16": 0.0,
+          "g2": 0.0,
+          "g3": 1.0,
+          "g4": 0.0,
+          "g5": 0.0,
+          "g6": 1.0,
+          "g7": 0.0,
+          "g8": 0.0,
+          "g9": 0.0,
+          "gate_len": 50.0,
+          "gate_mode": 1.0,
+          "length": 16.0,
+          "p11": 9.0,
+          "p13": 12.0,
+          "p3": 9.0,
+          "p6": 9.0,
+          "v11": 70.0,
+          "v13": 70.0,
+          "v3": 70.0,
+          "v6": 70.0
+        }
+      },
+      "2": {
+        "kind": "osc.va",
+        "pos": {
+          "x": 24.0,
+          "y": 420.0
+        },
+        "params": {
+          "base_hz": 130.815,
+          "detune": 14.0,
+          "pw": 35.0,
+          "unison": 2.0,
+          "waveform": 3.0
+        }
+      },
+      "3": {
+        "kind": "env.adsr",
+        "pos": {
+          "x": 214.0,
+          "y": 420.0
+        },
+        "params": {
+          "attack_ms": 1.0,
+          "decay_ms": 200.0,
+          "release_ms": 40.0,
+          "sustain": 0.7
+        }
+      },
+      "4": {
+        "kind": "vca",
+        "pos": {
+          "x": 404.0,
+          "y": 420.0
+        },
+        "params": {
+          "gain": 0.0
+        }
+      },
+      "5": {
+        "kind": "gain",
+        "pos": {
+          "x": 594.0,
+          "y": 420.0
+        },
+        "params": {
+          "gain_db": -6.0
+        }
+      },
+      "6": {
+        "kind": "filter.svf",
+        "pos": {
+          "x": 784.0,
+          "y": 420.0
+        },
+        "params": {
+          "cutoff_hz": 3000.0,
+          "resonance": 0.1
+        }
+      }
+    },
+    "cables": {
+      "1": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "pitch"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 2,
+            "port": "pitch"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "2": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "gate"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 3,
+            "port": "gate"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "3": {
+        "from": {
+          "Module": {
+            "id": 3,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 4,
+            "port": "cv"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "4": {
+        "from": {
+          "Module": {
+            "id": 2,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 4,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "5": {
+        "from": {
+          "Module": {
+            "id": 4,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 5,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "6": {
+        "from": {
+          "Module": {
+            "id": 5,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 6,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      }
+    }
+  }
+}

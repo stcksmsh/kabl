@@ -16,6 +16,15 @@ unguided = "u"
 "#;
 
 #[test]
+fn a_plugin_shows_plugin_text_when_the_step_has_it() {
+    let mut s = parse("t.toml", MINIMAL).unwrap().steps[0].clone();
+    assert_eq!(s.text_for(true), "one", "no plugin_text: the text");
+    s.plugin_text = Some("from your host".into());
+    assert_eq!(s.text_for(true), "from your host");
+    assert_eq!(s.text_for(false), "one");
+}
+
+#[test]
 fn every_embedded_lesson_parses_with_a_unique_id() {
     assert!(!FILES.is_empty());
     for (name, text) in FILES {
@@ -239,6 +248,7 @@ fn a_step_completes_only_when_all_its_conditions_hold() {
         completed_at: None,
         armed: false,
         done: vec![false; l.steps.len()],
+        met_at_start: vec![false; l.steps.len()],
     };
     assert!(!complete(&l, &a, &e, &ui), "no conditions: Next only");
     l.steps[0].done = vec![
@@ -265,4 +275,218 @@ fn a_step_completes_only_when_all_its_conditions_hold() {
         0.0,
     );
     assert!(complete(&l, &a, &e, &ui));
+}
+
+#[test]
+fn an_include_step_is_the_named_step_and_a_bad_include_drops_its_lesson() {
+    let t = parse("t.toml", MINIMAL).unwrap();
+    let named = |id: &str, r: &str| {
+        let text = MINIMAL
+            .replace("id = \"t\"", &format!("id = \"{id}\""))
+            .replace("text = \"one\"", &format!("include = {r}"));
+        parse(&format!("{id}.toml"), &text).unwrap()
+    };
+    let b = named("b", "{ lesson = \"t\", step = 1 }");
+    let (got, errors) = resolve_includes(vec![t.clone(), b.clone()]);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(got[1].steps, t.steps, "the step as it is in lesson t");
+    for (r, want) in [
+        ("{ lesson = \"x\", step = 1 }", "unknown lesson \"x\""),
+        ("{ lesson = \"t\", step = 2 }", "\"t\" has no step 2"),
+        ("{ lesson = \"t\", step = 0 }", "\"t\" has no step 0"),
+        ("{ lesson = \"b\", step = 1 }", "\"b\" step 1 is an include"),
+    ] {
+        let (got, errors) = resolve_includes(vec![t.clone(), b.clone(), named("c", r)]);
+        assert_eq!(got.len(), 2, "{want}: lesson c is left out");
+        assert!(errors.len() == 1 && errors[0].contains(want), "{errors:?}");
+    }
+    let both = MINIMAL.replace(
+        "text = \"one\"",
+        "text = \"one\"\ninclude = { lesson = \"t\", step = 1 }",
+    );
+    let e = parse("d.toml", &both).unwrap_err();
+    assert!(
+        e.contains("step 1: a step with `include` has no other field"),
+        "{e}"
+    );
+    let neither = MINIMAL.replace("text = \"one\"", "anchor = \"browser\"");
+    let e = parse("e.toml", &neither).unwrap_err();
+    assert!(e.contains("step 1: `text` is empty"), "{e}");
+}
+
+#[test]
+fn notes_played_sees_keys_and_midi_voices() {
+    let (e, mut ui, _) = fixture();
+    let base = Baseline::of(&e);
+    assert!(!holds(&Cond::NotesPlayed, &e, &ui, &base));
+    ui.status_voices = Some((0, 16));
+    assert!(
+        !holds(&Cond::NotesPlayed, &e, &ui, &base),
+        "no voice sounds"
+    );
+    ui.status_voices = Some((1, 16));
+    assert!(holds(&Cond::NotesPlayed, &e, &ui, &base));
+    ui.status_voices = None;
+    ui.keys.strip_to(Some(60));
+    assert!(holds(&Cond::NotesPlayed, &e, &ui, &base), "the key strip");
+    ui.keys.strip_to(None);
+    assert!(!holds(&Cond::NotesPlayed, &e, &ui, &base));
+}
+
+#[test]
+fn favorited_and_saved_as_user_look_at_the_open_document() {
+    let (mut e, mut ui, _) = fixture();
+    let base = Baseline::of(&e);
+    let user = tempfile::tempdir().unwrap();
+    ui.library = Some(crate::library::Library::open(None, user.path().into()));
+    let doc = |id: &str, e: &PatchEditor| {
+        Some(Doc::new(
+            "Filter movement",
+            DocOrigin::Library(id.into()),
+            e.state(),
+        ))
+    };
+    let factory = "factory:recipes/filter-movement";
+    assert!(!holds(&Cond::Favorited, &e, &ui, &base), "no document");
+    ui.doc = doc(factory, &e);
+    assert!(!holds(&Cond::Favorited, &e, &ui, &base), "not a favorite");
+    assert!(
+        !holds(&Cond::SavedAsUser, &e, &ui, &base),
+        "a factory sound"
+    );
+    let lib = ui.library.as_mut().unwrap();
+    lib.prefs.favorites.insert(factory.into());
+    assert!(holds(&Cond::Favorited, &e, &ui, &base));
+    ui.doc = doc("factory:palette/pad", &e);
+    assert!(!holds(&Cond::Favorited, &e, &ui, &base), "another sound");
+
+    ui.doc = doc("user:my-filter-movement", &e);
+    assert!(holds(&Cond::SavedAsUser, &e, &ui, &base));
+    e.set_param(3, "cutoff_hz", 500.0);
+    assert!(
+        !holds(&Cond::SavedAsUser, &e, &ui, &base),
+        "edited since the save"
+    );
+    ui.doc = Some(Doc::new("Untitled", DocOrigin::New, e.state()));
+    assert!(!holds(&Cond::SavedAsUser, &e, &ui, &base), "never saved");
+}
+
+#[test]
+fn preview_played_holds_while_a_sound_preview_plays() {
+    let (e, mut ui, _) = fixture();
+    let base = Baseline::of(&e);
+    assert!(!holds(&Cond::PreviewPlayed, &e, &ui, &base));
+    let user = tempfile::tempdir().unwrap();
+    let lib = crate::library::Library::open(
+        Some(crate::library::built_factory_dir()),
+        user.path().into(),
+    );
+    let id = "factory:recipes/filter-movement";
+    let entry = lib.get(id).unwrap().clone();
+    let collector = basedrop::Collector::new();
+    let (player, _voice) = crate::sound_preview::channel(collector.handle());
+    ui.browser.clips.attach(Some(player));
+    ui.browser
+        .clips
+        .ensure(id, &entry.dir, &entry.meta, 48000.0);
+    let start = std::time::Instant::now();
+    while !matches!(
+        ui.browser.clips.look(id),
+        crate::sound_preview::ClipLook::Ready(_)
+    ) {
+        assert!(start.elapsed().as_secs() < 60, "the clip never rendered");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        ui.browser.clips.poll();
+    }
+    assert!(
+        !holds(&Cond::PreviewPlayed, &e, &ui, &base),
+        "rendered, not played"
+    );
+    ui.browser.clips.play(id);
+    assert!(holds(&Cond::PreviewPlayed, &e, &ui, &base));
+    ui.browser.clips.stop();
+    assert!(!holds(&Cond::PreviewPlayed, &e, &ui, &base));
+}
+
+#[test]
+fn cable_removed_and_reaches_output_follow_the_vca_cable() {
+    let (mut e, ui, _) = fixture();
+    let base = Baseline::of(&e);
+    let removed = Cond::CableRemoved {
+        from: 4,
+        port: "out".into(),
+        to: 5,
+        input: "in".into(),
+    };
+    let reaches = Cond::ReachesOutput {
+        id: 4,
+        kind: "vca".into(),
+    };
+    assert!(
+        !holds(&removed, &e, &ui, &base),
+        "VCA #4 is plugged into Output #5"
+    );
+    assert!(holds(&reaches, &e, &ui, &base));
+    let wrong = Cond::ReachesOutput {
+        id: 4,
+        kind: "lfo".into(),
+    };
+    assert!(!holds(&wrong, &e, &ui, &base), "same id, another kind");
+    let cable = *e
+        .state()
+        .cables
+        .iter()
+        .find(|(_, c)| {
+            c.from
+                == kabl_core::PortRef::Module {
+                    id: 4,
+                    port: "out".into(),
+                }
+        })
+        .unwrap()
+        .0;
+    e.disconnect(cable);
+    assert!(holds(&removed, &e, &ui, &base));
+    assert!(!holds(&reaches, &e, &ui, &base));
+    e.undo();
+    assert!(!holds(&removed, &e, &ui, &base), "Undo plugs it back");
+    assert!(holds(&reaches, &e, &ui, &base));
+    e.remove_module(5);
+    assert!(
+        !holds(&removed, &e, &ui, &base),
+        "a deleted Output is not an unplugged cable"
+    );
+}
+
+#[test]
+fn explain_open_and_pinned_name_one_control() {
+    let (mut e, mut ui, _) = fixture();
+    let base = Baseline::of(&e);
+    let explain = Cond::ExplainOpen {
+        id: 3,
+        key: "cutoff_hz".into(),
+    };
+    let pinned = Cond::Pinned {
+        id: 6,
+        param: "sustain".into(),
+    };
+    assert!(!holds(&explain, &e, &ui, &base));
+    let control = |key: &str| crate::explain::Subject::Control {
+        id: 3,
+        key: key.into(),
+    };
+    crate::explain::open(&mut ui, control("resonance"), None);
+    assert!(!holds(&explain, &e, &ui, &base), "another control");
+    crate::explain::open(&mut ui, control("cutoff_hz"), Some((3, "cutoff_hz".into())));
+    assert!(holds(&explain, &e, &ui, &base));
+    ui.explain.close();
+    assert!(!holds(&explain, &e, &ui, &base));
+
+    assert!(!holds(&pinned, &e, &ui, &base));
+    crate::perform::toggle_pin(&mut e, 6, "release_ms");
+    assert!(!holds(&pinned, &e, &ui, &base), "another control");
+    crate::perform::toggle_pin(&mut e, 6, "sustain");
+    assert!(holds(&pinned, &e, &ui, &base));
+    e.undo();
+    assert!(!holds(&pinned, &e, &ui, &base));
 }

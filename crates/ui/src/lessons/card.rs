@@ -116,11 +116,7 @@ pub fn card(
                         if let Some(t) = &s.title {
                             kit::label(ui, st, Role::H3, Tone::Text, t);
                         }
-                        // `devices` is `None` only in a plugin.
-                        let text = match (&ui_state.devices, &s.plugin_text) {
-                            (None, Some(t)) => t,
-                            _ => &s.text,
-                        };
+                        let text = s.text_for(ui_state.devices.is_none());
                         kit::paragraph(ui, st, Role::Body, Tone::Text2, text);
                         if s.sound_check && ui_state.devices.is_some() {
                             sound_check(ui, st, ui_state);

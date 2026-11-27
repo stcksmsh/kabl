@@ -59,12 +59,17 @@ pub struct End {
     pub unguided: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Step {
+    /// This step is a step of another lesson, as it is there (`all` resolves it). A step with
+    /// `include` has no other field.
+    #[serde(default)]
+    pub include: Option<StepRef>,
     /// A short heading (the Start card shows it above `text`).
     #[serde(default)]
     pub title: Option<String>,
+    #[serde(default)]
     pub text: String,
     /// `text` on the Start card in a plugin, where the host's transport decides whether the
     /// sound plays and the host owns the devices. Absent: `text`.
@@ -92,6 +97,25 @@ pub struct Step {
     /// The step advances by itself once all of these hold. Empty: Next only.
     #[serde(default)]
     pub done: Vec<Cond>,
+}
+
+impl Step {
+    /// The text to show: `plugin_text` in a plugin (`UiState::devices` is `None` only there),
+    /// when the step has one.
+    pub fn text_for(&self, plugin: bool) -> &str {
+        match &self.plugin_text {
+            Some(t) if plugin => t,
+            _ => &self.text,
+        }
+    }
+}
+
+/// Step `step` (from 1) of the lesson with id `lesson`.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StepRef {
+    pub lesson: String,
+    pub step: usize,
 }
 
 /// What a step points at, by explicit identity (id and kind; a route by its endpoints). Never
@@ -165,6 +189,27 @@ pub enum Cond {
     Inspecting { id: ModuleId, port: String },
     /// The Compare reference was restored since the step started (and not undone).
     CompareRestored,
+    /// A sound preview in Sounds is playing.
+    PreviewPlayed,
+    /// A note sounds: computer keys, the key strip, or MIDI.
+    NotesPlayed,
+    /// The open document is a library sound in the favorites.
+    Favorited,
+    /// The open document is a user sound with nothing unsaved.
+    SavedAsUser,
+    /// Explain is open on control `key` of module `id` (from its Perform card's "?").
+    ExplainOpen { id: ModuleId, key: String },
+    /// Control `param` of module `id` is pinned to Perform.
+    Pinned { id: ModuleId, param: String },
+    /// Module `id` (of `kind`) has a signal cable path to an output.
+    ReachesOutput { id: ModuleId, kind: String },
+    /// Both modules are in the patch and no cable runs from `from`'s `port` to `to`'s `input`.
+    CableRemoved {
+        from: ModuleId,
+        port: String,
+        to: ModuleId,
+        input: String,
+    },
 }
 
 /// Progress of one lesson, by `Lesson::id`, in `library.json`.
@@ -190,6 +235,18 @@ pub fn parse(name: &str, text: &str) -> Result<Lesson, String> {
     }
     for (i, s) in l.steps.iter().enumerate() {
         let n = i + 1;
+        if let Some(r) = &s.include {
+            let only = Step {
+                include: Some(r.clone()),
+                ..Step::default()
+            };
+            if *s != only {
+                return bad(&format!(
+                    "step {n}: a step with `include` has no other field"
+                ));
+            }
+            continue;
+        }
         if s.text.trim().is_empty() {
             return bad(&format!("step {n}: `text` is empty"));
         }
@@ -235,13 +292,49 @@ pub fn parse(name: &str, text: &str) -> Result<Lesson, String> {
 /// The embedded lesson files: (file name, text), in file-name order.
 const FILES: &[(&str, &str)] = include!(concat!(env!("OUT_DIR"), "/lessons.rs"));
 
-/// Every lesson that parses, in file-name order. A bad file (caught by the tests before it can
-/// ship) is left out with an error in the log; so is a second lesson with an id already used.
+/// Replaces every `include` step with the step it names, which must be in one of `lessons` and
+/// not an `include` itself. A lesson with a bad `include` is left out, with the reason.
+fn resolve_includes(lessons: Vec<Lesson>) -> (Vec<Lesson>, Vec<String>) {
+    let find = |r: &StepRef| -> Result<Step, String> {
+        let l = lessons
+            .iter()
+            .find(|l| l.id == r.lesson)
+            .ok_or(format!("includes unknown lesson {:?}", r.lesson))?;
+        match r.step.checked_sub(1).and_then(|k| l.steps.get(k)) {
+            Some(s) if s.include.is_none() => Ok(s.clone()),
+            Some(_) => Err(format!("{:?} step {} is an include", r.lesson, r.step)),
+            None => Err(format!("{:?} has no step {}", r.lesson, r.step)),
+        }
+    };
+    let mut errors = Vec::new();
+    let resolved = lessons
+        .iter()
+        .filter_map(|l| {
+            let steps: Result<Vec<Step>, String> = l
+                .steps
+                .iter()
+                .map(|s| s.include.as_ref().map_or_else(|| Ok(s.clone()), find))
+                .collect();
+            match steps {
+                Ok(steps) => Some(Lesson { steps, ..l.clone() }),
+                Err(e) => {
+                    errors.push(format!("lesson {:?}: {e}", l.id));
+                    None
+                }
+            }
+        })
+        .collect();
+    (resolved, errors)
+}
+
+/// Every lesson that parses, in file-name order, `include` steps resolved. A bad file (caught
+/// by the tests before it can ship) is left out with an error in the log; so is a second
+/// lesson with an id already used.
 pub fn all() -> &'static [Lesson] {
     static ALL: OnceLock<Vec<Lesson>> = OnceLock::new();
     ALL.get_or_init(|| {
         let mut ids = BTreeSet::new();
-        FILES
+        let parsed = FILES
             .iter()
             .filter_map(|(name, text)| match parse(name, text) {
                 Ok(l) if ids.insert(l.id.clone()) => Some(l),
@@ -254,7 +347,12 @@ pub fn all() -> &'static [Lesson] {
                     None
                 }
             })
-            .collect()
+            .collect();
+        let (lessons, errors) = resolve_includes(parsed);
+        for e in errors {
+            log::error!(target: "lesson", "{e}");
+        }
+        lessons
     })
 }
 
