@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 90] = [
+const SCENES: [&str; 91] = [
     "rack",
     "perform",
     "sounds",
@@ -106,6 +106,7 @@ const SCENES: [&str; 90] = [
     "design-page-fold",
     "settings-knobs-setup",
     "settings-knobs-saved",
+    "settings-knobs-builtin",
 ];
 
 /// The scenes on the performance patch's "Top" face with whole blocks; "face-compact" folds it
@@ -534,9 +535,13 @@ impl App {
             }
         }
         // Settings "Macro knobs" for a connected controller: a saved profile, or the setup
-        // prompt at knob 3 (set once the menu is open, `frame`).
+        // prompt at knob 3 (set once the menu is open, `frame`), or the owner's controller with
+        // no profile, so its built-in map shows.
         if j.scene.starts_with("settings-knobs") {
             ui.midi_input = Some("Arturia MiniLab mkII 24:0".into());
+        }
+        if j.scene == "settings-knobs-builtin" {
+            ui.midi_input = Some("KL Essential 61 mk3 MIDI".into());
         }
         if j.scene == "settings-knobs-saved" {
             ui.knob_profiles.insert(
@@ -1803,6 +1808,7 @@ impl eframe::App for App {
                     | "settings"
                     | "settings-knobs-setup"
                     | "settings-knobs-saved"
+                    | "settings-knobs-builtin"
             )
         {
             self.inject.push(egui::Event::Key {
