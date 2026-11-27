@@ -12,19 +12,20 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 - Every merge moves master: update-branch the other open PRs, re-verify, delta re-review (patch-id check), CI.
 
 ## Next
-1. Faces slice 11 (compact face): brief to write from FACES §9 item 11 (scope includes crates/core panel.rs/format.rs; add design_page.rs, snapshots.rs: slice 9 needed them).
-2. Windows: W8b (host resize on DPI change + Live keyboard passthrough: public baseview method + vendor/nice-plug egui change), W10 release job (+ VST logo guidelines check), W11a standalone ASIO (required for 1.0), WA Kosta VM pass (list in PR #276 body / packaging/windows/README.md).
-3. L6 (lessons 6, 8; clap automation hook), then L7+L8 as one slice.
-4. Before v1.0.0: rc.3 from master + short re-check (proposed, Kosta to confirm).
-5. Follow-ups (minors): #277 route knob: own drag code (panels.rs:322) without Escape cancel and losing pre-threshold pixels, no macro pulse ring / double-click reset on authored face (lib.rs:6086); core format does not refuse two exposures on one target (only encapsulate_with/add_exposure do). #276: launch check stops kabl-ui before the window is up (test-install.ps1:221); Inno fallback pins 6.4.3 vs runner 6.7.1. #283: macro held-cue test checks `morph_from` directly, not through `recall`. Older minors: git show c224539d:docs/STATE.md (Next 6).
+1. Faces slice 11 compact face: builder dispatched 11-27 on claude/faces-compact, brief .claude/tmp/coord1127/brief-faces-compact.md. Then verify, review, CI, merge.
+2. MIDI auto-mapping (Kosta 11-27: yes, after faces): M1 macros 1-8 follow a default CC profile set once in prefs (patch's own learned maps win); M2 per-device profiles keyed by MIDI port name. New prefs format approved by that yes; briefs to write.
+3. Windows: W8b (host resize on DPI change + Live keyboard passthrough: public baseview method + vendor/nice-plug egui change), W10 release job (+ VST logo guidelines check), W11a standalone ASIO (required for 1.0), WA Kosta VM pass (list in PR #276 body / packaging/windows/README.md).
+4. L6 (lessons 6, 8; clap automation hook), then L7+L8 as one slice.
+5. Before v1.0.0: rc.3 from master + short re-check (proposed, Kosta to confirm).
+6. Follow-ups (minors): #277 route knob: own drag code (panels.rs:322) without Escape cancel and losing pre-threshold pixels, no macro pulse ring / double-click reset on authored face (lib.rs:6086); core format does not refuse two exposures on one target (only encapsulate_with/add_exposure do). #276: launch check stops kabl-ui before the window is up (test-install.ps1:221); Inno fallback pins 6.4.3 vs runner 6.7.1. #283: macro held-cue test checks `morph_from` directly, not through `recall`. Older minors: git show c224539d:docs/STATE.md (Next 6).
 
 ## Waiting on owner
 - Morning review list: .claude/tmp/coord1126/kosta-review.md (captures, composite interface questions, VST3 id notation, validator allowlist, legacy input passthrough, lesson deviations).
 - #277 knob label "Env Amt" (labels must be unique vs port "Env Amount"): question in ANALOG-VOICE.md. Captures: .claude/tmp/coord1126/cap277/.
-- MIDI auto-mapping (asked 11-27): not on roadmap. Proposed 2 slices: macros follow a default CC profile from prefs unless the patch has learned maps; per-device profiles keyed by port name. New prefs format: needs Kosta's yes + order vs faces.
 - R4 acceptance pass on rc.2; rc.3 re-check before v1.0.0 (proposed).
 
 ## Decisions (Kosta)
+- 11-27: MIDI auto-mapping goes on the roadmap after the faces slices (two slices, M1 then M2).
 - 11-27: Windows icon option A: add build-only `embed-resource`, kabl.ico in exe/installer/Start menu. Keep Inno Setup (licence permits commercial use; authors ask commercial users to buy): Kosta buys a licence if kabl revenue passes 5k.
 - 11-27 coordinator: faces briefs must include design_page.rs + snapshots.rs (list UI lives there); refusal-test inversion approved when a slice lifts "not supported yet". Shared target dir cleared 11-27 (11 GB free -> 144 GB).
 - 11-27 coordinator: W9 does not ship kabl.exe (Linux doesn't; its self-test path is build-time); recall behind a fresh pending Load lands (FACES §3.3 "a recall morph always lands"), cue macros there are dropped.
