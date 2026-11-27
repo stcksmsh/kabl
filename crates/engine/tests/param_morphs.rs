@@ -547,3 +547,65 @@ fn a_reset_lands_160_pending_driven_and_staged_recall_targets() {
     }
     assert!(r.report().is_empty());
 }
+
+#[test]
+fn finished_recalls_free_their_slots_for_later_morphs() {
+    let mut r = Rig::new();
+    let full: Vec<_> = (0..MAX_DRIVEN).map(mt).collect();
+    r.recall(1, &full[..32], 16.0);
+    r.recall(2, &full[32..], 16.0);
+    r.run(BAR_BLOCKS + 100);
+    assert!(close(r.value(att(0)), mt(0).to));
+    assert!(r.report().is_empty(), "finished recalls hold no slot");
+    r.launch(&[(MA, 0, 0.9)], 16.0, Timing::Now);
+    let third = mt(MAX_DRIVEN);
+    r.recall(3, &[third], 16.0);
+    r.run(BAR_BLOCKS / 2);
+    let m = r.value(mac(0));
+    assert!(m > 0.3 && m < 0.8, "the macro morphs: {m}");
+    let v = r.value(third.target);
+    let (lo, hi) = (third.to.min(third.from), third.to.max(third.from));
+    assert!(
+        v > lo + 0.1 * (hi - lo) && v < hi - 0.1 * (hi - lo),
+        "the third recall morphs: {v}"
+    );
+    r.run(BAR_BLOCKS);
+    assert!(close(r.value(mac(0)), 0.9));
+    assert!(close(r.value(third.target), third.to));
+}
+
+#[test]
+fn a_load_does_not_write_a_finished_recall_into_the_new_patch() {
+    let mut r = Rig::new();
+    r.recall(1, &[mt(1)], 16.0);
+    r.run(BAR_BLOCKS + 100);
+    assert!(close(r.value(att(1)), mt(1).to));
+    // Doc B has the same attenuverter id, its offset stored at 0.
+    let mut b = r.graph(true, 5);
+    b.fresh = true;
+    r.e.receive_swap(b);
+    r.run(200);
+    assert!(close(r.value(att(1)), 0.0), "B keeps its own value");
+}
+
+#[test]
+fn a_recall_behind_a_fresh_load_is_dropped_like_cue_macros() {
+    let mut r = Rig::new();
+    // An edit fading in, then a Load waiting behind it.
+    let edit = r.graph(true, 5);
+    r.e.receive_swap(edit);
+    let mut b = r.graph(true, 6);
+    b.fresh = true;
+    r.e.receive_swap(b);
+    r.launch(&[(MA, 0, 0.9)], 16.0, Timing::Now);
+    r.recall(1, &[mt(1)], 16.0);
+    r.run(1);
+    assert!(r.report().is_empty(), "nothing is scheduled");
+    r.run(BAR_BLOCKS + 300);
+    assert!(
+        close(r.value(att(1)), 0.0),
+        "the loaded graph keeps its value"
+    );
+    assert!(close(r.value(mac(0)), 0.2));
+    assert!(r.report().is_empty());
+}

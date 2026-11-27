@@ -96,9 +96,6 @@ struct Driven {
     value: f32,
     to: f32,
     run: Option<Run>,
-    /// A recall that has arrived: the graphs hold `to` (and the document does), so it is no
-    /// longer written. Writing it again each block would restart its ramp.
-    arrived: bool,
 }
 
 /// The runtime target of macro output `index` of `id`.
@@ -166,6 +163,9 @@ impl Morphs {
             .iter()
             .position(|l| l.is_some_and(|l| l.0 == target))
             .or_else(|| self.lands.iter().position(|l| l.is_none()));
+        // 160 = pending + driven + staged, and the table is emptied after every command and
+        // every block, so it cannot fill.
+        debug_assert!(slot.is_some(), "land table full");
         if let Some(i) = slot {
             self.lands[i] = Some((target, to));
         }
@@ -186,6 +186,13 @@ impl Morphs {
                 self.land(t.target, t.to);
             }
         }
+        self.staged_seq = None;
+    }
+
+    /// Drops a recall part and the staged set, unlanded: behind a fresh Load the new graph is
+    /// compiled from the document and needs no land (FACES section 3.3).
+    pub fn drop_part(&mut self) {
+        self.staged.fill(None);
         self.staged_seq = None;
     }
 
@@ -327,15 +334,11 @@ impl Morphs {
                 value: if run.is_some() { from } else { p.to },
                 to: p.to,
                 run,
-                arrived: false,
             });
         }
         let mut n = 0;
         for slot in self.driven.iter_mut() {
             let Some(d) = slot else { continue };
-            if d.arrived {
-                continue;
-            }
             let running = d.run.is_some();
             if let Some(r) = &mut d.run {
                 let now = graph
@@ -365,7 +368,11 @@ impl Morphs {
             // last ramp got; one that starts without a run jumps.
             out[n] = (d.target, d.value, d.info.is_some() && running);
             n += 1;
-            d.arrived = d.info.is_some() && d.run.is_none();
+            // A recall that has arrived is done: the document holds `to`, and writing it again
+            // each block would restart its ramp. Its slot is free for the next morph.
+            if d.info.is_some() && d.run.is_none() {
+                *slot = None;
+            }
         }
         n
     }
