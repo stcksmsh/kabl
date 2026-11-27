@@ -172,6 +172,14 @@ impl UiState {
 
     /// What the audio thread says about a morph moving `target`, while its reports keep coming.
     pub fn live_param(&self, target: &kabl_engine::runtime::RuntimeTarget) -> Option<MacroLive> {
+        if let kabl_engine::runtime::RuntimeTarget::Param {
+            id,
+            kind: "macro",
+            index,
+        } = *target
+        {
+            return self.live_macro(id, index as u8);
+        }
         let (m, at) = self.param_live.get(target)?;
         (at.elapsed() < std::time::Duration::from_millis(400)).then_some(*m)
     }

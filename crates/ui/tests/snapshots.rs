@@ -328,6 +328,34 @@ fn cutoff_from(f: &mut Fix, snap: u64, live: Option<(f32, std::time::Instant)>) 
 }
 
 #[test]
+fn a_macro_a_cue_is_moving_reads_live_for_a_recall() {
+    let mut ui = UiState::default();
+    let target = RuntimeTarget::Param {
+        id: 7,
+        kind: "macro",
+        index: 2,
+    };
+    let now = std::time::Instant::now();
+    ui.accept_morph(target, 0.25, 0.9, 0.5, now);
+    assert_eq!(ui.live_param(&target).map(|l| l.value), Some(0.25));
+    assert!(ui
+        .live_param(&RuntimeTarget::Param {
+            id: 7,
+            kind: "macro",
+            index: 3
+        })
+        .is_none());
+    ui.accept_morph(
+        target,
+        0.25,
+        0.9,
+        0.5,
+        now - std::time::Duration::from_secs(1),
+    );
+    assert!(ui.live_param(&target).is_none());
+}
+
+#[test]
 fn a_recall_during_a_running_morph_starts_from_the_live_engine_value() {
     let mut f = fixture();
     let snap = morphing(&mut f);
