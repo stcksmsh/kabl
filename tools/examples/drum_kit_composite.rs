@@ -20,30 +20,14 @@
 //! The test `composites_drum_kit` includes this file to compare `bytes()` with the committed
 //! file, so only the generator is compiled there.
 use kabl_core::panel::{Kind, Panel, Placement, Source};
-use kabl_core::{Definition, Exposure, ModuleId, PortRef, Vec2};
+use kabl_core::{Definition, ModuleId, Vec2};
 use kabl_modules::builtins::{cell_index, make_code, with_code, GRID_ROW_NAMES};
 use kabl_ui::{composites, PatchEditor};
 use std::collections::BTreeSet;
 
-fn jack(id: ModuleId, port: &str) -> PortRef {
-    PortRef::Module {
-        id,
-        port: port.into(),
-    }
-}
-fn param(id: ModuleId, name: &str) -> PortRef {
-    PortRef::Param {
-        id,
-        param: name.into(),
-    }
-}
-fn expose(label: &str, target: PortRef) -> Exposure {
-    Exposure {
-        label: label.into(),
-        target,
-        also: Vec::new(),
-    }
-}
+#[path = "composite_gen/mod.rs"]
+mod composite_gen;
+use composite_gen::{expose, jack, param};
 
 /// Grid rows in output order: kick, snare, clap, closed hat, open hat, tom. Steps as in
 /// `GROOVE.md`: `.` off, `o` `x` `X` rising velocity.
@@ -282,79 +266,12 @@ mod tool {
         println!("wrote {}", path.display());
     }
 
-    /// A clock at 120 BPM into `kabl.drum-kit` v1 from the bank, into the output.
-    fn standalone() -> PatchEditor {
-        let mut e = PatchEditor::new();
-        let clock = e.add_module("clock", Vec2 { x: 24.0, y: 20.0 });
-        e.set_param(clock, "bpm", 120.0);
-        let out = e.add_module("out", Vec2 { x: 1100.0, y: 20.0 });
-        let bank = Path::new(env!("CARGO_MANIFEST_DIR")).join("../composites");
-        let entry = composites::factory_entries(&bank)
-            .into_iter()
-            .find(|f| f.definition.id == "kabl.drum-kit" && f.definition.version == 1)
-            .expect("kabl.drum-kit v1 in the bank; run `drum_kit_composite write composites`");
-        let pkg = composites::read_factory(&entry).expect("read kabl.drum-kit v1");
-        let id = composites::insert(&mut e, &pkg).expect("insert Drum Kit");
-        let port = |e: &PatchEditor, label: &str| {
-            e.state().composites[&id]
-                .ports
-                .values()
-                .find(|x| x.label == label)
-                .expect("Drum Kit port")
-                .target
-                .clone()
-        };
-        let (c, r, o) = (port(&e, "Clock"), port(&e, "Reset"), port(&e, "Out"));
-        e.connect(jack(clock, "gate"), c);
-        e.connect(jack(clock, "reset"), r);
-        e.connect(o, jack(out, "in"));
-        e
-    }
-
-    fn wav(dir: &Path) {
-        const SR: usize = 48000;
-        std::fs::create_dir_all(dir).expect("out folder");
-        let mut engine =
-            kabl_engine::compile::compile(standalone().state(), SR as f32, 8).expect("compile");
-        let mut audio = Vec::with_capacity(8 * SR * 2);
-        while audio.len() < 8 * SR * 2 {
-            engine.process_block();
-            for (l, r) in engine.left().iter().zip(engine.right()) {
-                audio.push(*l);
-                audio.push(*r);
-            }
-        }
-        let path = dir.join("drum-kit.wav");
-        let mut w = hound::WavWriter::create(
-            &path,
-            hound::WavSpec {
-                channels: 2,
-                sample_rate: SR as u32,
-                bits_per_sample: 32,
-                sample_format: hound::SampleFormat::Float,
-            },
-        )
-        .expect("wav");
-        for s in &audio {
-            w.write_sample(*s).expect("sample");
-        }
-        w.finalize().expect("finalize");
-        let peak = audio.iter().fold(0.0f32, |m, s| m.max(s.abs()));
-        let rms = (audio.iter().map(|s| s * s).sum::<f32>() / audio.len() as f32).sqrt();
-        println!(
-            "{}: peak {:.1} dBFS, RMS {:.1} dBFS",
-            path.display(),
-            20.0 * peak.log10(),
-            20.0 * rms.log10()
-        );
-    }
-
     pub(super) fn main() {
         let a: Vec<String> = std::env::args().skip(1).collect();
         let dir = std::path::PathBuf::from(a.get(1).cloned().unwrap_or_else(|| ".".into()));
         match a.first().map(String::as_str) {
             Some("write") => write(&dir),
-            Some("wav") => wav(&dir),
+            Some("wav") => composite_gen::wav(&dir, "drum-kit"),
             _ => eprintln!("usage: drum_kit_composite write|wav DIR"),
         }
     }
