@@ -9,11 +9,15 @@
 //! mapping only moves its parameter once the hardware reaches the parameter's position (within
 //! 1.5 steps of 127, or by crossing it). Any other change to the value (mouse, undo, load)
 //! drops the pickup again, so the next turn never jumps.
+//!
+//! A knob profile (the user's preferences, per controller, not the patch) maps CCs to macros
+//! 1-8: the patch's first `macro` module follows it the same way, wherever the patch has not
+//! mapped the CC or the macro itself.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use kabl_core::{ModuleId, ParamTarget, PatchState};
-use kabl_modules::builtins::Transport;
+use kabl_modules::builtins::{Transport, MACROS, MACRO_INFO};
 use kabl_modules::{registry, ParamInfo, Taper};
 
 use crate::{routing, PatchEditor, UiState};
@@ -153,6 +157,149 @@ fn mapped(state: &PatchState, ch: u8, cc: u8) -> Vec<(ModuleId, &'static ParamIn
     out
 }
 
+/// Knob profile key for an input with no port name (the plugin) or no input at all.
+pub const ANY_CONTROLLER: &str = "any controller";
+
+/// A controller's macro knobs: macro param (`m1`..`m8`) = channel × 128 + CC, the encoding of
+/// a `cc.<param>` mapping.
+pub type KnobProfile = BTreeMap<String, u32>;
+
+/// The knob profile for an input: the port's own, else the "any controller" one.
+pub fn knob_profile<'a>(
+    profiles: &'a BTreeMap<String, KnobProfile>,
+    port: Option<&str>,
+) -> Option<&'a KnobProfile> {
+    port.and_then(|p| profiles.get(p))
+        .or_else(|| profiles.get(ANY_CONTROLLER))
+}
+
+/// Lowest id wins when a patch has several, as in the sound browser and cues.
+fn first_macro(state: &PatchState) -> Option<ModuleId> {
+    state
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == "macro")
+        .map(|(&id, _)| id)
+}
+
+/// The macro params the knob profile drives, with their codes: none that the patch maps.
+fn profile_macros(
+    state: &PatchState,
+    ui_state: &UiState,
+) -> Vec<(ModuleId, &'static ParamInfo, u32)> {
+    let (Some(profile), Some(id)) = (
+        knob_profile(&ui_state.knob_profiles, ui_state.midi_input.as_deref()),
+        first_macro(state),
+    ) else {
+        return Vec::new();
+    };
+    MACRO_INFO
+        .params
+        .iter()
+        .filter_map(|p| Some((id, p, *profile.get(p.name)?)))
+        .filter(|&(_, p, _)| mapping(state, id, p.name).is_none())
+        .collect()
+}
+
+/// The macro param the knob profile drives from this CC, unless the patch maps the CC itself.
+fn profile_target(
+    state: &PatchState,
+    ui_state: &UiState,
+    ch: u8,
+    cc: u8,
+) -> Option<(ModuleId, &'static ParamInfo)> {
+    if !mapped(state, ch, cc).is_empty() || !mapped_buttons(state, ch, cc).is_empty() {
+        return None;
+    }
+    let code = ch as u32 * 128 + cc as u32;
+    profile_macros(state, ui_state)
+        .into_iter()
+        .find(|&(_, _, c)| c == code)
+        .map(|(id, p, _)| (id, p))
+}
+
+/// "Set up macro knobs" in progress: the knobs turned so far, for one profile key.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KnobSetup {
+    /// The profile it replaces when finished: the port name, or `ANY_CONTROLLER`.
+    pub key: String,
+    /// The knob asked for next, from 0; `MACROS` once every one has been asked.
+    pub slot: usize,
+    pub knobs: [Option<(u8, u8)>; MACROS],
+    /// The CC that took the last slot and when it last sent: one turn sends many messages, so
+    /// it takes the next slot only after a pause.
+    last: Option<((u8, u8), f64)>,
+}
+
+impl KnobSetup {
+    pub fn new(key: String) -> Self {
+        KnobSetup {
+            key,
+            slot: 0,
+            knobs: [None; MACROS],
+            last: None,
+        }
+    }
+
+    /// A CC turned while the setup waits: it takes the current slot, and leaves any earlier
+    /// one it had.
+    pub fn take(&mut self, ch: u8, cc: u8, now: f64) {
+        if let Some((k, at)) = &mut self.last {
+            if *k == (ch, cc) && now - *at < GESTURE_GAP_S {
+                *at = now;
+                return;
+            }
+        }
+        if self.done() {
+            return;
+        }
+        for k in &mut self.knobs {
+            if *k == Some((ch, cc)) {
+                *k = None;
+            }
+        }
+        self.knobs[self.slot] = Some((ch, cc));
+        self.slot += 1;
+        self.last = Some(((ch, cc), now));
+    }
+
+    /// Leaves the current slot empty.
+    pub fn skip(&mut self) {
+        self.slot = (self.slot + 1).min(MACROS);
+        // The knob that took the last slot may be the one meant for the next.
+        self.last = None;
+    }
+
+    pub fn done(&self) -> bool {
+        self.slot >= MACROS
+    }
+
+    pub fn profile(&self) -> KnobProfile {
+        self.knobs
+            .iter()
+            .zip(MACRO_INFO.params)
+            .filter_map(|(k, p)| {
+                let (ch, cc) = (*k)?;
+                Some((p.name.to_string(), ch as u32 * 128 + cc as u32))
+            })
+            .collect()
+    }
+}
+
+/// A profile's knobs in macro order: (macro number from 1, channel, CC). Codes out of range
+/// (a hand-edited file) are left out.
+pub fn profile_knobs(profile: &KnobProfile) -> Vec<(usize, (u8, u8))> {
+    MACRO_INFO
+        .params
+        .iter()
+        .enumerate()
+        .filter_map(|(i, p)| {
+            let code = *profile.get(p.name)?;
+            (code < 16 * 128).then_some((i + 1, ((code / 128) as u8, (code % 128) as u8)))
+        })
+        .collect()
+}
+
 /// Soft-takeover state of one mapping (runtime only).
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Takeover {
@@ -182,6 +329,7 @@ impl Takeover {
 /// mappings that no longer exist.
 pub fn sync_takeover(editor: &PatchEditor, ui_state: &mut UiState) {
     let state = editor.state();
+    let profiled = profile_macros(state, ui_state);
     ui_state.takeover.retain(|(id, param), t| {
         let Some(p) = state
             .modules
@@ -191,7 +339,10 @@ pub fn sync_takeover(editor: &PatchEditor, ui_state: &mut UiState) {
         else {
             return false;
         };
-        if mapping(state, *id, param).is_none() {
+        let by_profile = profiled
+            .iter()
+            .any(|&(pid, pp, _)| pid == *id && pp.name == param);
+        if mapping(state, *id, param).is_none() && !by_profile {
             return false;
         }
         if t.picked && t.sent != Some(routing::base_value(state, *id, p)) {
@@ -212,7 +363,8 @@ pub fn rearm(ui_state: &mut UiState, now: f64) {
 }
 
 /// Applies incoming CC messages `(channel, controller, value)`: a pending learn takes the
-/// first one; otherwise each drives the params mapped to it. Runs on the control thread
+/// first one, a knob setup takes them all; otherwise each drives the params mapped to it, or
+/// the macro the knob profile gives it. Runs on the control thread
 /// (`control::midi`), not in an editor frame; `now` is seconds on one steady clock.
 pub fn apply_cc(
     editor: &mut PatchEditor,
@@ -232,6 +384,10 @@ pub fn apply_cc(
             }
             continue;
         }
+        if let Some(setup) = &mut ui_state.knob_setup {
+            setup.take(ch, cc, now);
+            continue;
+        }
         // Buttons: one action per press (low → high); release and repeats do nothing.
         if high && !was_high && now >= ui_state.button_guard {
             for (id, action) in mapped_buttons(editor.state(), ch, cc) {
@@ -239,7 +395,9 @@ pub fn apply_cc(
             }
         }
         sync_takeover(editor, ui_state);
-        for (id, p) in mapped(editor.state(), ch, cc) {
+        let mut targets = mapped(editor.state(), ch, cc);
+        targets.extend(profile_target(editor.state(), ui_state, ch, cc));
+        for (id, p) in targets {
             let key = (id, p.name.to_string());
             let base = ui_state.param_now(editor.state(), id, p);
             let t = ui_state.takeover.entry(key.clone()).or_default();
@@ -761,6 +919,7 @@ pub fn module_menu(
                 ui_state.record(format!("menu:button:{action}"), r.rect);
                 if r.clicked() {
                     ui_state.learn = Some((id, format!("{BTN_PREFIX}{action}")));
+                    ui_state.knob_setup = None;
                     ui_state.perform_open = true;
                     ui.close();
                 }
@@ -794,6 +953,7 @@ pub fn module_menu(
                 ui_state.record(format!("menu:learn:{}", p.name), r.rect);
                 if r.clicked() {
                     ui_state.learn = Some((id, p.name.to_string()));
+                    ui_state.knob_setup = None;
                     ui_state.perform_open = true;
                     ui_state.pin_reveal = Some((id, p.name.to_string()));
                     ui.close();

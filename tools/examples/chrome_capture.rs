@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 88] = [
+const SCENES: [&str; 90] = [
     "rack",
     "perform",
     "sounds",
@@ -104,6 +104,8 @@ const SCENES: [&str; 88] = [
     "face-compact",
     "face-compact-open",
     "design-page-fold",
+    "settings-knobs-setup",
+    "settings-knobs-saved",
 ];
 
 /// The scenes on the performance patch's "Top" face with whole blocks; "face-compact" folds it
@@ -530,6 +532,20 @@ impl App {
                     leaving: None,
                 });
             }
+        }
+        // Settings "Macro knobs" for a connected controller: a saved profile, or the setup
+        // prompt at knob 3 (set once the menu is open, `frame`).
+        if j.scene.starts_with("settings-knobs") {
+            ui.midi_input = Some("Arturia MiniLab mkII 24:0".into());
+        }
+        if j.scene == "settings-knobs-saved" {
+            ui.knob_profiles.insert(
+                "Arturia MiniLab mkII 24:0".into(),
+                [("m1", 74), ("m2", 71), ("m3", 76), ("m4", 77), ("m6", 18)]
+                    .into_iter()
+                    .map(|(k, c)| (k.to_string(), c))
+                    .collect(),
+            );
         }
         if matches!(
             j.scene,
@@ -1782,7 +1798,11 @@ impl eframe::App for App {
         if self.f == 6
             && matches!(
                 self.jobs[self.i].scene,
-                "menu-module" | "menu-cable" | "settings"
+                "menu-module"
+                    | "menu-cable"
+                    | "settings"
+                    | "settings-knobs-setup"
+                    | "settings-knobs-saved"
             )
         {
             self.inject.push(egui::Event::Key {
@@ -1854,7 +1874,7 @@ impl eframe::App for App {
             });
         }
         // The settings menu: a click on the rail's gear.
-        if matches!(self.f, 8 | 9) && self.jobs[self.i].scene == "settings" {
+        if matches!(self.f, 8 | 9) && self.jobs[self.i].scene.starts_with("settings") {
             let at = self.ui.hits["view-menu"].center();
             self.inject.push(egui::Event::PointerMoved(at));
             self.inject.push(egui::Event::PointerButton {
@@ -1863,6 +1883,15 @@ impl eframe::App for App {
                 pressed: self.f == 8,
                 modifiers: egui::Modifiers::NONE,
             });
+        }
+        if self.f > 9
+            && self.jobs[self.i].scene == "settings-knobs-setup"
+            && self.ui.knob_setup.is_none()
+        {
+            let mut setup = kabl_ui::perform::KnobSetup::new("Arturia MiniLab mkII 24:0".into());
+            setup.take(0, 74, 0.0);
+            setup.take(0, 71, 10.0);
+            self.ui.knob_setup = Some(setup);
         }
         // The lanes' animation runs on the clock: give the routes scenes time to settle.
         if self.jobs[self.i].scene == "sounds-preview" {
@@ -1946,7 +1975,7 @@ impl eframe::App for App {
             || self.jobs[self.i].scene.starts_with("menu-")
             || self.jobs[self.i].scene.starts_with("more-controls")
             || self.jobs[self.i].scene.starts_with("design-page")
-            || self.jobs[self.i].scene == "settings"
+            || self.jobs[self.i].scene.starts_with("settings")
             || self.jobs[self.i].scene.starts_with("learn-")
         {
             30

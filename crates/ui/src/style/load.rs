@@ -582,6 +582,9 @@ pub struct Prefs {
     /// The standalone app's output device and MIDI input.
     #[serde(default)]
     pub devices: crate::first_run::devices::Devices,
+    /// Macro knob profiles by MIDI input port name (`perform::ANY_CONTROLLER` for none).
+    #[serde(default)]
+    pub knob_profiles: std::collections::BTreeMap<String, crate::perform::KnobProfile>,
 }
 
 impl Default for Prefs {
@@ -596,6 +599,7 @@ impl Default for Prefs {
             theme_mode: Some(Default::default()),
             reduce_motion: Default::default(),
             devices: Default::default(),
+            knob_profiles: Default::default(),
         }
     }
 }
@@ -662,6 +666,35 @@ mod tests {
         let old = Prefs::load(dir.path());
         assert!(old.dark);
         assert_eq!(old.devices, Devices::default());
+    }
+
+    #[test]
+    fn knob_profiles_round_trip_and_an_old_file_loads_without_them() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = Prefs {
+            knob_profiles: [
+                (
+                    "Arturia MiniLab 24:0".to_string(),
+                    [("m1".to_string(), 74), ("m3".to_string(), 128 + 71)].into(),
+                ),
+                (
+                    crate::perform::ANY_CONTROLLER.to_string(),
+                    [("m8".to_string(), 20)].into(),
+                ),
+            ]
+            .into(),
+            ..Prefs::default()
+        };
+        p.save(dir.path()).unwrap();
+        assert_eq!(Prefs::load(dir.path()), p);
+        std::fs::write(
+            dir.path().join("settings.toml"),
+            "theme = \"look-b\"\ndark = true\n",
+        )
+        .unwrap();
+        let old = Prefs::load(dir.path());
+        assert!(old.dark);
+        assert!(old.knob_profiles.is_empty());
     }
 
     fn themes() -> Themes {
@@ -849,6 +882,7 @@ mod tests {
             theme_mode: Some(crate::desktop::ThemeMode::Light),
             reduce_motion: crate::desktop::ReduceMotion::On,
             devices: Default::default(),
+            knob_profiles: Default::default(),
         };
         p.save(d.path()).unwrap();
         assert_eq!(Prefs::load(d.path()), p);
