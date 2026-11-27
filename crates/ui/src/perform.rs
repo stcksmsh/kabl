@@ -416,7 +416,7 @@ fn learn_button(
 }
 
 /// Runs a button's action: a launch, a cancel or a transport command (runtime only).
-fn fire(editor: &PatchEditor, ui_state: &mut UiState, id: ModuleId, action: &str) {
+pub(crate) fn fire(editor: &PatchEditor, ui_state: &mut UiState, id: ModuleId, action: &str) {
     if ui_state.host_clock && matches!(action, "run" | "restart") {
         ui_state.last_message = Some("Host clock: use REAPER transport or switch to Free".into());
         return;
