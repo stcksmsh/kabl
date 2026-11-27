@@ -1145,7 +1145,7 @@ pub fn faces(
         let mut rect = egui::Rect::from_min_size(
             egui::pos2(pos.x, pos.y),
             egui::vec2(
-                c.panel.as_ref().map_or(240.0, |p| p.width),
+                c.panel.as_ref().map_or(240.0, |p| p.shown_width(false)),
                 crate::rack::PANEL_H,
             ),
         );

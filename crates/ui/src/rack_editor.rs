@@ -22,6 +22,11 @@ pub(crate) struct ReturnView {
     route: Option<CableId>,
 }
 impl UiState {
+    /// Shows composite `id`'s whole face, closing any other face or module's advanced controls.
+    pub(crate) fn expand_composite(&mut self, id: CompositeId) {
+        self.expanded.clear();
+        self.expanded_composites = BTreeSet::from([id]);
+    }
     pub(crate) fn enter_composite(&mut self, p: &PatchState, id: CompositeId) {
         if self.scope == Some(id) || !p.composites.contains_key(&id) {
             return;
@@ -50,6 +55,7 @@ impl UiState {
         self.selected_composite = None;
         self.inspected = None;
         self.expanded.clear();
+        self.expanded_composites.clear();
         self.moving = None;
         self.fitted = false;
         self.lanes_shown = None;
@@ -66,6 +72,7 @@ impl UiState {
             self.inspected = v.inspected;
             self.fitted = v.fitted;
             self.expanded.clear();
+            self.expanded_composites.clear();
             self.moving = None;
             self.lanes_shown = v.lanes_shown;
             self.last_inspected = v.last_inspected;
@@ -108,7 +115,8 @@ pub(crate) fn layout(p: &PatchState, view: &UiState) -> Layout {
             items.push((
                 Item::Composite(id),
                 c.pos,
-                c.panel.as_ref().map_or(240., |p| p.width),
+                // The slot stays compact: an expanded face draws over its neighbours.
+                c.panel.as_ref().map_or(240., |p| p.shown_width(false)),
             ));
         }
     }
@@ -1552,5 +1560,244 @@ mod tests {
             assert_eq!(v.extreme_bg_color, t.rack);
             assert_eq!(v.override_text_color, Some(t.ctext));
         }
+    }
+
+    /// Composite `id` with an authored 480-point face, folded at `compact`: a cutoff knob and
+    /// an input jack on the compact face, a resonance knob from x 250. Its cutoff, resonance
+    /// and jack keys.
+    fn fold(e: &mut PatchEditor, id: CompositeId, compact: Option<f32>) -> (u64, u64, u64) {
+        use kabl_core::panel::{Kind, Panel, Placement};
+        let leaf = *e.state().composites[&id].members.first().unwrap();
+        for (target, control) in [
+            (
+                PortRef::Param {
+                    id: leaf,
+                    param: "cutoff_hz".into(),
+                },
+                true,
+            ),
+            (
+                PortRef::Param {
+                    id: leaf,
+                    param: "resonance".into(),
+                },
+                true,
+            ),
+            (
+                PortRef::Module {
+                    id: leaf,
+                    port: "in".into(),
+                },
+                false,
+            ),
+        ] {
+            composites::add_exposure(e, id, target, control).unwrap();
+        }
+        let mut c = e.state().composites[&id].clone();
+        let key = |c: &kabl_core::Composite, name: &str| {
+            *c.controls
+                .iter()
+                .chain(&c.ports)
+                .find(|(_, x)| match &x.target {
+                    PortRef::Param { param, .. } => param == name,
+                    PortRef::Module { port, .. } => port == name,
+                    PortRef::CableParam { .. } => false,
+                })
+                .unwrap()
+                .0
+        };
+        let (cut, res, jack) = (key(&c, "cutoff_hz"), key(&c, "resonance"), key(&c, "in"));
+        let at = |kind, x, y, width, height| Placement {
+            kind,
+            x,
+            y,
+            width,
+            height,
+            source: None,
+            label: None,
+            icons: Vec::new(),
+        };
+        let mut panel = Panel {
+            width: 480.0,
+            compact_width: compact,
+            ..Panel::default()
+        };
+        panel
+            .placements
+            .insert(cut, at(Kind::Knob, 12.0, 72.0, 84.0, 110.0));
+        panel
+            .placements
+            .insert(res, at(Kind::Knob, 250.0, 72.0, 84.0, 110.0));
+        panel
+            .placements
+            .insert(jack, at(Kind::Jack, 100.0, 200.0, 60.0, 60.0));
+        c.panel = Some(Box::new(panel));
+        composites::set(e, id, c).unwrap();
+        (cut, res, jack)
+    }
+    fn texts(out: &egui::FullOutput) -> Vec<String> {
+        fn walk(s: &egui::Shape, out: &mut Vec<String>) {
+            match s {
+                egui::Shape::Text(t) => out.push(t.galley.text().to_string()),
+                egui::Shape::Vec(v) => v.iter().for_each(|s| walk(s, out)),
+                _ => {}
+            }
+        }
+        let mut v = Vec::new();
+        out.shapes.iter().for_each(|s| walk(&s.shape, &mut v));
+        v
+    }
+    fn settle(ctx: &egui::Context, e: &mut PatchEditor, v: &mut UiState) -> egui::FullOutput {
+        for _ in 0..3 {
+            frame(ctx, e, v, vec![]);
+        }
+        frame(ctx, e, v, vec![])
+    }
+    #[test]
+    fn a_folded_face_takes_the_compact_slot_and_hides_the_expanded_part() {
+        let (mut e, mut v, _, id) = fixture();
+        let (cut, res, _) = fold(&mut e, id, Some(240.0));
+        let ctx = egui::Context::default();
+        let out = settle(&ctx, &mut e, &mut v);
+        let lay = layout(e.state(), &v);
+        assert_eq!(lay.faces[&id].width(), 240.0);
+        let body = v.hits[&format!("composite:{id}:body")];
+        assert!((body.width() / v.zoom - 240.0).abs() < 0.5, "{body:?}");
+        assert!(v
+            .hits
+            .contains_key(&format!("composite:{id}:control:{cut}")));
+        assert!(!v
+            .hits
+            .contains_key(&format!("composite:{id}:control:{res}")));
+        // The chip: its reserved rect, counting the one placement past the fold.
+        let chip = v.hits[&format!("composite:{id}:more")];
+        let face = body.min;
+        assert!((chip.min - face - vec2(178.0, 310.0) * v.zoom).length() < 0.5);
+        assert!((chip.size() - vec2(54.0, 22.0) * v.zoom).length() < 0.5);
+        assert!(texts(&out).iter().any(|t| t == "+1"));
+        // A click where the resonance knob would be reaches nothing of the composite's.
+        let before = e.state().clone();
+        let p = face + vec2(250.0 + 42.0, 72.0 + 56.0) * v.zoom;
+        frame(
+            &ctx,
+            &mut e,
+            &mut v,
+            vec![egui::Event::PointerMoved(p), button(p, true)],
+        );
+        frame(&ctx, &mut e, &mut v, vec![button(p, false)]);
+        settle(&ctx, &mut e, &mut v);
+        assert_eq!(*e.state(), before);
+        assert!(v.expanded_composites.is_empty());
+        assert!(!v
+            .hits
+            .contains_key(&format!("composite:{id}:control:{res}")));
+    }
+    #[test]
+    fn a_fold_with_nothing_past_it_draws_no_chip_and_keeps_the_compact_slot() {
+        let (mut e, mut v, _, id) = fixture();
+        let (_, res, _) = fold(&mut e, id, Some(360.0));
+        let ctx = egui::Context::default();
+        settle(&ctx, &mut e, &mut v);
+        assert_eq!(layout(e.state(), &v).faces[&id].width(), 360.0);
+        assert!(v
+            .hits
+            .contains_key(&format!("composite:{id}:control:{res}")));
+        assert!(!v.hits.contains_key(&format!("composite:{id}:more")));
+    }
+    #[test]
+    fn the_chip_shows_the_whole_face_over_an_unchanged_rack() {
+        let (mut e, mut v, a, id) = fixture();
+        let (_, res, jack) = fold(&mut e, id, Some(240.0));
+        let ctx = egui::Context::default();
+        settle(&ctx, &mut e, &mut v);
+        let collapsed = layout(e.state(), &v);
+        let body = v.hits[&format!("composite:{id}:body")];
+        let port = |v: &UiState| v.hits[&format!("composite:{id}:port:{jack}")];
+        let anchor = port(&v);
+        click(&ctx, &mut e, &mut v, &format!("composite:{id}:more"));
+        let out = settle(&ctx, &mut e, &mut v);
+        assert_eq!(v.expanded_composites, BTreeSet::from([id]));
+        assert!(texts(&out).iter().any(|t| t == "Less"));
+        assert!(v
+            .hits
+            .contains_key(&format!("composite:{id}:control:{res}")));
+        let whole = v.hits[&format!("composite:{id}:body")];
+        assert_eq!(whole.min, body.min);
+        assert!((whole.width() / v.zoom - 480.0).abs() < 0.5, "{whole:?}");
+        // Same rack layout, and every jack where its cables were anchored.
+        let expanded = layout(e.state(), &v);
+        assert_eq!(collapsed.bounds, expanded.bounds);
+        assert_eq!(collapsed.faces, expanded.faces);
+        for m in &collapsed.mods {
+            assert_eq!(m.face, expanded.get(m.id).unwrap().face);
+        }
+        assert_eq!(port(&v), anchor);
+        // Opening a module's advanced controls closes the face, and the reverse.
+        click(&ctx, &mut e, &mut v, &format!("toggle:{a}"));
+        assert_eq!(v.expanded, BTreeSet::from([a]));
+        assert!(v.expanded_composites.is_empty());
+        v.expand_composite(id);
+        assert!(v.expanded.is_empty());
+        assert_eq!(v.expanded_composites, BTreeSet::from([id]));
+        // "Less" folds it again, once the dialog has closed.
+        settle(&ctx, &mut e, &mut v);
+        click(&ctx, &mut e, &mut v, &format!("composite:{id}:more"));
+        assert!(v.expanded_composites.is_empty());
+    }
+    #[test]
+    fn an_unfolded_face_draws_as_before() {
+        let (mut e, mut v, _, id) = fixture();
+        let (cut, res, jack) = fold(&mut e, id, None);
+        let ctx = egui::Context::default();
+        settle(&ctx, &mut e, &mut v);
+        assert_eq!(layout(e.state(), &v).faces[&id].width(), 480.0);
+        let prefix = format!("composite:{id}:");
+        let keys: BTreeSet<String> = v
+            .hits
+            .keys()
+            .filter(|k| k.starts_with(&prefix))
+            .cloned()
+            .collect();
+        let want: BTreeSet<String> = [
+            "body".to_string(),
+            "open".into(),
+            "design".into(),
+            "fallback".into(),
+            format!("control:{cut}"),
+            format!("control:{res}"),
+            format!("port:{jack}"),
+        ]
+        .into_iter()
+        .map(|k| format!("{prefix}{k}"))
+        .collect();
+        assert_eq!(keys, want);
+        let fallback = v.hits[&format!("{prefix}fallback")];
+        assert!(
+            (fallback.width() / v.zoom - 464.0).abs() < 0.5,
+            "{fallback:?}"
+        );
+    }
+    #[test]
+    fn an_expanded_face_closes_when_its_fold_or_composite_goes() {
+        let (mut e, mut v, _, id) = fixture();
+        fold(&mut e, id, Some(240.0));
+        let ctx = egui::Context::default();
+        settle(&ctx, &mut e, &mut v);
+        click(&ctx, &mut e, &mut v, &format!("composite:{id}:more"));
+        assert_eq!(v.expanded_composites, BTreeSet::from([id]));
+        let mut c = e.state().composites[&id].clone();
+        c.panel.as_mut().unwrap().compact_width = None;
+        composites::set(&mut e, id, c).unwrap();
+        settle(&ctx, &mut e, &mut v);
+        assert!(v.expanded_composites.is_empty());
+        assert!(!v.hits.contains_key(&format!("composite:{id}:more")));
+
+        e.undo();
+        settle(&ctx, &mut e, &mut v);
+        click(&ctx, &mut e, &mut v, &format!("composite:{id}:more"));
+        assert_eq!(v.expanded_composites, BTreeSet::from([id]));
+        e.restore_to(vec![Op::SetComposite { id, value: None }]);
+        settle(&ctx, &mut e, &mut v);
+        assert!(v.expanded_composites.is_empty());
     }
 }

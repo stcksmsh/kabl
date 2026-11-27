@@ -431,16 +431,40 @@ impl Page {
         true
     }
 
+    /// Whether the draft may become `panel`: a valid face, except that elements the fold line
+    /// moved onto may cross it until they are moved (Apply refuses meanwhile). An element this
+    /// edit places must fit the fold.
+    fn admit(&self, state: &PatchState, panel: &Panel, next: u64) -> Result<(), String> {
+        let mut c = self.draft.base.clone();
+        c.next_interface = next;
+        c.snapshots = self.draft.snapshots.clone();
+        let mut unfolded = panel.clone();
+        unfolded.compact_width = None;
+        panels::check(state, &c, &unfolded)?;
+        let bare = Panel {
+            placements: Default::default(),
+            light: None,
+            dark: None,
+            ..panel.clone()
+        };
+        bare.validate(&c)?;
+        for (key, p) in &panel.placements {
+            if self.draft.panel.placements.get(key) != Some(p) {
+                if let Some(why) = panel.fold_error(p) {
+                    return Err(format!("Element {key}: {why}"));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Replaces the draft's panel with `panel` and its `next_interface` with `next` as one step
     /// when that is a valid face; otherwise keeps the draft and says why.
     fn commit(&mut self, state: &PatchState, panel: Panel, next: u64) -> Result<(), String> {
         if panel == self.draft.panel && next == self.draft.next_interface {
             return Ok(());
         }
-        let mut c = self.draft.base.clone();
-        c.next_interface = next;
-        c.snapshots = self.draft.snapshots.clone();
-        if let Err(e) = panels::check(state, &c, &panel) {
+        if let Err(e) = self.admit(state, &panel, next) {
             self.note = Some(e.clone());
             return Err(e);
         }
@@ -762,6 +786,23 @@ impl Page {
         self.commit(state, panel, self.draft.next_interface)
     }
 
+    /// Moves the fold line to `width`, or removes the compact face with None, as one step.
+    pub fn set_compact(&mut self, state: &PatchState, width: Option<f32>) -> Result<(), String> {
+        let mut panel = self.draft.panel.clone();
+        panel.compact_width = width;
+        self.commit(state, panel, self.draft.next_interface)
+    }
+
+    /// The elements that do not fit the draft's fold, with why.
+    pub fn crossing(&self) -> Vec<(u64, &'static str)> {
+        let panel = &self.draft.panel;
+        panel
+            .placements
+            .iter()
+            .filter_map(|(&k, p)| Some((k, panel.fold_error(p)?)))
+            .collect()
+    }
+
     /// Sets (or clears) the light or dark face artwork.
     pub fn set_art(&mut self, dark: bool, art: Option<Artwork>) {
         let slot = if dark {
@@ -912,6 +953,9 @@ fn apply(editor: &mut PatchEditor, page: &mut Page, confirmed: bool) -> Result<b
         .ok_or("The composite was removed")?;
     if *current != page.draft.base {
         return Err("The composite changed: Reload before applying".into());
+    }
+    if let Some((key, why)) = page.crossing().first() {
+        return Err(format!("Element {key}: {why}. Move it before applying"));
     }
     let mut c = current.clone();
     c.panel = (page.draft.panel != Panel::default()).then(|| Box::new(page.draft.panel.clone()));
@@ -1186,6 +1230,11 @@ fn top_bar(
             if button(ui, view, st, "width-up", "+", w < 840.0) {
                 // A refusal keeps the draft and shows its reason in `page.note`.
                 let _ = page.set_width(editor.state(), w + 30.0);
+            }
+            let folded = page.draft.panel.compact_width.is_some();
+            if button(ui, view, st, "no-compact", "No compact face", folded) {
+                // A refusal keeps the draft and shows its reason in `page.note`.
+                let _ = page.set_compact(editor.state(), None);
             }
             kit::segmented(ui, st, |ui| {
                 for (key, text, dark) in [("light", "Light", false), ("dark", "Dark", true)] {
@@ -1544,7 +1593,7 @@ fn face(
             live = Some((
                 d.key,
                 to,
-                panels::check(editor.state(), &page.draft.base, &panel),
+                page.admit(editor.state(), &panel, page.draft.next_interface),
             ));
         }
     }
@@ -1552,7 +1601,10 @@ fn face(
     let painter = ui.painter_at(rect);
     if let Some(current) = current {
         let mut shown = current.clone();
-        shown.panel = Some(Box::new(panel.clone()));
+        // The whole face without the rack's chip: the page draws its own fold line.
+        let mut whole = panel.clone();
+        whole.compact_width = None;
+        shown.panel = Some(Box::new(whole));
         shown.snapshots = page.draft.snapshots.clone();
         let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect));
         child.set_clip_rect(rect.intersect(ui.clip_rect()));
@@ -1677,6 +1729,57 @@ fn face(
             let resp = ui.interact(h, Id::new(("design-corner", key, name)), Sense::drag());
             view.record(format!("design:corner:{key}:{name}"), h);
             gesture(page, &resp, key, Some((right, bottom)));
+        }
+    }
+    // The fold line: at the right edge while there is no compact face; dragged, it snaps to
+    // rack units. Its strip sits above the elements so a crossing one cannot hide it.
+    let at = panel.compact_width.unwrap_or(panel.width);
+    // The line's full height and a grip above the face.
+    let ax = xf.p(pos2(at, 0.0)).x;
+    let strip = Rect::from_min_max(
+        pos2(ax - 5.0, face.top() - 20.0),
+        pos2(ax + 5.0, face.bottom()),
+    );
+    let resp = ui.interact(strip, Id::new("design-fold"), Sense::drag());
+    view.record("design:fold".into(), strip);
+    let snapped = |p: Pos2| ((xf.inv(p).x / 30.0).round() * 30.0).clamp(180.0, panel.width);
+    let fold = match pointer.filter(|_| resp.dragged() || resp.drag_stopped()) {
+        Some(p) => Some(snapped(p)).filter(|&w| w < panel.width),
+        None => panel.compact_width,
+    };
+    if resp.drag_stopped() {
+        // A refusal keeps the draft and shows its reason in `page.note`.
+        let _ = page.set_compact(state, fold);
+    }
+    let x = xf.p(pos2(fold.unwrap_or(panel.width), 0.0)).x;
+    let ink = if resp.hovered() || resp.dragged() {
+        st.roles.accent
+    } else {
+        st.roles.text2
+    };
+    if fold.is_some() {
+        painter.line_segment(
+            [pos2(x, face.top()), pos2(x, face.bottom())],
+            Stroke::new(2.0, ink),
+        );
+    }
+    let grip = Rect::from_center_size(pos2(x, face.top() - 10.0), vec2(10.0, 16.0));
+    painter.rect_filled(grip, 2.0, ink);
+    // Elements that do not fit the fold, as it is or as it is being dragged.
+    let shown = Panel {
+        compact_width: fold,
+        ..panel.clone()
+    };
+    for p in panel.placements.values() {
+        if shown.fold_error(p).is_some() {
+            let r = xf.r(Rect::from_min_size(pos2(p.x, p.y), vec2(p.width, p.height)));
+            painter.rect_filled(r, 2.0, st.roles.bad.gamma_multiply(0.25));
+            painter.rect_stroke(
+                r,
+                2.0,
+                Stroke::new(2.0, st.roles.bad),
+                egui::StrokeKind::Outside,
+            );
         }
     }
     // Refused, in flight or just dropped: red, with the reason.
