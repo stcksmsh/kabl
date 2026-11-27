@@ -46,7 +46,7 @@ enum RuntimeReport {
     Seq(u64, usize, usize, Option<usize>),
     Delay(u64, kabl_modules::builtins::DelayLock, f32),
     Lfo(u64, kabl_modules::builtins::LfoSync),
-    Morph(u64, u8, f32, f32, f32),
+    Morph(kabl_engine::runtime::RuntimeTarget, f32, f32, f32),
     Probe(kabl_engine::probe::ProbeReport),
     Faces(kabl_engine::facetap::FaceReport),
 }
@@ -165,7 +165,15 @@ impl Control {
                 RuntimeReport::Lfo(id, sync) => {
                     self.view.lfo_status.insert(id, sync);
                 }
-                RuntimeReport::Morph(id, k, value, to, progress) => {
+                RuntimeReport::Morph(t, value, to, progress) => {
+                    let kabl_engine::runtime::RuntimeTarget::Param {
+                        id,
+                        kind: "macro",
+                        index,
+                    } = t
+                    else {
+                        continue;
+                    };
                     let live = kabl_ui::MacroLive {
                         value,
                         to,
@@ -173,7 +181,7 @@ impl Control {
                     };
                     self.view
                         .macro_live
-                        .insert((id, k), (live, std::time::Instant::now()));
+                        .insert((id, index as u8), (live, std::time::Instant::now()));
                 }
                 RuntimeReport::Probe(report) => {
                     let age =
@@ -1187,8 +1195,8 @@ impl Instrument {
         s.engine.lfos(|id, sync| {
             let _ = reports.push(RuntimeReport::Lfo(id, sync));
         });
-        s.engine.morphs(|id, k, value, to, progress| {
-            let _ = reports.push(RuntimeReport::Morph(id, k, value, to, progress));
+        s.engine.param_morphs(|t, value, to, progress| {
+            let _ = reports.push(RuntimeReport::Morph(t, value, to, progress));
         });
         if let Some(report) = s.engine.take_probe_report() {
             let _ = reports.push(RuntimeReport::Probe(report));
