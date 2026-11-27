@@ -516,17 +516,74 @@ fn a_display_of_a_leaf_with_one_is_accepted() {
 fn a_button_action_its_module_does_not_offer_is_refused() {
     assert!(refusal(Kind::Button).ends_with("modules have no trigger button"));
 }
-#[test]
-fn cue_pads_are_not_supported_yet() {
-    assert!(refusal(Kind::CuePads).ends_with("CuePads elements are not supported yet"));
+/// The performance patch's clock (1), bass sequencer (3) and a new cues module in one composite
+/// whose face shows a `kind` block of the `module` leaf at `width` x `height`; the verdict.
+fn block_on(kind: Kind, module: &str, width: f32, height: f32) -> Result<(), String> {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/performance");
+    let mut e = PatchEditor::from_log(kabl_core::load(&dir).expect("patch"));
+    let cues = e.add_module("cues", kabl_core::Vec2 { x: 30.0, y: 10.0 });
+    let id = composites::encapsulate(&mut e, [1, 3, cues].into(), BTreeSet::new(), "Show").unwrap();
+    let mut state = e.state().clone();
+    let leaf = *state
+        .modules
+        .iter()
+        .find(|(_, m)| m.kind == module)
+        .unwrap()
+        .0;
+    let c = state.composites.get_mut(&id).unwrap();
+    let key = c.next_interface;
+    c.next_interface += 1;
+    let mut p = Panel {
+        width: 840.,
+        ..Panel::default()
+    };
+    p.placements.insert(
+        key,
+        Placement {
+            kind,
+            x: 12.,
+            y: 72.,
+            width,
+            height,
+            source: Some(Source::Module {
+                id: leaf,
+                action: None,
+            }),
+            label: None,
+            icons: Vec::new(),
+        },
+    );
+    c.panel = Some(Box::new(p));
+    kabl_core::composite::validate(&state).unwrap();
+    panels::validate(&state)
 }
 #[test]
-fn banks_are_not_supported_yet() {
-    assert!(refusal(Kind::Banks).ends_with("Banks elements are not supported yet"));
+fn cue_pads_are_accepted() {
+    assert_eq!(block_on(Kind::CuePads, "cues", 336., 150.), Ok(()));
 }
 #[test]
-fn transport_is_not_supported_yet() {
-    assert!(refusal(Kind::Transport).ends_with("Transport elements are not supported yet"));
+fn banks_are_accepted() {
+    assert_eq!(block_on(Kind::Banks, "seq", 372., 18.), Ok(()));
+}
+#[test]
+fn transport_is_accepted() {
+    assert_eq!(block_on(Kind::Transport, "clock", 240., 36.), Ok(()));
+}
+#[test]
+fn a_block_of_another_kind_of_module_is_refused() {
+    assert!(refusal(Kind::CuePads).ends_with("CuePads blocks need a cues module"));
+    assert!(block_on(Kind::Transport, "seq", 240., 36.)
+        .unwrap_err()
+        .ends_with("Transport blocks need a clock module"));
+}
+#[test]
+fn a_block_smaller_than_its_drawing_is_refused() {
+    assert!(block_on(Kind::Banks, "seq", 120., 18.)
+        .unwrap_err()
+        .ends_with("Banks blocks need at least 370 x 18 points"));
+    assert!(block_on(Kind::CuePads, "cues", 336., 120.)
+        .unwrap_err()
+        .ends_with("CuePads blocks need at least 240 x 150 points"));
 }
 #[test]
 fn snapshot_strips_are_accepted() {

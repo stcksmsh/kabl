@@ -3362,16 +3362,16 @@ fn draw_module_shapes(
         }
     }
     if let Decor::Transport(r) = m.decor {
-        draw_transport(ui_state, ui, painter, th, xf, m.id, r);
+        draw_transport(ui_state, ui, painter, th, xf, "", m.id, r);
     }
     if let Decor::Cues(r) = m.decor {
-        draw_cues(editor, ui_state, ui, painter, xf, m.id, r, now);
+        draw_cues(editor, ui_state, ui, painter, xf, "", m.id, r, now);
     }
     if let Decor::Grid(r) = m.decor {
         drum_grid::draw(editor, ui_state, ui, painter, th, xf, m.id, r);
     }
     if let Decor::Banks(r) = m.decor {
-        draw_banks(editor, ui_state, ui, painter, xf, m.id, r, now, drawn);
+        draw_banks(editor, ui_state, ui, painter, xf, "", m.id, r, now, drawn);
     }
     if let Decor::Display(r) = m.decor {
         let sync = editor
@@ -3690,13 +3690,16 @@ fn module_menu(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::
     }
 }
 
-/// Run/Stop and Restart. The label follows the audio thread's report, not the click.
+/// Run/Stop and Restart. The label follows the audio thread's report, not the click. `prefix`
+/// keeps hit keys and egui IDs apart where a composite face shows the same clock.
+#[allow(clippy::too_many_arguments)]
 fn draw_transport(
     ui_state: &mut UiState,
     ui: &mut egui::Ui,
     painter: &egui::Painter,
     th: &Theme,
     xf: Xf,
+    prefix: &str,
     id: ModuleId,
     r: Rect,
 ) {
@@ -3729,10 +3732,10 @@ fn draw_transport(
             r.min + vec2(dx, 0.0),
             vec2(half, r.height()),
         ));
-        ui_state.record(format!("{key}:{id}"), b);
+        ui_state.record(format!("{prefix}{key}:{id}"), b);
         let resp = ui.interact(
             b,
-            Id::new(("kabl-transport", key, id)),
+            Id::new(("kabl-transport", prefix, key, id)),
             if ui_state.host_clock {
                 Sense::hover()
             } else {
@@ -3808,7 +3811,7 @@ pub(crate) const BANKS_W: f32 = 3.0 * BANK_GROUP_W + 2.0 * BANK_GROUP_GAP;
 /// The sequencer's header row. EDIT picks the bank the face shows (view only); PLAY launches a
 /// bank with the sequencer's own timing and clock (runtime); the playing bank is lit, a queued
 /// one blinks, and Cancel drops the queued launch. Right-click an EDIT option for bank edits.
-/// PAGE shows steps 1-8, 9-16, 17-24 or 25-32 (view only).
+/// PAGE shows steps 1-8, 9-16, 17-24 or 25-32 (view only). `prefix` as for `draw_transport`.
 #[allow(clippy::too_many_arguments)]
 fn draw_banks(
     editor: &mut PatchEditor,
@@ -3816,6 +3819,7 @@ fn draw_banks(
     ui: &mut egui::Ui,
     painter: &egui::Painter,
     xf: Xf,
+    prefix: &str,
     id: ModuleId,
     r: Rect,
     now: f64,
@@ -3886,8 +3890,12 @@ fn draw_banks(
         let name = banks::title(editor.state(), id, b);
         // EDIT option.
         let t = edit_tabs[b];
-        ui_state.record(format!("bank-edit:{id}.{b}"), t);
-        let resp = ui.interact(t, Id::new(("kabl-bank-edit", id, b)), Sense::click());
+        ui_state.record(format!("{prefix}bank-edit:{id}.{b}"), t);
+        let resp = ui.interact(
+            t,
+            Id::new(("kabl-bank-edit", prefix, id, b)),
+            Sense::click(),
+        );
         let on = b == edit;
         resp.widget_info(|| {
             egui::WidgetInfo::selected(
@@ -3941,8 +3949,12 @@ fn draw_banks(
 
         // PLAY option.
         let pbtn = play_btns[b];
-        ui_state.record(format!("bank-play:{id}.{b}"), pbtn);
-        let resp = ui.interact(pbtn, Id::new(("kabl-bank-play", id, b)), Sense::click());
+        ui_state.record(format!("{prefix}bank-play:{id}.{b}"), pbtn);
+        let resp = ui.interact(
+            pbtn,
+            Id::new(("kabl-bank-play", prefix, id, b)),
+            Sense::click(),
+        );
         let lit = b == playing;
         resp.widget_info(|| {
             egui::WidgetInfo::selected(
@@ -3995,8 +4007,12 @@ fn draw_banks(
     let page_btns = group(r.left() + 2.0 * (BANK_GROUP_W + BANK_GROUP_GAP), "PAGE");
     let page = ui_state.edit_page.get(&id).copied().unwrap_or(0);
     for (pg, &t) in page_btns.iter().enumerate() {
-        ui_state.record(format!("bank-page:{id}.{pg}"), t);
-        let resp = ui.interact(t, Id::new(("kabl-seq-page", id, pg)), Sense::click());
+        ui_state.record(format!("{prefix}bank-page:{id}.{pg}"), t);
+        let resp = ui.interact(
+            t,
+            Id::new(("kabl-seq-page", prefix, id, pg)),
+            Sense::click(),
+        );
         resp.widget_info(|| {
             egui::WidgetInfo::selected(
                 egui::WidgetType::SelectableLabel,
@@ -4250,6 +4266,7 @@ fn pad(
 }
 
 /// The cues module's face: eight cue buttons (active lit, queued blinking) and Cancel.
+/// `prefix` as for `draw_transport`.
 #[allow(clippy::too_many_arguments)]
 fn draw_cues(
     editor: &mut PatchEditor,
@@ -4257,6 +4274,7 @@ fn draw_cues(
     ui: &mut egui::Ui,
     painter: &egui::Painter,
     xf: Xf,
+    prefix: &str,
     id: ModuleId,
     r: Rect,
     now: f64,
@@ -4291,7 +4309,7 @@ fn draw_cues(
                     ui,
                     painter,
                     z,
-                    format!("cue:{id}.{n}"),
+                    format!("{prefix}cue:{id}.{n}"),
                     b,
                     &c.name,
                     active,
@@ -4352,7 +4370,7 @@ fn draw_cues(
             ui,
             painter,
             z,
-            format!("cue-cancel:{id}"),
+            format!("{prefix}cue-cancel:{id}"),
             c,
             "Cancel",
             false,
@@ -5901,7 +5919,7 @@ fn draw_authored_face(
     c: &kabl_core::Composite,
     face: Rect,
 ) {
-    use kabl_core::panel::Kind;
+    use kabl_core::panel::{Kind, Source};
     let panel = c.panel.as_ref().unwrap();
     let mut th = theme::panel_theme(&view.style, "filter.svf");
     let rect = xf.r(face);
@@ -6086,6 +6104,28 @@ fn draw_authored_face(
                 if pad(view, ui, &painter, z, hit, r, &name, on, false, now).clicked() {
                     snapshots::recall(editor, view, id, snap);
                 }
+            }
+            continue;
+        }
+        if let Some((module, _)) = panels::block(p.kind) {
+            // The module's own block, keyed apart from its face. Core prunes a block whose
+            // module is removed; a frame in between draws nothing.
+            let Some(Source::Module { id: leaf, .. }) = p.source else {
+                continue;
+            };
+            if editor.state().modules.get(&leaf).map(|m| m.kind.as_str()) != Some(module) {
+                continue;
+            }
+            let prefix = format!("composite:{id}:");
+            let now = ui.input(|i| i.time);
+            match p.kind {
+                Kind::CuePads => draw_cues(
+                    editor, view, ui, &painter, xf, &prefix, leaf, footprint, now,
+                ),
+                Kind::Banks => draw_banks(
+                    editor, view, ui, &painter, xf, &prefix, leaf, footprint, now, drawn,
+                ),
+                _ => draw_transport(view, ui, &painter, &th, xf, &prefix, leaf, footprint),
             }
             continue;
         }
@@ -6289,6 +6329,12 @@ fn draw_authored_face(
                 }
             }
             view.record(format!("composite:{id}:control:{key}"), screen);
+            // The design page's canvas draws this face under its own handles: no menu there.
+            if view.panels.page.is_none() {
+                perform::face_menu(
+                    editor, view, &local, screen, id, key, *leaf, param.name, &e.label,
+                );
+            }
             face_label(
                 &painter,
                 Rect::from_min_size(screen.min, vec2(screen.width(), 22.0 * z)),
