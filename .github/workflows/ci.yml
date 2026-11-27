@@ -214,6 +214,68 @@ jobs:
         run: cargo build --locked -p kabl-ui -p kabl-clap -p kabl-standalone --all-targets
       - name: Tests
         run: cargo test --locked -p kabl-ui -p kabl-clap -p kabl-standalone
+      - name: Release build for the installer
+        # Separate invocations: with one, --bin applies to every -p and drops the plugin's cdylib.
+        shell: bash
+        run: |
+          cargo build --locked --release -p kabl-ui --bin kabl-ui
+          cargo build --locked --release -p kabl-clap
+          cargo build --locked --release -p kabl-standalone --bin kabl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kabl-windows-bin
+          path: |
+            target/release/kabl-ui.exe
+            target/release/kabl.exe
+            target/release/kabl_clap.dll
+          if-no-files-found: error
+
+  windows-installer:
+    # Inno Setup installer and portable zip from the two jobs' outputs, then a silent install,
+    # self-test, upgrade and uninstall on this runner (packaging/windows/README.md).
+    needs: [windows, windows-vst3]
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: kabl-windows-bin
+          path: target/win-bin
+      - uses: actions/download-artifact@v4
+        with:
+          name: kabl-windows-vst3
+          path: target/win-vst3
+      - name: Stage the package and zip it
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          echo "KABL_VERSION=$version" >> "$GITHUB_ENV"
+          packaging/windows/installer/stage.sh target/win-bin target/win-vst3 target/dist
+      - name: Build the installer with Inno Setup
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup 6 is not installed at $iscc" }
+          & $iscc "/DAppVersion=$env:KABL_VERSION" "/DStageDir=$PWD\target\dist\kabl-$env:KABL_VERSION-windows-x64" "/DOutputDir=$PWD\target\dist" packaging\windows\installer\kabl.iss
+          if ($LASTEXITCODE -ne 0) { throw "iscc exited with $LASTEXITCODE" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kabl-windows-installer
+          path: target/dist/kabl-*-windows-x64-setup.exe
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kabl-windows-zip
+          path: target/dist/kabl-*-windows-x64.zip
+          if-no-files-found: error
+      - name: Silent install puts every file in place
+        run: ./packaging/windows/installer/test-install.ps1 -Check install -Setup "target\dist\kabl-$env:KABL_VERSION-windows-x64-setup.exe"
+      - name: Installed kabl.exe runs its self-test
+        run: ./packaging/windows/installer/test-install.ps1 -Check selftest
+      - name: Zip holds exactly the installed files
+        run: ./packaging/windows/installer/test-install.ps1 -Check zip -Zip "target\dist\kabl-$env:KABL_VERSION-windows-x64.zip"
+      - name: Upgrade, then uninstall keeps user data
+        run: ./packaging/windows/installer/test-install.ps1 -Check upgrade -Setup "target\dist\kabl-$env:KABL_VERSION-windows-x64-setup.exe"
 
   windows-vst3:
     runs-on: windows-latest
