@@ -35,7 +35,7 @@ use crate::compile::{carry_state, compile_scoped, CompileError, CompiledPatch, P
 use crate::facetap::{FaceReport, FaceTargets};
 use crate::graph::BLOCK;
 use crate::keyboard::{Action, KeyEvent, Keyboard, MidiEvent, Source};
-use crate::morph::{MacroTarget, Morphs, Pending, MAX_DRIVEN, MAX_MACRO_TARGETS};
+use crate::morph::{MacroTarget, MorphPart, Morphs, Pending, MAX_DRIVEN, MAX_MACRO_TARGETS};
 use crate::probe::{ProbeReport, ProbeTarget, WINDOW_SECS};
 use crate::runtime::{Feedback, ParamSet, ToAudio};
 use crate::swap::CROSSFADE_MS;
@@ -177,6 +177,8 @@ impl Launch {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Command {
     Launch(Launch),
+    /// Part of a snapshot recall's morph (`morph.rs`).
+    Morph(MorphPart),
     /// Cancel one sequencer's pending launch, or every one.
     Cancel(Option<kabl_core::ModuleId>),
     /// Audition: press `notes[..count]` at `velocity` through the keyboards, release them
@@ -740,9 +742,11 @@ impl PatchEngine {
         };
         // A cue waiting behind a fresh Load is not playing yet: its macros are not scheduled.
         if !self.pending.as_ref().is_some_and(|g| g.fresh) {
-            for &target in &l.macros[..l.macro_count.min(MAX_MACRO_TARGETS)] {
+            for &m in &l.macros[..l.macro_count.min(MAX_MACRO_TARGETS)] {
                 self.morphs.schedule(Pending {
-                    target,
+                    target: crate::morph::target(m.id, m.index),
+                    from: None,
+                    to: m.value,
                     pulses: l.morph_pulses,
                     clock: l.clock,
                     at,
@@ -785,6 +789,7 @@ impl PatchEngine {
     pub fn command(&mut self, c: &Command) {
         match c {
             Command::Launch(l) => self.launch(l),
+            Command::Morph(p) => self.morphs.part(p),
             Command::Cancel(s) => self.cancel(*s),
             Command::Preview {
                 notes,
@@ -808,6 +813,8 @@ impl PatchEngine {
             Command::Inspect(t) => self.inspect(*t),
             Command::Faces(t) => self.face_taps(*t),
         }
+        // At once, so the land table only ever holds what one command or one clear drops.
+        self.write_lands();
     }
 
     /// Audio-thread call: drops the pending launch and the arm of sequencer `seq`, or of every
@@ -889,31 +896,71 @@ impl PatchEngine {
 
     /// Audio-thread call: `CompiledPatch::clocks` of the graph fading in, else the active one.
     /// Audio-thread call: `f(macro module, output index, value, target, progress)` for every
-    /// macro a cue is driving or holds.
-    pub fn morphs(&self, f: impl FnMut(kabl_core::ModuleId, u8, f32, f32, f32)) {
+    /// macro a morph is driving or holds.
+    pub fn morphs(&self, mut f: impl FnMut(kabl_core::ModuleId, u8, f32, f32, f32)) {
+        self.morphs.report(|t, v, to, p| {
+            if let crate::runtime::RuntimeTarget::Param {
+                id,
+                kind: "macro",
+                index,
+            } = t
+            {
+                f(id, index as u8, v, to, p);
+            }
+        });
+    }
+
+    /// Audio-thread call: `f(target, value, to, progress)` for every param a morph is driving
+    /// or holds.
+    pub fn param_morphs(&self, f: impl FnMut(crate::runtime::RuntimeTarget, f32, f32, f32)) {
         self.morphs.report(f);
     }
 
-    /// Starts and moves the cue morphs and writes the values into every graph. No allocation.
+    /// Starts and moves the morphs and writes the values into every graph. A recall target
+    /// ramps to each block's value in a playing graph. No allocation.
     fn drive_morphs(&mut self) {
-        let mut out = [(crate::runtime::RuntimeTarget::Route { cable: 0 }, 0.0); MAX_DRIVEN];
+        self.write_lands();
+        let mut out = [(
+            crate::runtime::RuntimeTarget::Route { cable: 0 },
+            0.0,
+            false,
+        ); MAX_DRIVEN];
         let graph = match &self.incoming {
             Some((g, _)) => g,
             None => &self.active,
         };
         let n = self.morphs.step(graph, &mut out);
-        for &(t, v) in &out[..n] {
-            let mut hit = self.active.drive_runtime(t, v);
+        for &(t, v, ramp_it) in &out[..n] {
+            let ramp = |g: &CompiledPatch| ramp_it && g.started();
+            let r = ramp(&self.active);
+            let mut hit = self.active.drive_runtime(t, v, r);
             if let Some((g, _)) = &mut self.incoming {
-                hit |= g.drive_runtime(t, v);
+                let r = ramp(g);
+                hit |= g.drive_runtime(t, v, r);
             }
             if let Some(g) = &mut self.pending {
-                hit |= g.drive_runtime(t, v);
+                let r = ramp(g);
+                hit |= g.drive_runtime(t, v, r);
             }
             if !hit {
                 self.morphs.release(t);
             }
         }
+        self.write_lands();
+    }
+
+    /// Writes the values of recall morphs that were dropped (`Morphs::land`) into every graph.
+    fn write_lands(&mut self) {
+        let (active, incoming, pending) = (&mut self.active, &mut self.incoming, &mut self.pending);
+        self.morphs.take_lands(|t, v| {
+            active.drive_runtime(t, v, false);
+            if let Some((g, _)) = incoming {
+                g.drive_runtime(t, v, false);
+            }
+            if let Some(g) = pending {
+                g.drive_runtime(t, v, false);
+            }
+        });
     }
 
     pub fn clocks(&self, f: impl FnMut(kabl_core::ModuleId, bool, f64)) {
