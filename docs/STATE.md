@@ -5,15 +5,15 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 
 ## Done
 - Up to 11-27 morning: see git history (state #272, #278). Highlights: W6 VST3 #264, W7 #267, W8 editor #274, CB2-CB5 #268 #271 #273 #275, L5 #269, faces slices 1-7.
-- 11-27 day: state #278, cable-param controls #277 (Env Amt knob on Analog Voice), W9 Windows installer #276 (Inno Setup + zip; CI install/launch/upgrade/uninstall; kabl.exe not shipped), faces slice 8 engine morph #279 (ca337fe5), W9b #280 (4dba6cba: windows_subsystem; notices union linux+windows-msvc), state #281, W9c icon #282 (c5b18da0: embed-resource, kabl.ico in exe + installer), faces slice 9 snapshots #283 (2d87517b; captures + recall WAV sent to Kosta, copies in .claude/tmp/cap283/), faces slice 10 whole blocks + Pin to Perform #284 (57ca23fe; review minor: new too_many_arguments allows on draw_transport, face_menu; captures sent).
+- 11-27 day: state #278, cable-param controls #277 (Env Amt knob on Analog Voice), W9 Windows installer #276 (Inno Setup + zip; CI install/launch/upgrade/uninstall; kabl.exe not shipped), faces slice 8 engine morph #279 (ca337fe5), W9b #280 (4dba6cba: windows_subsystem; notices union linux+windows-msvc), state #281, W9c icon #282 (c5b18da0: embed-resource, kabl.ico in exe + installer), faces slice 9 snapshots #283 (2d87517b; captures + recall WAV sent to Kosta, copies in .claude/tmp/cap283/), faces slice 10 whole blocks + Pin to Perform #284 (57ca23fe; review minor: new too_many_arguments allows on draw_transport, face_menu; captures sent), faces slice 11 compact face #286 (merged 11-27; minors: chip-overlap check unreachable given footer band, kept per FACES §6.3; cables of covered modules draw over an expanded face, shown to Kosta). Faces slices 1-11 complete.
 
 ## In flight (builders die on restart: resume from the pushed branch, never redispatch from scratch)
 - #203 promo v2: parked.
 - Every merge moves master: update-branch the other open PRs, re-verify, delta re-review (patch-id check), CI.
 
 ## Next
-1. Faces slice 11 compact face: builder dispatched 11-27 on claude/faces-compact, brief .claude/tmp/coord1127/brief-faces-compact.md. Then verify, review, CI, merge.
-2. MIDI auto-mapping (Kosta 11-27: yes, after faces): M1 macros 1-8 follow a default CC profile set once in prefs (patch's own learned maps win); M2 per-device profiles keyed by MIDI port name. New prefs format approved by that yes; briefs to write.
+1. MIDI M1 knob profiles: builder dispatched 11-27 on claude/midi-knobs, brief .claude/tmp/coord1127/brief-midi-knobs.md (profiles in style::Prefs keyed by MIDI port name + "any controller" for the plugin; set by turning knobs 1-8; patch learn wins per CC). Then verify, review, CI, merge.
+2. MIDI M2 built-in profiles for common controllers (Kosta: "default per-device maps, like broad ones"), matched by port name; user profile overrides. Needs researched CC tables with sources (manufacturer manuals), not memory.
 3. Windows: W8b (host resize on DPI change + Live keyboard passthrough: public baseview method + vendor/nice-plug egui change), W10 release job (+ VST logo guidelines check), W11a standalone ASIO (required for 1.0), WA Kosta VM pass (list in PR #276 body / packaging/windows/README.md).
 4. L6 (lessons 6, 8; clap automation hook), then L7+L8 as one slice.
 5. Before v1.0.0: rc.3 from master + short re-check (proposed, Kosta to confirm).
@@ -25,7 +25,7 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 - R4 acceptance pass on rc.2; rc.3 re-check before v1.0.0 (proposed).
 
 ## Decisions (Kosta)
-- 11-27: MIDI auto-mapping goes on the roadmap after the faces slices (two slices, M1 then M2).
+- 11-27: MIDI auto-mapping after faces. Setup = turn knobs 1-8. Before a user profile exists: built-in per-device maps (M2).
 - 11-27: Windows icon option A: add build-only `embed-resource`, kabl.ico in exe/installer/Start menu. Keep Inno Setup (licence permits commercial use; authors ask commercial users to buy): Kosta buys a licence if kabl revenue passes 5k.
 - 11-27 coordinator: faces briefs must include design_page.rs + snapshots.rs (list UI lives there); refusal-test inversion approved when a slice lifts "not supported yet". Shared target dir cleared 11-27 (11 GB free -> 144 GB).
 - 11-27 coordinator: W9 does not ship kabl.exe (Linux doesn't; its self-test path is build-time); recall behind a fresh pending Load lands (FACES §3.3 "a recall morph always lands"), cue macros there are dropped.
