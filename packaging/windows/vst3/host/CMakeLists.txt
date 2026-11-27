@@ -35,6 +35,8 @@ add_executable(kabl-vst3-host
 # The platform's module loader, as the validator adds it; Linux only for a local compile check.
 if(SMTG_WIN)
     target_sources(kabl-vst3-host PRIVATE ${SDK_ROOT}/public.sdk/source/vst/hosting/module_win32.cpp)
+    # The editor checks open windows and probe OpenGL (user32 and gdi32 are linked by default).
+    target_link_libraries(kabl-vst3-host PRIVATE opengl32)
 elseif(SMTG_LINUX)
     target_sources(kabl-vst3-host PRIVATE ${SDK_ROOT}/public.sdk/source/vst/hosting/module_linux.cpp)
     target_link_libraries(kabl-vst3-host PRIVATE dl)

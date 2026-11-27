@@ -9,6 +9,11 @@
 // oscillator in the audio output: pitch bend and the mod wheel raise it, CC 74 moves it, and
 // the sustain pedal holds a released note until the pedal is let go.
 //
+// The editor checks (Windows only) open and close kabl's editor 20 times in a parent window, as
+// Live does, and check its size against the window's DPI, that a host resize is held to the
+// editor's fixed size, and that GDI and USER handles do not grow. They need an OpenGL 3.2
+// context for the editor's renderer; without one they stop before attached() and say so.
+//
 // Prints one PASS or FAIL line per check; the exit code is the number of failed checks
 // (a setup failure exits with 100).
 
@@ -25,6 +30,16 @@
 #include "pluginterfaces/vst/ivsteditcontroller.h"
 #include "pluginterfaces/vst/ivstmidicontrollers.h"
 #include "pluginterfaces/vst/ivstunits.h"
+#include "pluginterfaces/gui/iplugview.h"
+#include "pluginterfaces/gui/iplugviewcontentscalesupport.h"
+
+#if SMTG_OS_WINDOWS
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <GL/gl.h>
+#endif
 
 #include <algorithm>
 #include <chrono>
@@ -200,6 +215,255 @@ std::string fmt(const char* format, double a, double b = 0)
     std::snprintf(buffer, sizeof buffer, format, a, b);
     return buffer;
 }
+
+#if SMTG_OS_WINDOWS
+// What a host's IPlugFrame does with a resize request: resize the parent, then the view.
+struct Frame : IPlugFrame
+{
+    HWND parent = nullptr;
+
+    tresult PLUGIN_API resizeView(IPlugView* view, ViewRect* rect) override
+    {
+        SetWindowPos(parent, nullptr, 0, 0, rect->getWidth(), rect->getHeight(), SWP_NOMOVE | SWP_NOZORDER);
+        return view->onSize(rect) == kResultOk ? kResultOk : kResultFalse;
+    }
+    tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override
+    {
+        if (FUnknownPrivate::iidEqual(iid, IPlugFrame::iid) || FUnknownPrivate::iidEqual(iid, FUnknown::iid))
+        {
+            *obj = this;
+            return kResultOk;
+        }
+        *obj = nullptr;
+        return kNoInterface;
+    }
+    // Lives on the stack for the whole check.
+    uint32 PLUGIN_API addRef() override { return 1; }
+    uint32 PLUGIN_API release() override { return 1; }
+};
+
+// Whether this machine can make the OpenGL 3.2 core context kabl's editor asks for, with the
+// driver's version and renderer for the log.
+bool probeGl(std::string& driver)
+{
+    constexpr int kMajor = 0x2091, kMinor = 0x2092, kProfile = 0x9126, kCore = 0x1;
+    using CreateContextAttribs = HGLRC(WINAPI*)(HDC, HGLRC, const int*);
+    WNDCLASSW wc {};
+    wc.style = CS_OWNDC;
+    wc.lpfnWndProc = DefWindowProcW;
+    wc.hInstance = GetModuleHandleW(nullptr);
+    wc.lpszClassName = L"kabl-gl-probe";
+    RegisterClassW(&wc);
+    HWND window = CreateWindowExW(0, wc.lpszClassName, L"", WS_OVERLAPPEDWINDOW, 0, 0, 16, 16, nullptr, nullptr,
+                                  wc.hInstance, nullptr);
+    HDC dc = GetDC(window);
+    PIXELFORMATDESCRIPTOR pfd {};
+    pfd.nSize = sizeof(pfd);
+    pfd.nVersion = 1;
+    pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+    pfd.iPixelType = PFD_TYPE_RGBA;
+    pfd.cColorBits = 32;
+    pfd.cDepthBits = 24;
+    pfd.cStencilBits = 8;
+    SetPixelFormat(dc, ChoosePixelFormat(dc, &pfd), &pfd);
+    bool core = false;
+    driver = "none (wglCreateContext failed)";
+    if (HGLRC legacy = wglCreateContext(dc))
+    {
+        wglMakeCurrent(dc, legacy);
+        const auto* version = reinterpret_cast<const char*>(glGetString(GL_VERSION));
+        const auto* renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+        driver = std::string(version ? version : "?") + " on " + (renderer ? renderer : "?");
+        auto create = reinterpret_cast<CreateContextAttribs>(wglGetProcAddress("wglCreateContextAttribsARB"));
+        const int attributes[] = {kMajor, 3, kMinor, 2, kProfile, kCore, 0};
+        if (HGLRC context = create ? create(dc, nullptr, attributes) : nullptr)
+        {
+            core = true;
+            wglDeleteContext(context);
+        }
+        wglMakeCurrent(nullptr, nullptr);
+        wglDeleteContext(legacy);
+    }
+    ReleaseDC(window, dc);
+    DestroyWindow(window);
+    return core;
+}
+
+void pump(int ms)
+{
+    const auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+    while (std::chrono::steady_clock::now() < end)
+    {
+        MSG msg;
+        while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+        Sleep(5);
+    }
+}
+
+SIZE clientSize(HWND window)
+{
+    RECT r {};
+    if (window)
+        GetClientRect(window, &r);
+    return {r.right - r.left, r.bottom - r.top};
+}
+
+std::string sizes(const char* what, double width, double height)
+{
+    return fmt((std::string(what) + " %.0f x %.0f").c_str(), width, height);
+}
+
+void editorChecks(IEditController* controller)
+{
+    constexpr int kCycles = 20;
+    // A leak of one handle per cycle grows the count by 19 from cycle 1 to cycle 20.
+    constexpr DWORD kTolerance = 10;
+    constexpr int32 kWidth = 1180, kHeight = 680; // EguiState::from_size in crates/clap/src/lib.rs
+
+    std::string driver;
+    const bool gl = probeGl(driver);
+    std::printf("editor: OpenGL %s; 3.2 core context: %s\n", driver.c_str(), gl ? "yes" : "no");
+    if (!gl)
+        std::printf("editor: SKIPPED attached()/removed(), which open the editor window: kabl renders it with "
+                    "OpenGL 3.2, which this machine cannot create. Every cycle still runs createView, "
+                    "setContentScaleFactor, getSize, the resize checks and the release.\n");
+
+    WNDCLASSW wc {};
+    wc.lpfnWndProc = DefWindowProcW;
+    wc.hInstance = GetModuleHandleW(nullptr);
+    wc.lpszClassName = L"kabl-vst3-host";
+    RegisterClassW(&wc);
+    HWND parent = CreateWindowExW(0, wc.lpszClassName, L"kabl-vst3-host", WS_POPUP | WS_VISIBLE, 0, 0, kWidth,
+                                  kHeight, nullptr, nullptr, wc.hInstance, nullptr);
+    require(parent != nullptr, "create the parent window");
+    const UINT dpi = GetDpiForWindow(parent);
+    const double scale = dpi / 96.0;
+    const LONG scaledWidth = std::lround(kWidth * scale);
+    const LONG scaledHeight = std::lround(kHeight * scale);
+    std::printf("editor: parent window at %u DPI (scale %.2f)\n", dpi, scale);
+
+    Frame frame;
+    frame.parent = parent;
+    const HANDLE process = GetCurrentProcess();
+    const DWORD gdiStart = GetGuiResources(process, GR_GDIOBJECTS);
+    const DWORD userStart = GetGuiResources(process, GR_USEROBJECTS);
+    DWORD gdiFirst = 0, userFirst = 0;
+    int created = 0, sized = 0, attached = 0, opened = 0, gone = 0;
+    std::string firstProblem;
+    auto problem = [&](int cycle, const std::string& what) {
+        if (firstProblem.empty())
+            firstProblem = "cycle " + std::to_string(cycle) + ": " + what;
+    };
+
+    for (int cycle = 1; cycle <= kCycles; ++cycle)
+    {
+        IPtr<IPlugView> view = owned(controller->createView(ViewType::kEditor));
+        if (!view || view->isPlatformTypeSupported(kPlatformTypeHWND) != kResultTrue)
+        {
+            problem(cycle, "createView or HWND support");
+            continue;
+        }
+        ++created;
+        view->setFrame(&frame);
+        if (FUnknownPtr<IPlugViewContentScaleSupport> scaling(view); scaling)
+            scaling->setContentScaleFactor(static_cast<float>(scale));
+        ViewRect rect {};
+        if (view->getSize(&rect) == kResultOk && rect.getWidth() == kWidth && rect.getHeight() == kHeight)
+            ++sized;
+        else
+            problem(cycle, sizes("getSize before attached", rect.getWidth(), rect.getHeight()));
+
+        if (cycle == 1)
+        {
+            check(view->canResize() == kResultFalse, "the editor tells the host it is not resizable");
+            ViewRect asked {0, 0, kWidth * 3 / 2, kHeight * 3 / 2};
+            const bool held = view->checkSizeConstraint(&asked) == kResultOk;
+            check(held && asked.getWidth() == kWidth && asked.getHeight() == kHeight,
+                  sizes("checkSizeConstraint holds a 1770 x 1020 request to the editor size:", asked.getWidth(),
+                        asked.getHeight()));
+        }
+
+        if (gl)
+        {
+            SetWindowPos(parent, nullptr, 0, 0, rect.getWidth(), rect.getHeight(), SWP_NOMOVE | SWP_NOZORDER);
+            if (view->attached(parent, kPlatformTypeHWND) == kResultOk)
+            {
+                ++attached;
+                pump(150);
+                HWND child = GetWindow(parent, GW_CHILD);
+                ViewRect now {};
+                view->getSize(&now);
+                const SIZE size = clientSize(child);
+                // The editor window follows the DPI, and getSize reports what the window is.
+                if (child && size.cx == scaledWidth && size.cy == scaledHeight && now.getWidth() == size.cx &&
+                    now.getHeight() == size.cy)
+                    ++opened;
+                else
+                    problem(cycle, sizes("editor window", size.cx, size.cy) + ", " +
+                                       sizes("getSize after attached", now.getWidth(), now.getHeight()));
+
+                if (cycle == 1)
+                {
+                    ViewRect asked {0, 0, kWidth * 3 / 2, kHeight * 3 / 2};
+                    view->onSize(&asked);
+                    pump(50);
+                    ViewRect after {};
+                    view->getSize(&after);
+                    const SIZE held = clientSize(child);
+                    check(after.getWidth() == scaledWidth && after.getHeight() == scaledHeight &&
+                              held.cx == scaledWidth && held.cy == scaledHeight,
+                          sizes("onSize(1770 x 1020) leaves the open editor at its size: window", held.cx, held.cy) +
+                              ", " + sizes("getSize", after.getWidth(), after.getHeight()));
+                }
+
+                view->removed();
+                pump(20);
+                if (child && !IsWindow(child))
+                    ++gone;
+                else
+                    problem(cycle, "the editor window outlived removed()");
+            }
+            else
+                problem(cycle, "attached");
+        }
+        view->setFrame(nullptr);
+        view = nullptr;
+        pump(10);
+        if (cycle == 1)
+        {
+            gdiFirst = GetGuiResources(process, GR_GDIOBJECTS);
+            userFirst = GetGuiResources(process, GR_USEROBJECTS);
+        }
+    }
+    const DWORD gdiEnd = GetGuiResources(process, GR_GDIOBJECTS);
+    const DWORD userEnd = GetGuiResources(process, GR_USEROBJECTS);
+    DestroyWindow(parent);
+
+    if (!firstProblem.empty())
+        std::printf("editor: first problem: %s\n", firstProblem.c_str());
+    check(created == kCycles, fmt("createView gives an HWND editor %.0f of %.0f times", created, kCycles));
+    check(sized == kCycles, fmt("getSize is 1180 x 680 before attached %.0f of %.0f times", sized, kCycles));
+    if (gl)
+    {
+        check(attached == kCycles, fmt("attached() opens the editor %.0f of %.0f times", attached, kCycles));
+        check(opened == kCycles, fmt("the open editor is 1180 x 680 times the DPI scale and getSize says so "
+                                     "%.0f of %.0f times",
+                                     opened, kCycles));
+        check(gone == kCycles, fmt("removed() destroys the editor window %.0f of %.0f times", gone, kCycles));
+    }
+    std::printf("editor: GDI objects %lu at start, %lu after cycle 1, %lu after cycle %d; "
+                "USER objects %lu, %lu, %lu\n",
+                gdiStart, gdiFirst, gdiEnd, kCycles, userStart, userFirst, userEnd);
+    check(gdiEnd <= gdiFirst + kTolerance,
+          fmt("GDI objects grow by at most 10 from cycle 1 to cycle 20: %+.0f", double(gdiEnd) - double(gdiFirst)));
+    check(userEnd <= userFirst + kTolerance,
+          fmt("USER objects grow by at most 10 from cycle 1 to cycle 20: %+.0f", double(userEnd) - double(userFirst)));
+}
+#endif
 
 } // namespace
 
@@ -399,6 +663,12 @@ int main(int argc, char* argv[])
     const double released = rms(host.last(20));
     check(released < 0.01 * level, fmt("pedal up releases it: rms %.6f", released));
     check(host.broken == 0, fmt("every output sample is finite: %.0f are not", static_cast<double>(host.broken)));
+
+#if SMTG_OS_WINDOWS
+    editorChecks(controller);
+#else
+    std::printf("editor: the editor checks are Windows only\n");
+#endif
 
     host.processor->setProcessing(false);
     component->setActive(false);
