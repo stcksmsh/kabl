@@ -459,6 +459,9 @@ pub struct UiState {
     /// knobs" while it waits for knobs (exclusive with `learn`).
     pub knob_profiles: std::collections::BTreeMap<String, perform::KnobProfile>,
     pub knob_setup: Option<perform::KnobSetup>,
+    /// The last setup ended with every knob skipped, so nothing was saved (shown until the
+    /// menu closes or a new setup starts).
+    pub knob_nothing_saved: bool,
     /// The performance panel shows more rows (taller), at the rack's expense.
     pub perform_tall: bool,
     /// Pin being renamed: (module, pin key, text so far).
@@ -657,6 +660,7 @@ impl Default for UiState {
             takeover: Default::default(),
             knob_profiles: Default::default(),
             knob_setup: None,
+            knob_nothing_saved: false,
             pin_reveal: None,
             renaming: None,
             perform_tall: false,
@@ -1100,13 +1104,20 @@ impl UiState {
     pub fn start_knob_setup(&mut self) {
         self.learn = None;
         self.knob_setup = Some(perform::KnobSetup::new(self.knob_key()));
+        self.knob_nothing_saved = false;
     }
 
     /// Saves a knob setup once every knob has been asked for, replacing its key's profile.
+    /// With every knob skipped the stored profile stays, as on Cancel: an empty one would hide
+    /// the "any controller" profile.
     pub fn finish_knob_setup(&mut self) {
         if self.knob_setup.as_ref().is_some_and(|s| s.done()) {
             let s = self.knob_setup.take().expect("checked");
-            self.set_knob_profile(&s.key, Some(s.profile()));
+            let profile = s.profile();
+            self.knob_nothing_saved = profile.is_empty();
+            if !profile.is_empty() {
+                self.set_knob_profile(&s.key, Some(profile));
+            }
         }
     }
 
@@ -2340,6 +2351,7 @@ fn rail(editor: &mut PatchEditor, ui_state: &mut UiState, ui: &mut egui::Ui, st:
             // The setup prompt lives in this menu: closing it cancels the setup.
             if !menu_open {
                 ui_state.knob_setup = None;
+                ui_state.knob_nothing_saved = false;
             }
         });
     });

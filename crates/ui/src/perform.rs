@@ -266,6 +266,8 @@ impl KnobSetup {
     /// Leaves the current slot empty.
     pub fn skip(&mut self) {
         self.slot = (self.slot + 1).min(MACROS);
+        // The knob that took the last slot may be the one meant for the next.
+        self.last = None;
     }
 
     pub fn done(&self) -> bool {

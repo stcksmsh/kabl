@@ -2129,20 +2129,34 @@ pub(crate) fn macro_knobs(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style)
         .knob_profiles
         .get(&key)
         .map(|p| (key, perform::profile_knobs(p)));
+    if ui_state.knob_nothing_saved {
+        kit::paragraph(
+            ui,
+            st,
+            Role::Caption,
+            Tone::Text2,
+            "No knobs set: nothing saved",
+        );
+    }
     match &saved {
         Some((key, knobs)) => {
             kit::paragraph(ui, st, Role::Label, Tone::Text, key);
-            // One wrapped line: the menu has no room for a row per macro.
-            let line = if knobs.is_empty() {
-                "No knobs".to_string()
-            } else {
-                knobs
-                    .iter()
-                    .map(|(n, map)| format!("M{n} {}", perform::cc_text(*map)))
-                    .collect::<Vec<_>>()
-                    .join("   ")
-            };
-            kit::paragraph(ui, st, Role::Caption, Tone::Text2, &line);
+            // A fixed grid of all eight, two per row, so each macro keeps its place.
+            egui::Grid::new("knobs:grid")
+                .num_columns(2)
+                .spacing(vec2(16.0, 2.0))
+                .show(ui, |ui| {
+                    for n in 1..=kabl_modules::builtins::MACROS {
+                        let text = match knobs.iter().find(|(m, _)| *m == n) {
+                            Some((_, map)) => format!("M{n}  {}", perform::cc_text(*map)),
+                            None => format!("M{n}  \u{2014}"),
+                        };
+                        ui.label(kit::rich(st, Role::Caption, Tone::Text2, text));
+                        if n % 2 == 0 {
+                            ui.end_row();
+                        }
+                    }
+                });
         }
         None => {
             kit::paragraph(

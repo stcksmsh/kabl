@@ -445,3 +445,95 @@ fn settings_lists_the_profile_of_the_device_and_forgets_it() {
         .is_empty());
     assert!(!h.has("knobs:forget"));
 }
+
+#[test]
+fn setup_with_every_knob_skipped_keeps_the_stored_profiles() {
+    let mut h = H::new();
+    let dir = tempfile::tempdir().unwrap();
+    h.ui.prefs_dir = Some(dir.path().to_owned());
+    h.ui.midi_input = Some(PORT.into());
+    h.ui.set_knob_profile(ANY_CONTROLLER, Some([("m1".to_string(), 74)].into()));
+    let before = h.ui.knob_profiles.clone();
+    start_setup(&mut h);
+    for _ in 0..8 {
+        h.click("knobs:skip");
+    }
+    assert!(h.ui.knob_setup.is_none());
+    assert!(h.ui.knob_nothing_saved, "the menu says nothing was saved");
+    assert_eq!(h.ui.knob_profiles, before);
+    assert_eq!(
+        kabl_ui::style::Prefs::load(dir.path()).knob_profiles,
+        before
+    );
+    // The "any controller" profile still drives the port's knobs.
+    let start = h.value(MACROS, "m1");
+    let v = h.at(MACROS, "m1");
+    h.turn(0, 74, v, 4);
+    assert!(h.value(MACROS, "m1") > start);
+    // A new setup clears the note.
+    h.frame();
+    start_setup(&mut h);
+    assert!(!h.ui.knob_nothing_saved);
+}
+
+#[test]
+fn skip_lets_the_same_knob_take_the_next_slot_at_once() {
+    let mut s = perform::KnobSetup::new(PORT.into());
+    s.take(0, 20, 0.0);
+    s.skip();
+    s.take(0, 20, 0.1);
+    assert_eq!(s.slot, 3);
+    assert_eq!(s.knobs[..3], [None, None, Some((0, 20))]);
+}
+
+/// `use_user_prefs` reads the process-wide `KABL_CONFIG_DIR`; only this test sets it.
+#[test]
+fn another_windows_profile_on_disk_survives_this_windows_save() {
+    let dir = tempfile::tempdir().unwrap();
+    std::env::set_var("KABL_CONFIG_DIR", dir.path());
+    let mut a = UiState::default();
+    a.use_user_prefs();
+    let mut b = UiState::default();
+    b.use_user_prefs();
+    a.set_knob_profile(PORT, Some([("m1".to_string(), 74)].into()));
+    // b never saw a's profile: an unrelated save keeps it, and so does b's own profile.
+    b.set_theme_mode(kabl_ui::desktop::ThemeMode::Dark);
+    let on_disk = kabl_ui::style::Prefs::load(dir.path()).knob_profiles;
+    assert!(on_disk.contains_key(PORT));
+    b.set_knob_profile(ANY_CONTROLLER, Some([("m2".to_string(), 75)].into()));
+    a.set_theme_mode(kabl_ui::desktop::ThemeMode::Light);
+    let saved = kabl_ui::style::Prefs::load(dir.path()).knob_profiles;
+    assert_eq!(saved.len(), 2, "{saved:?}");
+    assert_eq!(saved[PORT], [("m1".to_string(), 74)].into());
+    assert_eq!(saved[ANY_CONTROLLER], [("m2".to_string(), 75)].into());
+}
+
+#[test]
+fn an_out_of_range_code_in_settings_loads_and_maps_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    // A saved file with a profile table added by hand.
+    kabl_ui::style::Prefs::default().save(dir.path()).unwrap();
+    let path = dir.path().join("settings.toml");
+    let mut text = std::fs::read_to_string(&path).unwrap();
+    text.push_str("\n[knob_profiles.\"Pad 24:0\"]\nm1 = 5000\nm2 = 2048\nm3 = 74\n");
+    std::fs::write(&path, text).unwrap();
+    let profiles = kabl_ui::style::Prefs::load(dir.path()).knob_profiles;
+    assert_eq!(profiles[PORT]["m1"], 5000, "loaded as written");
+    assert_eq!(perform::profile_knobs(&profiles[PORT]), vec![(3, (0, 74))]);
+    let mut h = H::new();
+    h.ui.midi_input = Some(PORT.into());
+    h.ui.knob_profiles = profiles;
+    let (m1, m2) = (h.value(MACROS, "m1"), h.value(MACROS, "m2"));
+    let entries = h.entries();
+    for ch in 0..16u8 {
+        for cc in [0u8, 8, 39, 127] {
+            h.cc(ch, cc, 0);
+            h.cc(ch, cc, 127);
+        }
+    }
+    assert_eq!((h.value(MACROS, "m1"), h.value(MACROS, "m2")), (m1, m2));
+    assert_eq!(h.entries(), entries, "nothing mapped");
+    // Settings lists it without panicking.
+    h.click("view-menu");
+    assert!(h.has("knobs:forget"));
+}
