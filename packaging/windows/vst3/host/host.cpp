@@ -387,6 +387,8 @@ void editorChecks(IEditController* controller)
                         asked.getHeight()));
         }
 
+        HWND child = nullptr;
+        bool afterRemoved = false;
         if (gl)
         {
             SetWindowPos(parent, nullptr, 0, 0, rect.getWidth(), rect.getHeight(), SWP_NOMOVE | SWP_NOZORDER);
@@ -394,7 +396,7 @@ void editorChecks(IEditController* controller)
             {
                 ++attached;
                 pump(150);
-                HWND child = GetWindow(parent, GW_CHILD);
+                child = GetWindow(parent, GW_CHILD);
                 ViewRect now {};
                 view->getSize(&now);
                 const SIZE size = clientSize(child);
@@ -422,17 +424,27 @@ void editorChecks(IEditController* controller)
 
                 view->removed();
                 pump(20);
-                if (child && !IsWindow(child))
-                    ++gone;
-                else
-                    problem(cycle, "the editor window outlived removed()");
+                afterRemoved = child && IsWindow(child);
             }
             else
                 problem(cycle, "attached");
         }
         view->setFrame(nullptr);
         view = nullptr;
-        pump(10);
+        // clap-wrapper keeps the editor window through removed() and destroys it with the view,
+        // which a host releases after removed(); a host's message loop keeps running meanwhile.
+        pump(100);
+        if (child)
+        {
+            if (!IsWindow(child))
+                ++gone;
+            else
+                problem(cycle, "the editor window outlived the released view");
+        }
+        if (gl && (cycle <= 3 || cycle == kCycles))
+            std::printf("editor: cycle %d: window alive after removed() %s, after release %s; GDI %lu, USER %lu\n",
+                        cycle, afterRemoved ? "yes" : "no", child && IsWindow(child) ? "yes" : "no",
+                        GetGuiResources(process, GR_GDIOBJECTS), GetGuiResources(process, GR_USEROBJECTS));
         if (cycle == 1)
         {
             gdiFirst = GetGuiResources(process, GR_GDIOBJECTS);
@@ -453,7 +465,7 @@ void editorChecks(IEditController* controller)
         check(opened == kCycles, fmt("the open editor is 1180 x 680 times the DPI scale and getSize says so "
                                      "%.0f of %.0f times",
                                      opened, kCycles));
-        check(gone == kCycles, fmt("removed() destroys the editor window %.0f of %.0f times", gone, kCycles));
+        check(gone == kCycles, fmt("releasing the view destroys the editor window %.0f of %.0f times", gone, kCycles));
     }
     std::printf("editor: GDI objects %lu at start, %lu after cycle 1, %lu after cycle %d; "
                 "USER objects %lu, %lu, %lu\n",
