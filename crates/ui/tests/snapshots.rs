@@ -337,9 +337,12 @@ fn a_macro_a_cue_is_moving_reads_live_for_a_recall() {
     };
     let now = std::time::Instant::now();
     ui.accept_morph(target, 0.25, 0.9, 0.5, now);
-    assert_eq!(ui.live_param(&target).map(|l| l.value), Some(0.25));
+    assert_eq!(ui.morph_from(&target), Some(0.25));
+    // Arrived and held: the engine plays the cue's value, not the document's hand value.
+    ui.accept_morph(target, 0.9, 0.9, 1.0, now);
+    assert_eq!(ui.morph_from(&target), Some(0.9));
     assert!(ui
-        .live_param(&RuntimeTarget::Param {
+        .morph_from(&RuntimeTarget::Param {
             id: 7,
             kind: "macro",
             index: 3
@@ -352,7 +355,7 @@ fn a_macro_a_cue_is_moving_reads_live_for_a_recall() {
         0.5,
         now - std::time::Duration::from_secs(1),
     );
-    assert!(ui.live_param(&target).is_none());
+    assert!(ui.morph_from(&target).is_none());
 }
 
 #[test]

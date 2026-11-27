@@ -170,18 +170,22 @@ impl UiState {
         }
     }
 
-    /// What the audio thread says about a morph moving `target`, while its reports keep coming.
-    pub fn live_param(&self, target: &kabl_engine::runtime::RuntimeTarget) -> Option<MacroLive> {
+    /// Where a new morph of `target` starts when the engine, not the document, holds its value,
+    /// while the audio thread's reports keep coming. A macro a cue moved or holds plays the
+    /// cue's value while the document keeps the hand's; any other param's morph leaves the
+    /// document at its target, so its report counts only until it arrives.
+    pub fn morph_from(&self, target: &kabl_engine::runtime::RuntimeTarget) -> Option<f32> {
         if let kabl_engine::runtime::RuntimeTarget::Param {
             id,
             kind: "macro",
             index,
         } = *target
         {
-            return self.live_macro(id, index as u8);
+            return self.live_macro(id, index as u8).map(|m| m.value);
         }
         let (m, at) = self.param_live.get(target)?;
-        (at.elapsed() < std::time::Duration::from_millis(400)).then_some(*m)
+        (at.elapsed() < std::time::Duration::from_millis(400) && m.progress < 1.0)
+            .then_some(m.value)
     }
 
     /// Where param `p` of `id` is now: a macro a cue is driving reads as the cue moved it,

@@ -99,10 +99,7 @@ pub fn recall(editor: &mut PatchEditor, view: &mut UiState, id: CompositeId, sna
         .filter(|((a, _), (b, _))| a == b)
         .map(|(&(target, to), &(_, from))| {
             // A morph already moving the target: the new one starts where it is.
-            let from = view
-                .live_param(&target)
-                .filter(|l| l.progress < 1.0)
-                .map_or(from, |l| l.value);
+            let from = view.morph_from(&target).unwrap_or(from);
             MorphTarget { target, from, to }
         })
         .collect();
