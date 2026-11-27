@@ -167,8 +167,8 @@ fn the_committed_analog_voice_is_what_the_generator_writes() {
 }
 
 /// Ports with every target, and every control's target with its range and stored default, as
-/// ANALOG-VOICE.md lists them; the leaves are wired as the catalogue's core; Unison and Detune
-/// are off the face and everything else is on it.
+/// ANALOG-VOICE.md lists them; the leaves are wired as the catalogue's core; Unison, Detune and
+/// Detune mod are off the face and everything else is on it.
 #[test]
 fn analog_voice_has_the_catalogue_interface() {
     let pkg = package();
@@ -365,8 +365,13 @@ fn analog_voice_has_the_catalogue_interface() {
             e.label
         );
     }
-    for &key in c.ports.keys() {
-        assert!(face.placements.contains_key(&key), "port {key} on the face");
+    for (&key, e) in &c.ports {
+        assert_eq!(
+            face.placements.contains_key(&key),
+            e.label != "Detune mod",
+            "port {} on the face",
+            e.label
+        );
     }
 }
 

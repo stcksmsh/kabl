@@ -153,10 +153,10 @@ fn package() -> composites::Package {
     // glyphs, then Octave 1, Octave 2 and Mix 2), Drive, the filter (Cutoff, Resonance) and the
     // filter envelope; the bottom row is the jacks, Level, and the amp envelope right under the
     // filter's, so the two envelopes read as a pair. Unison and Detune are off the face, under
-    // "More controls": Unison's sixteen steps need a selector wider than the face has room for,
+    // "More controls": Unison's sixteen steps need a 288-point selector (18 points a choice),
     // and Detune only spreads unison voices. There is no room for displays at the face's fixed
     // height. Knobs, not sliders: a face slider follows the player's orientation setting. Knob
-    // and jack widths fit their longest label, "Filter Release" and "IN Detune mod", at the
+    // and jack widths fit their longest label, "Filter Release" and "IN Env Amount", at the
     // face's 12-point type.
     let mut panel = Panel {
         width: 840.0,
@@ -193,11 +193,12 @@ fn package() -> composites::Package {
             put(first + i as u64, Kind::Knob, x, y, w);
         }
     }
-    // Env Amount Cutoff mod Drive mod Detune mod, over Pitch Gate Level mod Out: the jacks a
-    // keyboard and the output patch to along the face's bottom edge, so their cables leave
-    // under the face instead of across the other jacks.
-    for (i, key) in [4, 5, 7, 8, 1, 2, 6, 3].into_iter().enumerate() {
-        let (col, row) = (i % 4, i / 4);
+    // Env Amount Cutoff mod Drive mod, over Pitch Gate Level mod Out: the jacks a keyboard and
+    // the output patch to along the face's bottom edge, so their cables leave under the face
+    // instead of across the other jacks. Detune mod is off the face with Unison and Detune: it
+    // does nothing at Unison 1, and Unison's selector does not fit.
+    for (i, key) in [4, 5, 7, 1, 2, 6, 3].into_iter().enumerate() {
+        let (col, row) = if i < 3 { (i, 0) } else { (i - 3, 1) };
         put(
             key,
             Kind::Jack,

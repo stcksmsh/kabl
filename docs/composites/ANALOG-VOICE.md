@@ -56,7 +56,7 @@ Ports (interface keys 1–8):
 | Cutoff mod | modulation in | `filter.ladder.cutoff_hz` |
 | Level mod | modulation in | `gain.gain_db` |
 | Drive mod | modulation in | `drive.drive_db` |
-| Detune mod | modulation in | oscillator 1's `detune` |
+| Detune mod | modulation in | oscillator 1's `detune` (off the face) |
 
 Controls (interface keys 9–27):
 
@@ -84,21 +84,22 @@ Every control uses its parameter's own range and curve, so no control needs a ma
 
 - **Top row**: Wave 1 over Wave 2 as waveform glyphs, then Octave 1, Octave 2, Mix 2 | Drive |
   Cutoff, Resonance | Filter Attack to Filter Release.
-- **Bottom row**: eight jacks in two rows of four at the left; Level under Cutoff; Amp Attack to
-  Amp Release right under the filter envelope, so the two envelopes read as a pair.
-- **Jacks**: Env Amount, Cutoff mod, Drive mod, Detune mod over Pitch, Gate, Level mod, Out.
+- **Bottom row**: seven jacks in two rows at the left; Level under Cutoff; Amp Attack to Amp
+  Release right under the filter envelope, so the two envelopes read as a pair.
+- **Jacks**: Env Amount, Cutoff mod, Drive mod over Pitch, Gate, Level mod, Out.
   The jacks a keyboard and the output patch to sit on the face's bottom edge, so in the rack
   capture (a `midi.in` left of the card, the output under the `midi.in`) their cables leave
   under the face and cross no control or label.
 
-Knob and jack widths fit their longest labels ("Filter Release", "IN Detune mod") at the face's
+Knob and jack widths fit their longest labels ("Filter Release", "IN Env Amount") at the face's
 12-point type, so every label prints whole. Knobs, not sliders: a face slider follows the
 player's orientation setting.
 
 Off the face, in the design page's list, More controls and Inspect internals: **Unison**, whose
-sixteen steps need a selector wider than the face has room for, and **Detune**, which only
-spreads unison voices and so does nothing at the default Unison of 1. The face's fixed height
-leaves no room for displays. No artwork.
+sixteen steps need a 288-point selector (18 points a choice) where the face has 76 points free,
+and **Detune** and **Detune mod**, which only spread unison voices and so do nothing at the
+default Unison of 1. Detune mod is still patchable: like any unplaced port, it takes cables at
+the face's footer. The face's fixed height leaves no room for displays. No artwork.
 
 ## Differences from the catalogue proposal
 
@@ -119,6 +120,8 @@ Questions for Kosta are marked **Q**.
   share a label.
 - **Ranges are the parameters' own**: Unison 1–16 (catalogue 1–8), Detune 0–100 ct (0–45),
   Drive 0–36 dB (0–30), Octave in Hz (the catalogue's −3…+2 octave view needs a mapping, G2).
+- **Octave 1 and 2 are Hz knobs** on `base_hz` that sweep continuously, not octave steps.
+  **Q:** Octave 1/2 knobs show Hz and sweep continuously; relabel or wait for a G2 octave view?
 - **Two oscillators and no vibrato LFO** (see One definition). **Q:** a Vibrato port on both
   oscillators' `fine`?
 - **No amp envelope inputs.** Cinder Block's Hold macro routes into the amp envelope's decay,
@@ -159,7 +162,8 @@ seconds of a two-bar line in eighths at 125 BPM through Cinder Block's flat voic
   file.
 - `analog_voice_has_the_catalogue_interface`: ports with their keys and every target, controls
   with their parameter, range and default, as listed above; which leaf each reaches; the
-  chain's wiring; Env Amount's cable and its 0.2; Unison and Detune alone off the face.
+  chain's wiring; Env Amount's cable and its 0.2; Unison, Detune and Detune mod alone off the
+  face.
 - `analog_voice_plays_notes_in_tune_and_is_silent_ungated`: notes through a `midi.in` sound;
   with no note the RMS is below 1e-6; note 69 on a sine with the filter open measures 440 Hz
   within 1 % (440.01 measured).

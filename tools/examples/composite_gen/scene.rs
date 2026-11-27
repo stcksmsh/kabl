@@ -12,7 +12,7 @@ pub(crate) fn factory_patch(name: &str) -> PatchEditor {
     use kabl_ui::composites;
     let mut e = PatchEditor::new();
     let voice = name == "analog-voice";
-    let clock = if voice {
+    let source = if voice {
         e.add_module("midi.in", kabl_core::Vec2 { x: 24.0, y: 20.0 })
     } else {
         let clock = e.add_module("clock", kabl_core::Vec2 { x: 24.0, y: 20.0 });
@@ -62,12 +62,12 @@ pub(crate) fn factory_patch(name: &str) -> PatchEditor {
     let mut mix = port(&e, "Out");
     if voice {
         let (pitch, gate) = (port(&e, "Pitch"), port(&e, "Gate"));
-        composites::connect(&mut e, &Default::default(), jack(clock, "pitch"), pitch);
-        composites::connect(&mut e, &Default::default(), jack(clock, "gate"), gate);
+        composites::connect(&mut e, &Default::default(), jack(source, "pitch"), pitch);
+        composites::connect(&mut e, &Default::default(), jack(source, "gate"), gate);
     } else {
         let (gate, reset) = (port(&e, "Clock"), port(&e, "Reset"));
-        e.connect(jack(clock, "gate"), gate);
-        e.connect(jack(clock, "reset"), reset);
+        e.connect(jack(source, "gate"), gate);
+        e.connect(jack(source, "reset"), reset);
     }
     if let Some(bus) = bus {
         e.connect(mix, port_of(&e, bus, "In"));
