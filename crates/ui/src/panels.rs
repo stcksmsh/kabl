@@ -91,6 +91,9 @@ pub fn check(state: &kabl_core::PatchState, c: &Composite, panel: &Panel) -> Res
         }
         if let Some(e) = c.controls.get(&id) {
             let target = param_info(state, &e.target)?;
+            if matches!(e.target, PortRef::CableParam { .. }) && p.kind != Kind::Knob {
+                return Err(format!("Binding {id}: a route's amount is drawn as a knob"));
+            }
             let stepped = target.taper == Taper::Stepped;
             let options = (target.max - target.min).round() as usize + 1;
             match p.kind {
@@ -257,13 +260,35 @@ pub fn button_name<'a>(state: &'a PatchState, mut p: &'a Placement) -> String {
     }
     String::new()
 }
-/// The module parameter a control exposure aliases.
+/// A route's signed amount as a control's parameter: the knob travel `set_route_amount` takes.
+pub(crate) static ROUTE_AMOUNT: kabl_modules::ParamInfo = kabl_modules::ParamInfo {
+    name: kabl_engine::compile::DEPTH,
+    min: -1.0,
+    max: 1.0,
+    default: kabl_engine::compile::DEFAULT_ROUTE_AMOUNT,
+    unit: "",
+    taper: Taper::Linear,
+    smoothing_ms: 0.0,
+};
+/// The parameter a control exposure aliases: a module parameter, or a route's amount
+/// (`ROUTE_AMOUNT`).
 pub(crate) fn param_info(
     state: &kabl_core::PatchState,
     target: &PortRef,
 ) -> Result<&'static kabl_modules::ParamInfo, String> {
-    let PortRef::Param { id: leaf, param } = target else {
-        return Err("Control target must be a parameter".into());
+    let (leaf, param) = match target {
+        PortRef::Param { id, param } => (id, param),
+        PortRef::CableParam { cable, param } if param == ROUTE_AMOUNT.name => {
+            return state
+                .cables
+                .contains_key(cable)
+                .then_some(&ROUTE_AMOUNT)
+                .ok_or_else(|| "Missing cable".into());
+        }
+        PortRef::CableParam { .. } => {
+            return Err("Only a route's amount can be a control on a cable".into())
+        }
+        PortRef::Module { .. } => return Err("Control target must be a parameter".into()),
     };
     let info = state
         .modules
@@ -275,6 +300,130 @@ pub(crate) fn param_info(
         .iter()
         .find(|p| p.name == param)
         .ok_or("Missing parameter")?)
+}
+/// The stored amount of route `cable`, the engine's default when unset. Not clamped: a value
+/// outside -1..1 is shown and kept as stored until the knob writes a new one.
+pub(crate) fn route_amount(state: &PatchState, cable: kabl_core::CableId) -> f32 {
+    state
+        .cables
+        .get(&cable)
+        .and_then(|c| c.params.get(ROUTE_AMOUNT.name))
+        .copied()
+        .unwrap_or(ROUTE_AMOUNT.default)
+}
+/// A route's amount as a face reads it: a signed percentage of knob travel.
+pub(crate) fn fmt_amount(v: f32) -> String {
+    format!("{:+.0} %", v * 100.0 + 0.0)
+}
+/// A composite face knob on the amount of route `cable`, of radius `r` (world units) at screen
+/// `center`: a vertical drag writes the amount through `PatchEditor::set_route_amount`, one
+/// undo step per gesture.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn face_route_knob(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    painter: &egui::Painter,
+    cable: kabl_core::CableId,
+    center: egui::Pos2,
+    r: f32,
+    look: crate::routing::Look,
+) {
+    let z = look.z;
+    let rect = egui::Rect::from_center_size(center, egui::Vec2::splat((r + 8.0) * z * 2.0));
+    ui_state.record(format!("knob:cable{cable}.{}", ROUTE_AMOUNT.name), rect);
+    let resp = ui.interact(
+        rect,
+        egui::Id::new(("kabl-route-knob", cable)),
+        egui::Sense::click_and_drag(),
+    );
+    if resp.dragged() {
+        let fine = if ui.input(|i| i.modifiers.shift) {
+            0.1
+        } else {
+            1.0
+        };
+        // 150 points of travel sweep the whole range, as on a module knob.
+        let step = -resp.drag_delta().y / 150.0 * 2.0 * fine;
+        if step != 0.0 {
+            let v = route_amount(editor.state(), cable) + step;
+            editor.set_route_amount(cable, v, first_of_gesture(ui, &resp));
+        }
+    }
+    let v = route_amount(editor.state(), cable);
+    resp.widget_info(|| egui::WidgetInfo::slider(true, f64::from(v), "Route amount"));
+    let on = resp.hovered() || resp.dragged();
+    let hover = crate::kit::smooth_to(
+        ui.ctx(),
+        egui::Id::new(("kabl-route-knob-hover", cable)),
+        if on { 1.0 } else { 0.0 },
+        ui_state.style.motion.hover,
+    );
+    crate::kit::face::knob(
+        painter,
+        &ui_state.style,
+        &crate::kit::face::Knob {
+            c: center,
+            rs: r * z,
+            z,
+            value: ROUTE_AMOUNT.to_norm(v).clamp(0.0, 1.0),
+            hover,
+            inspected: false,
+            focused: false,
+            arc: ui_state.style.roles.accent,
+        },
+    );
+    let vh = crate::kit::face::selector_font(&ui_state.style, z).map_or(0.0, |f| f.size * 1.075);
+    let at = center + egui::vec2(0.0, crate::rack::knob_text_dy(r, z, vh));
+    // Line panels read values in the dimmer text colour, as on a module knob.
+    let ink = if ui_state.style.slots.face.material == crate::style::FaceMaterial::Line {
+        look.ink2
+    } else {
+        look.ink
+    };
+    if let Some(g) = crate::kit::face::readout(
+        painter,
+        &ui_state.style,
+        &fmt_amount(v),
+        z,
+        look.slot * z - 4.0,
+        ink,
+    ) {
+        let rect = egui::Align2::CENTER_CENTER.anchor_size(at, g.size());
+        painter.add(egui::Shape::galley(rect.min, g, ink));
+    }
+}
+/// A plain editor for the amount of route `cable` (the list face and "More controls"): one
+/// undo step per drag.
+pub(crate) fn route_amount_editor(
+    editor: &mut PatchEditor,
+    ui_state: &mut UiState,
+    ui: &mut egui::Ui,
+    cable: kabl_core::CableId,
+    hit: String,
+) {
+    let mut v = route_amount(editor.state(), cable);
+    let resp = ui.add(
+        egui::Slider::new(&mut v, ROUTE_AMOUNT.min..=ROUTE_AMOUNT.max)
+            .custom_formatter(|v, _| fmt_amount(v as f32)),
+    );
+    ui_state.record(hit, resp.rect);
+    if resp.changed() {
+        editor.set_route_amount(cable, v, first_of_gesture(ui, &resp));
+    }
+}
+/// Whether an edit through `resp` this frame starts an undo step: any edit outside a drag, and
+/// a drag's first write, which need not come on the frame the drag starts.
+fn first_of_gesture(ui: &egui::Ui, resp: &egui::Response) -> bool {
+    if !resp.dragged() {
+        return true;
+    }
+    // A drag is told apart from the one before by the time its press began.
+    let id = resp.id.with("kabl-gesture");
+    let start = ui.input(|i| i.pointer.press_start_time());
+    let first = ui.data(|d| d.get_temp::<Option<f64>>(id)) != Some(start);
+    ui.data_mut(|d| d.insert_temp(id, start));
+    first
 }
 /// A composite face toggle for two-option stepped `param` in `rect` (screen): the kit pill,
 /// on at the upper option. A click anywhere in `rect` sets the other option of the base value,
@@ -564,6 +713,16 @@ pub fn editor(editor: &mut PatchEditor, view: &mut UiState, ctx: &egui::Context)
                         "All exposed controls remain available regardless of artwork or placement.",
                     );
                         for (&key, e) in &c.controls {
+                            if let PortRef::CableParam { cable, .. } = &e.target {
+                                ui.label(&e.label);
+                                route_amount_editor(
+                                    editor,
+                                    view,
+                                    ui,
+                                    *cable,
+                                    format!("fallback:{id}:{key}"),
+                                );
+                            }
                             if let PortRef::Param { id: leaf, param } = &e.target {
                                 if let Some(p) =
                                     registry::info_for(&editor.state().modules[leaf].kind)

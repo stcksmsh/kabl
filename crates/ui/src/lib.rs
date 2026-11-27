@@ -5786,6 +5786,16 @@ fn draw_default_face(
                             });
                         }
                         for (&key, e) in &c.controls {
+                            if let PortRef::CableParam { cable, .. } = &e.target {
+                                ui.label(&e.label);
+                                panels::route_amount_editor(
+                                    editor,
+                                    view,
+                                    ui,
+                                    *cable,
+                                    format!("composite:{id}:control:{key}"),
+                                );
+                            }
                             if let PortRef::Param { id: leaf, param } = &e.target {
                                 if let Some(info) = registry::info_for(&snapshot.modules[leaf].kind)
                                 {
@@ -6067,6 +6077,42 @@ fn draw_authored_face(
             let Some(e) = c.controls.get(&key) else {
                 continue;
             };
+            let look = Look {
+                z,
+                ink: th.ink,
+                ink2: th.ink2,
+                slot: 76.0,
+            };
+            if let PortRef::CableParam { cable, .. } = &e.target {
+                // `panels::check` allows a route's amount only as a knob.
+                let Geo::Knob { c: cen, r } = panel_control_geo(face, p) else {
+                    continue;
+                };
+                let value = Rect::from_min_size(
+                    screen.min + vec2(0.0, 83.0) * z,
+                    vec2(screen.width(), 24.0 * z),
+                );
+                painter.rect_filled(value, 2.0, th.panel);
+                panels::face_route_knob(
+                    editor,
+                    view,
+                    &mut local,
+                    &painter,
+                    *cable,
+                    xf.p(cen),
+                    r,
+                    look,
+                );
+                view.record(format!("composite:{id}:control:{key}"), screen);
+                face_label(
+                    &painter,
+                    Rect::from_min_size(screen.min, vec2(screen.width(), 22.0 * z)),
+                    &e.label,
+                    z,
+                    &th,
+                );
+                continue;
+            }
             let PortRef::Param { id: leaf, param } = &e.target else {
                 continue;
             };
@@ -6075,12 +6121,6 @@ fn draw_authored_face(
             };
             let Some(param) = info.params.iter().find(|p| p.name == param) else {
                 continue;
-            };
-            let look = Look {
-                z,
-                ink: th.ink,
-                ink2: th.ink2,
-                slot: 76.0,
             };
             let vertical = view.vertical_sliders;
             // Contrast plates guarantee labels and values remain usable over any supplied image.

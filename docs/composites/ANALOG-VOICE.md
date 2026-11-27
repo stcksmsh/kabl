@@ -58,7 +58,7 @@ Ports (interface keys 1–8):
 | Drive mod | modulation in | `drive.drive_db` |
 | Detune mod | modulation in | oscillator 1's `detune` (off the face) |
 
-Controls (interface keys 9–27):
+Controls (interface keys 9–28):
 
 | control | default | range | unit | inside |
 |---|---|---|---|---|
@@ -75,6 +75,7 @@ Controls (interface keys 9–27):
 | Filter Attack, Decay, Sustain, Release | 2, 300, 0.3, 100 | 0.1–10000 ms, 0–1 | ms | filter `env.adsr` |
 | Amp Attack, Decay, Sustain, Release | 2, 300, 0.6, 90 | 0.1–10000 ms, 0–1 | ms | amp `env.adsr` |
 | Level | −6 | −60–24 | dB | `gain.gain_db` |
+| Env Amt | 0.2 | −1–1 | | the Env Amount route's `amount`, the cable parameter Env Amount also exposes as a port |
 
 Every control uses its parameter's own range and curve, so no control needs a mapping (G2).
 
@@ -84,8 +85,9 @@ Every control uses its parameter's own range and curve, so no control needs a ma
 
 - **Top row**: Wave 1 over Wave 2 as waveform glyphs, then Octave 1, Octave 2, Mix 2 | Drive |
   Cutoff, Resonance | Filter Attack to Filter Release.
-- **Bottom row**: seven jacks in two rows at the left; Level under Cutoff; Amp Attack to Amp
-  Release right under the filter envelope, so the two envelopes read as a pair.
+- **Bottom row**: seven jacks in two rows at the left; Level under Cutoff; Env Amt under
+  Resonance, next to the envelope it scales; Amp Attack to Amp Release right under the filter
+  envelope, so the two envelopes read as a pair.
 - **Jacks**: Env Amount, Cutoff mod, Drive mod over Pitch, Gate, Level mod, Out.
   The jacks a keyboard and the output patch to sit on the face's bottom edge, so in the rack
   capture (a `midi.in` left of the card, the output under the `midi.in`) their cables leave
@@ -105,12 +107,11 @@ the face's footer. The face's fixed height leaves no room for displays. No artwo
 
 Questions for Kosta are marked **Q**.
 
-- **Env Amount is a port, not a knob.** G1 (CI3) lets a cable parameter be exposed as a port
-  only: a face draws knobs for module parameters, so `encapsulate` refuses a cable parameter
-  as a control. The route's stored depth is 0.2; a macro or any source patched to Env Amount
-  moves it, as the 40 G1-blocked patches do with their macros. Setting the stored depth is
-  Inspect internals' job until a face can draw a cable-parameter knob. **Q:** keep it a port
-  in v1, or wait for a face knob on cable parameters?
+- **Env Amount is a port and a knob.** The knob, Env Amt, sets the route's stored depth (0.2);
+  a macro or any source patched to the Env Amount port moves it from there, as the 40
+  G1-blocked patches do with their macros. Labels are unique across ports and controls, so the
+  knob is "Env Amt". **Q:** keep the names, or rename the port (for example "Env Amount mod",
+  as Cutoff mod) so the knob can be "Env Amount"?
 - **No Velocity port.** The subtractive core uses no velocity (the catalogue lists it for FM
   voices); a port with no target inside would be dead. **Q:** add it if a later variant
   scales the amp envelope by velocity.
@@ -152,7 +153,9 @@ seconds of a two-bar line in eighths at 125 BPM through Cinder Block's flat voic
 (`cinder-block-voice.wav`) and through the card set to its values
 (`analog-voice-cinder-block.wav`), and the card's defaults at C4 gated by a clock at 120 BPM
 (`analog-voice.wav`). The captures are the `chrome_capture` scenes `analog-voice-rack`,
-`analog-voice-face` and `analog-voice-design`, built in `tools/examples/composite_gen/scene.rs`.
+`analog-voice-face` and `analog-voice-design`, built in `tools/examples/composite_gen/scene.rs`,
+and `analog-voice-design-env`: the design page with Env Amt off the face, its palette scrolled
+to the Env Amt entry it offers.
 
 ## Tests
 
@@ -162,8 +165,8 @@ seconds of a two-bar line in eighths at 125 BPM through Cinder Block's flat voic
   file.
 - `analog_voice_has_the_catalogue_interface`: ports with their keys and every target, controls
   with their parameter, range and default, as listed above; which leaf each reaches; the
-  chain's wiring; Env Amount's cable and its 0.2; Unison, Detune and Detune mod alone off the
-  face.
+  chain's wiring; Env Amount's cable and its 0.2, which Env Amt controls; Unison, Detune and
+  Detune mod alone off the face.
 - `analog_voice_plays_notes_in_tune_and_is_silent_ungated`: notes through a `midi.in` sound;
   with no note the RMS is below 1e-6; note 69 on a sine with the filter open measures 440 Hz
   within 1 % (440.01 measured).
@@ -171,6 +174,8 @@ seconds of a two-bar line in eighths at 125 BPM through Cinder Block's flat voic
 - `env_amount_moves_the_filter_envelope_route`: setting the depth to −0.5, 0 and 0.5 changes the
   cable's `amount` and the sound darkens then brightens; −1 renders finite and audible; a macro
   patched to Env Amount brightens it.
+- `the_env_amt_knob_sets_the_route_one_step_per_drag`: on the closed face, two upward drags on
+  Env Amt each raise the route's amount as one undo step, and the voice renders brighter.
 - `analog_voice_plays_inside_a_parent_composite`: the card with its `midi.in` and output
   outside it, all in a parent composite, renders the same samples as before grouping and as
   the bare leaf graph.

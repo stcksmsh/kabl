@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 80] = [
+const SCENES: [&str; 81] = [
     "rack",
     "perform",
     "sounds",
@@ -96,6 +96,7 @@ const SCENES: [&str; 80] = [
     "analog-voice-rack",
     "analog-voice-face",
     "analog-voice-design",
+    "analog-voice-design-env",
 ];
 
 struct Job {
@@ -1482,6 +1483,20 @@ impl eframe::App for App {
             let (&id, c) = self.editor.state().composites.iter().next_back().unwrap();
             kabl_ui::panels::open(&mut self.ui, id, c);
         }
+        // Analog Voice's design page with its Env Amt knob taken off the face, so the palette
+        // offers that route amount again; the palette is scrolled to it below.
+        if self.f == 6 && scene == "analog-voice-design-env" {
+            let (&id, c) = self.editor.state().composites.iter().next_back().unwrap();
+            let key = *c
+                .controls
+                .iter()
+                .find(|(_, e)| e.label == "Env Amt")
+                .unwrap()
+                .0;
+            kabl_ui::panels::open(&mut self.ui, id, c);
+            let page = self.ui.panels.page.as_mut().unwrap();
+            page.draft.panel.placements.remove(&key);
+        }
         // The "Top" face, first in the rack, at zoom 1.
         if self.f == 6 && scene == "face-buttons" {
             self.ui.zoom = 1.0;
@@ -1625,6 +1640,16 @@ impl eframe::App for App {
         if self.f == 8 && self.jobs[self.i].scene == "design-page-buttons" {
             // The clock's Run / Stop entry, module 1 of the performance patch.
             let at = self.ui.hits["design:button:1.run"].center();
+            self.inject.push(egui::Event::PointerMoved(at));
+            self.inject.push(egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: egui::vec2(0.0, -2000.0),
+                phase: egui::TouchPhase::Move,
+                modifiers: egui::Modifiers::NONE,
+            });
+        }
+        if self.f == 8 && self.jobs[self.i].scene == "analog-voice-design-env" {
+            let at = self.ui.hits["design:palette:9"].center();
             self.inject.push(egui::Event::PointerMoved(at));
             self.inject.push(egui::Event::MouseWheel {
                 unit: egui::MouseWheelUnit::Point,
