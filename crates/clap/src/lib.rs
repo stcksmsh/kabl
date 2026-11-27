@@ -2027,4 +2027,6 @@ mod tests {
 #[cfg(test)]
 mod code_tests;
 #[cfg(test)]
+mod editor_tests;
+#[cfg(test)]
 mod host_tests;

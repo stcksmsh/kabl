@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/*", "tools"]
 # Developer tools (tools/) are built on request only: `cargo test`/`clippy` on the default set skip them.
 default-members = ["crates/*"]
-exclude = ["vendor/nice-plug", "vendor/egui-baseview"]
+exclude = ["vendor/nice-plug", "vendor/egui-baseview", "vendor/baseview"]
 
 [workspace.package]
 version = "1.0.0"
@@ -23,3 +23,6 @@ nice-plug-core = { path = "vendor/nice-plug/crates/nice-plug-core" }
 nice-plug-derive = { path = "vendor/nice-plug/crates/nice-plug-derive" }
 nice-log = { path = "vendor/nice-plug/crates/nice-log" }
 nice-plug-egui = { path = "vendor/nice-plug/crates/nice-plug-egui" }
+
+[patch."https://github.com/RustAudio/baseview.git"]
+baseview = { path = "vendor/baseview" }
