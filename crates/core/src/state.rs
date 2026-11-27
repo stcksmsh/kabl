@@ -218,33 +218,46 @@ impl PatchState {
 
     /// A composite binding of a cable parameter goes when its owner (the module the cable ends
     /// on) is no longer inside the composite: the cable was removed or now ends elsewhere. A
-    /// port that feeds several targets loses only that one and goes with its last.
+    /// port that feeds several targets loses only that one and goes with its last. A control
+    /// has one target and goes with it.
     fn prune_cable_bindings(&mut self) {
         let mut changed = Vec::new();
         for (&id, c) in &self.composites {
-            for (&key, e) in &c.ports {
-                if !e.targets().any(|t| matches!(t, PortRef::CableParam { .. })) {
+            for (&key, old) in c.ports.iter().chain(&c.controls) {
+                if !old
+                    .targets()
+                    .any(|t| matches!(t, PortRef::CableParam { .. }))
+                {
                     continue;
                 }
                 let leaves = crate::composite::leaves(self, id);
-                let mut e = e.clone();
+                let mut e = old.clone();
                 let live = e.retain_targets(|t| {
                     !matches!(t, PortRef::CableParam { .. })
                         || crate::composite::owner(self, t).is_some_and(|m| leaves.contains(&m))
                 });
-                if c.ports[&key] != e || !live {
+                if *old != e || !live {
                     changed.push((id, key, live.then_some(e)));
                 }
             }
         }
         for (id, key, e) in changed {
             let c = self.composites.get_mut(&id).unwrap();
-            if let Some(e) = e {
-                c.ports.insert(key, e);
+            let side = if c.ports.contains_key(&key) {
+                &mut c.ports
             } else {
-                c.ports.remove(&key);
+                &mut c.controls
+            };
+            if let Some(e) = e {
+                side.insert(key, e);
+            } else {
+                side.remove(&key);
                 if let Some(panel) = &mut c.panel {
                     panel.placements.remove(&key);
+                }
+                // A snapshot may hold only controls.
+                for s in &mut c.snapshots {
+                    s.values.remove(&key);
                 }
             }
         }

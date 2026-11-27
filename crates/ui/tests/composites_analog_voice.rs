@@ -1,7 +1,8 @@
 //! The factory composite `kabl.analog-voice` v1 (docs/composites/ANALOG-VOICE.md): it is what
 //! its generator writes, has the catalogue's interface, plays notes in tune and keeps silence
 //! silent, renders Cinder Block's voice when set to its values, moves its filter with Env
-//! Amount (a cable parameter, G1), and plays the same inside a parent composite.
+//! Amount (a cable parameter, G1) as a port and as the face's Env Amt knob, and plays the same
+//! inside a parent composite.
 use kabl_core::{CableId, CompositeId, ModuleId, PatchState, PortRef, Vec2};
 use kabl_ui::{composites, PatchEditor};
 use std::collections::{BTreeMap, BTreeSet};
@@ -229,10 +230,22 @@ fn analog_voice_has_the_catalogue_interface() {
         .controls
         .values()
         .map(|e| {
-            let PortRef::Param { id, param } = &e.target else {
-                panic!("{} is not a parameter", e.label);
-            };
             assert!(e.also.is_empty(), "{}: one target", e.label);
+            let (id, param) = match &e.target {
+                PortRef::Param { id, param } => (id, param),
+                // A route's amount: -1..1, stored on the cable.
+                PortRef::CableParam { cable, param } => {
+                    return (
+                        e.label.clone(),
+                        "cable".to_string(),
+                        format!("{cable}.{param}"),
+                        -1.0,
+                        1.0,
+                        p.cables[cable].params[param],
+                    );
+                }
+                PortRef::Module { .. } => panic!("{} is not a parameter", e.label),
+            };
             let m = &p.modules[id];
             let info = kabl_modules::registry::info_for(&m.kind).unwrap();
             let q = info.params.iter().find(|q| q.name == param).unwrap();
@@ -284,6 +297,14 @@ fn analog_voice_has_the_catalogue_interface() {
     ]
     .into_iter()
     .map(|(l, k, n, lo, hi, d)| (l.to_string(), k.to_string(), n.to_string(), lo, hi, d))
+    .chain([(
+        "Env Amt".to_string(),
+        "cable".to_string(),
+        format!("{route}.amount"),
+        -1.0,
+        1.0,
+        generator::ENV_AMOUNT,
+    )])
     .collect();
     assert_eq!(controls, expected);
 
@@ -513,6 +534,121 @@ fn env_amount_moves_the_filter_envelope_route() {
         driven > none,
         "a macro on Env Amount brightens: {driven} over {none}"
     );
+}
+
+/// One frame of the whole UI at 1440x900, at time `t`, with `events`.
+fn frame(
+    e: &mut PatchEditor,
+    ui: &mut kabl_ui::UiState,
+    ctx: &egui::Context,
+    t: f64,
+    events: Vec<egui::Event>,
+) {
+    let size = egui::vec2(1440.0, 900.0);
+    let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, size);
+    ctx.begin_pass(egui::RawInput {
+        screen_rect: Some(screen),
+        time: Some(t),
+        events,
+        ..Default::default()
+    });
+    let mut root = egui::Ui::new(
+        ctx.clone(),
+        egui::Id::new("root"),
+        egui::UiBuilder::new().max_rect(screen),
+    );
+    kabl_ui::show(e, ui, &mut root);
+    let _ = ctx.end_pass();
+}
+
+/// The Env Amt knob on the closed face sets the Env Amount route: an upward drag raises the
+/// amount as one undo step, a second drag is a second step, and the voice is brighter for it.
+#[test]
+fn the_env_amt_knob_sets_the_route_one_step_per_drag() {
+    let mut e = PatchEditor::seed_from(&PatchState::default());
+    let id = voice(&mut e);
+    let route = env_route(&e, id);
+    let c = &e.state().composites[&id];
+    let key = *c
+        .controls
+        .iter()
+        .find(|(_, x)| x.label == "Env Amt")
+        .unwrap()
+        .0;
+    assert_eq!(
+        c.controls[&key].target,
+        PortRef::CableParam {
+            cable: route,
+            param: "amount".into()
+        },
+        "the knob and the port share the route"
+    );
+    let (ctx, mut ui, mut t) = (egui::Context::default(), kabl_ui::UiState::default(), 0.0);
+    let mut run = |e: &mut PatchEditor, ui: &mut kabl_ui::UiState, ev: Vec<egui::Event>| {
+        frame(e, ui, &ctx, t, ev);
+        t += 1.0 / 60.0;
+    };
+    for _ in 0..3 {
+        run(&mut e, &mut ui, vec![]);
+    }
+    let hit = format!("knob:cable{route}.amount");
+    let at = ui
+        .hits
+        .get(&hit)
+        .unwrap_or_else(|| panic!("{hit} on the face"))
+        .center();
+    assert!(
+        ui.hits
+            .contains_key(&format!("composite:{id}:control:{key}")),
+        "the face records the control"
+    );
+    let amount = |e: &PatchEditor| e.state().cables[&route].params["amount"];
+    let before = amount(&e);
+    let dim = brightness(&play(e.state(), &LINE));
+    let button = |pos, pressed| egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Default::default(),
+    };
+    let mut drag = |e: &mut PatchEditor, ui: &mut kabl_ui::UiState| {
+        run(e, ui, vec![egui::Event::PointerMoved(at)]);
+        run(e, ui, vec![button(at, true)]);
+        for i in 1..=8 {
+            run(
+                e,
+                ui,
+                vec![egui::Event::PointerMoved(
+                    at - egui::vec2(0.0, 5.0 * i as f32),
+                )],
+            );
+        }
+        let end = at - egui::vec2(0.0, 40.0);
+        run(e, ui, vec![button(end, false)]);
+        run(
+            e,
+            ui,
+            vec![egui::Event::PointerMoved(egui::pos2(1430.0, 890.0))],
+        );
+    };
+    drag(&mut e, &mut ui);
+    let once = amount(&e);
+    assert!(
+        once > before + 0.2,
+        "an upward drag raises the amount: {before} to {once}"
+    );
+    drag(&mut e, &mut ui);
+    let twice = amount(&e);
+    assert!(twice > once + 0.2, "{once} to {twice}");
+    let bright = brightness(&play(e.state(), &LINE));
+    assert!(
+        bright > dim,
+        "a higher Env Amount is brighter: {bright} over {dim}"
+    );
+    assert!(e.undo());
+    assert_eq!(amount(&e), once, "the second drag is one step");
+    assert!(e.undo());
+    assert_eq!(amount(&e), before, "the first drag is one step");
 }
 
 /// The card with its midi.in and output outside it, all in a parent composite, renders the

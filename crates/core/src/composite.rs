@@ -137,7 +137,7 @@ pub fn leaves(p: &PatchState, root: CompositeId) -> BTreeSet<ModuleId> {
 
 /// The module an interface binding belongs to: its own module, or, for a cable parameter, the
 /// module that cable ends on (where its route takes effect). Schema v9 allows a cable parameter
-/// as a port; a control must still be a module parameter, the only kind a face can draw.
+/// as a port, schema v10 as a control as well.
 pub fn owner(p: &PatchState, target: &PortRef) -> Option<ModuleId> {
     match target {
         PortRef::CableParam { cable, .. } => p.end_module(*cable),
@@ -226,9 +226,13 @@ pub fn prune(p: &PatchState) -> Vec<crate::Op> {
     ops
 }
 
-/// Whether the composite uses a face element or field that only schema v10 readers accept.
+/// Whether the composite uses a face element or field that only schema v10 readers accept,
+/// a control on a cable parameter included.
 pub fn needs_faces(c: &Composite) -> bool {
     !c.snapshots.is_empty()
+        || c.controls
+            .values()
+            .any(|e| matches!(e.target, PortRef::CableParam { .. }))
         || c.panel.as_ref().is_some_and(|panel| {
             panel.compact_width.is_some()
                 || panel.placements.values().any(|pl| {
@@ -397,7 +401,7 @@ pub fn validate(p: &PatchState) -> Result<(), String> {
         }
         if c.controls
             .values()
-            .any(|e| !matches!(e.target, PortRef::Param { .. }) || !e.also.is_empty())
+            .any(|e| !e.target.is_route() || !e.also.is_empty())
         {
             return Err(format!("Composite {id}: control must bind a parameter"));
         }

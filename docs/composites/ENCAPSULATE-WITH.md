@@ -42,7 +42,7 @@ Each returns an error and leaves the log untouched:
 | Case | Error names |
 |---|---|
 | An exposure target outside `members` (a cable parameter's owner is outside) | the exposure's label and target |
-| A control whose target is not a module parameter (cable parameters are ports only) | the label and target |
+| A control whose target is neither a module parameter nor a cable parameter inside `members` | the label and target |
 | Two exposures with the same label | the label |
 | The same target listed twice as a port, or twice as a control (across `target` and `also`) | the label and target |
 | A boundary crossing no port covers | every such cable, with its inside and outside ends (`#<module>.<port>`) |
@@ -104,13 +104,19 @@ CC maps on the macro and runtime writes to the route (`RuntimeTarget::Route`) re
 before and the render is bit-identical. Opening the composite shows the inner route and its
 amount, editable as usual.
 
-A cable parameter can be a port, not a control: composite faces and panels only draw knobs
-for module parameters, so the core format refuses a cable-parameter control too
-(`Composite <id>: control must bind a parameter`).
+A cable parameter can be a port, a control, or both. A control on a route's `amount` is
+drawn as a knob on the face (the design page offers no other kind), with the amount's own
+range of −1 to 1. Turning it writes the route's amount through the same path as the routing
+drawer, one undo step per drag. A stored amount outside −1 to 1 is shown as stored and kept
+until the knob is turned (G2). Only a route's `amount` can be a control: a control on any other
+cable parameter is refused when the composite is set. Two controls on one cable parameter are
+refused as two on one module parameter are (`... is exposed twice`). The same cable parameter
+may be both a port and a control.
 
 The binding follows its cable. Removing the owner or the cable's source module, disconnecting
-the cable, or reconnecting the cable's id so it ends outside the composite drops the port in
-the same entry, and undoing that entry puts the port back.
+the cable, or reconnecting the cable's id so it ends outside the composite drops the port or
+control in the same entry, together with the control's face element. Undoing that entry puts
+both back.
 
 Duplicating or publishing a composite copies the inner cables with new ids and rebinds the
 ports to them. A port on the parameter of a cable that crosses the boundary is dropped from
@@ -125,7 +131,9 @@ cannot parse the unknown `also` field of a fan-in port, so the writer chooses th
 per file: v9 only when a saved log entry binds a cable parameter or fans in, v8 otherwise.
 `also` is written only when it is non-empty, so a v9 file from before fan-in has the same
 bytes it had, and it loads with every port holding one target. Patches without either, every
-factory patch included, keep their bytes. Both versions load.
+factory patch included, keep their bytes. Both versions load. A control on a cable
+parameter makes the file v10, the face schema, because a v9 build refuses such a control
+(`Composite <id>: control must bind a parameter`).
 
 ## Stability guarantees
 
