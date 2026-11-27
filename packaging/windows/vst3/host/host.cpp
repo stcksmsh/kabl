@@ -95,6 +95,7 @@ struct Host
     ParameterChanges changes {8};
     ProcessContext context {};
     std::vector<float> left;
+    long broken = 0; // non-finite samples on any output bus and channel
 
     void note(bool on)
     {
@@ -141,6 +142,10 @@ struct Host
             require(processor->process(data) == kResultOk, "IAudioProcessor::process");
             const float* out = data.outputs[0].channelBuffers32[0];
             left.insert(left.end(), out, out + kBlock);
+            for (int32 bus = 0; bus < data.numOutputs; ++bus)
+                for (int32 channel = 0; channel < data.outputs[bus].numChannels; ++channel)
+                    if (const float* samples = data.outputs[bus].channelBuffers32[channel])
+                        broken += std::count_if(samples, samples + kBlock, [](float v) { return !std::isfinite(v); });
             context.projectTimeSamples += kBlock;
             events.clear();
             changes.clearQueue();
@@ -393,8 +398,7 @@ int main(int argc, char* argv[])
     host.render(200);
     const double released = rms(host.last(20));
     check(released < 0.01 * level, fmt("pedal up releases it: rms %.6f", released));
-    const auto broken = std::count_if(host.left.begin(), host.left.end(), [](float v) { return !std::isfinite(v); });
-    check(broken == 0, fmt("every output sample is finite: %.0f are not", static_cast<double>(broken)));
+    check(host.broken == 0, fmt("every output sample is finite: %.0f are not", static_cast<double>(host.broken)));
 
     host.processor->setProcessing(false);
     component->setActive(false);
