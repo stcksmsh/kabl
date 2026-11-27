@@ -215,7 +215,15 @@ impl App {
             }
         }
         if let Some(rx) = self.audio.morphs_rx.as_mut() {
-            while let Ok((id, k, value, to, progress)) = rx.pop() {
+            while let Ok((t, value, to, progress)) = rx.pop() {
+                let kabl_engine::runtime::RuntimeTarget::Param {
+                    id,
+                    kind: "macro",
+                    index,
+                } = t
+                else {
+                    continue;
+                };
                 let live = kabl_ui::MacroLive {
                     value,
                     to,
@@ -223,7 +231,7 @@ impl App {
                 };
                 ui_state
                     .macro_live
-                    .insert((id, k), (live, std::time::Instant::now()));
+                    .insert((id, index as u8), (live, std::time::Instant::now()));
             }
         }
         if let Some(rx) = self.audio.lfos_rx.as_mut() {

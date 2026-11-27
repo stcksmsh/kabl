@@ -2163,6 +2163,25 @@ impl CompiledPatch {
         }
     }
 
+    /// The info of a param target, when it resolves in this graph.
+    pub fn runtime_info(&self, target: RuntimeTarget) -> Option<&'static kabl_modules::ParamInfo> {
+        let RuntimeTarget::Param { id, kind, index } = target else {
+            return None;
+        };
+        let lo = self
+            .param_slots
+            .partition_point(|s| (s.id, s.index) < (id, index));
+        let slot = self
+            .param_slots
+            .get(lo)
+            .filter(|s| (s.id, s.index) == (id, index))?;
+        let Step::Process { module_index, .. } = &self.steps[slot.step as usize] else {
+            return None;
+        };
+        let info = self.modules[*module_index].info();
+        (info.kind == kind).then(|| info.params.get(index as usize))?
+    }
+
     /// The stored base value of a param target, as the module reads it now.
     pub fn runtime_value(&self, target: RuntimeTarget) -> Option<f32> {
         let RuntimeTarget::Param { id, kind, index } = target else {
@@ -2938,10 +2957,11 @@ impl CompiledPatch {
         self.set_runtime_with(target, value, ramp, true)
     }
 
-    /// A value the engine itself drives (a cue's macro morph): set now, and the host-automation
-    /// overlay of the target stays as it is, so a steady host value does not take it back.
-    pub fn drive_runtime(&mut self, target: RuntimeTarget, value: f32) -> bool {
-        self.set_runtime_with(target, value, false, false)
+    /// A value the engine itself drives (a morph): the host-automation overlay of the target
+    /// stays as it is, so a steady host value does not take it back. `ramp` as in
+    /// `set_runtime`.
+    pub fn drive_runtime(&mut self, target: RuntimeTarget, value: f32, ramp: bool) -> bool {
+        self.set_runtime_with(target, value, ramp, false)
     }
 
     fn set_runtime_with(

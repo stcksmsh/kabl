@@ -187,8 +187,8 @@ impl OutputCallback {
         engine.lfos(|id, sync| {
             let _ = self.lfos_tx.push((id, sync));
         });
-        engine.morphs(|id, k, v, to, p| {
-            let _ = self.morphs_tx.push((id, k, v, to, p));
+        engine.param_morphs(|t, v, to, p| {
+            let _ = self.morphs_tx.push((t, v, to, p));
         });
         let (held, sounding) = engine.keys();
         // Voices sounding: the keyboards' own, or the envelopes not idle when a
