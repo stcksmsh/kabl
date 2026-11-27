@@ -1,28 +1,27 @@
-# State 2026-11-27 (4)
+# State 2026-11-27 (5)
 
 ## Goal
 Make kabl easy to start, learn, understand and reuse, and bring it to Windows through VST3, without losing musical depth. Plan: `docs/ROADMAP.md` (canonical). 1.0 = Linux + Windows, CLAP + VST3 + standalone, with faces (FACES.md slices 5-11), composites CB2-CB5 and lessons L5-L8; macOS 1.1. Composite faces plan: `docs/composites/FACES.md` (§9 = slice plan).
 
 ## Done
 - Up to 11-27 morning: see git history (state #272, #278). Highlights: W6 VST3 #264, W7 #267, W8 editor #274, CB2-CB5 #268 #271 #273 #275, L5 #269, faces slices 1-7.
-- 11-27 day: state #278, cable-param controls #277 (Env Amt knob on Analog Voice), W9 Windows installer #276 (Inno Setup + zip; CI install/launch/upgrade/uninstall; kabl.exe not shipped), faces slice 8 engine morph #279 (ca337fe5), W9b #280 (4dba6cba: windows_subsystem; notices union linux+windows-msvc), state #281, W9c icon #282 (c5b18da0: embed-resource, kabl.ico in exe + installer), faces slice 9 snapshots #283 (2d87517b; captures + recall WAV sent to Kosta, copies in .claude/tmp/cap283/).
+- 11-27 day: state #278, cable-param controls #277 (Env Amt knob on Analog Voice), W9 Windows installer #276 (Inno Setup + zip; CI install/launch/upgrade/uninstall; kabl.exe not shipped), faces slice 8 engine morph #279 (ca337fe5), W9b #280 (4dba6cba: windows_subsystem; notices union linux+windows-msvc), state #281, W9c icon #282 (c5b18da0: embed-resource, kabl.ico in exe + installer), faces slice 9 snapshots #283 (2d87517b; captures + recall WAV sent to Kosta, copies in .claude/tmp/cap283/), faces slice 10 whole blocks + Pin to Perform #284 (57ca23fe; review minor: new too_many_arguments allows on draw_transport, face_menu; captures sent).
 
 ## In flight (builders die on restart: resume from the pushed branch, never redispatch from scratch)
-- #284 faces slice 10 whole blocks + Pin to Perform (`claude/faces-blocks`, pushed 3d6b8cbc; worktree .claude/worktrees/agent-a64ed450749f6ae38). Builder was killed by the restart before reporting: check the worktree (`git status`, unpushed), then send a builder with brief .claude/tmp/coord1126/brief-faces-blocks.md + "continue from the pushed branch claude/faces-blocks" to finish Done means (captures, PR body), then verify, review, CI, merge.
 - #203 promo v2: parked.
 - Every merge moves master: update-branch the other open PRs, re-verify, delta re-review (patch-id check), CI.
 
 ## Next
-1. Finish #284 (above).
-2. Faces slice 11 (compact face): brief to write from FACES §9 item 11 (scope includes crates/core panel.rs/format.rs; add design_page.rs, snapshots.rs: slice 9 needed them).
-3. Windows: W8b (host resize on DPI change + Live keyboard passthrough: public baseview method + vendor/nice-plug egui change), W10 release job (+ VST logo guidelines check), W11a standalone ASIO (required for 1.0), WA Kosta VM pass (list in PR #276 body / packaging/windows/README.md).
-4. L6 (lessons 6, 8; clap automation hook), then L7+L8 as one slice.
-5. Before v1.0.0: rc.3 from master + short re-check (proposed, Kosta to confirm).
-6. Follow-ups (minors): #277 route knob: own drag code (panels.rs:322) without Escape cancel and losing pre-threshold pixels, no macro pulse ring / double-click reset on authored face (lib.rs:6086); core format does not refuse two exposures on one target (only encapsulate_with/add_exposure do). #276: launch check stops kabl-ui before the window is up (test-install.ps1:221); Inno fallback pins 6.4.3 vs runner 6.7.1. #283: macro held-cue test checks `morph_from` directly, not through `recall`. Older minors: git show c224539d:docs/STATE.md (Next 6).
+1. Faces slice 11 (compact face): brief to write from FACES §9 item 11 (scope includes crates/core panel.rs/format.rs; add design_page.rs, snapshots.rs: slice 9 needed them).
+2. Windows: W8b (host resize on DPI change + Live keyboard passthrough: public baseview method + vendor/nice-plug egui change), W10 release job (+ VST logo guidelines check), W11a standalone ASIO (required for 1.0), WA Kosta VM pass (list in PR #276 body / packaging/windows/README.md).
+3. L6 (lessons 6, 8; clap automation hook), then L7+L8 as one slice.
+4. Before v1.0.0: rc.3 from master + short re-check (proposed, Kosta to confirm).
+5. Follow-ups (minors): #277 route knob: own drag code (panels.rs:322) without Escape cancel and losing pre-threshold pixels, no macro pulse ring / double-click reset on authored face (lib.rs:6086); core format does not refuse two exposures on one target (only encapsulate_with/add_exposure do). #276: launch check stops kabl-ui before the window is up (test-install.ps1:221); Inno fallback pins 6.4.3 vs runner 6.7.1. #283: macro held-cue test checks `morph_from` directly, not through `recall`. Older minors: git show c224539d:docs/STATE.md (Next 6).
 
 ## Waiting on owner
 - Morning review list: .claude/tmp/coord1126/kosta-review.md (captures, composite interface questions, VST3 id notation, validator allowlist, legacy input passthrough, lesson deviations).
 - #277 knob label "Env Amt" (labels must be unique vs port "Env Amount"): question in ANALOG-VOICE.md. Captures: .claude/tmp/coord1126/cap277/.
+- MIDI auto-mapping (asked 11-27): not on roadmap. Proposed 2 slices: macros follow a default CC profile from prefs unless the patch has learned maps; per-device profiles keyed by port name. New prefs format: needs Kosta's yes + order vs faces.
 - R4 acceptance pass on rc.2; rc.3 re-check before v1.0.0 (proposed).
 
 ## Decisions (Kosta)
