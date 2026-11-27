@@ -473,8 +473,9 @@ impl<A: App> EguiWindow<A> {
 
     /// Rescales the window when its DPI changed without baseview telling us, which is what
     /// happens to a child window when the host's window moves to another monitor: the logical
-    /// size stays, the physical size follows the DPI, and baseview passes the new size to the
-    /// host as a resize request.
+    /// size stays and the physical size follows the DPI. The host is not asked to resize its
+    /// frame (`WindowContext::resize` never calls `HostCallbacks::request_resize`), so the
+    /// frame keeps its old size until the host calls `getSize` again.
     #[cfg(windows)]
     fn follow_window_dpi(&self) {
         let size = self.window.size();
