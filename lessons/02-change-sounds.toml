@@ -1,0 +1,36 @@
+# Lesson 2 (docs/pivot/firstrun-learning-design.md §4 row 2) on the Pluck to pad recipe; its
+# envelope steps are included from lessons/r1-pluck-to-pad.toml. Format:
+# docs/learning/LESSON-FORMAT.md
+id = "change-sounds"
+title = "Change sounds"
+summary = "Read what a control does, turn a pluck into a pad, pin a control, save your pad."
+start = { sound = "factory:recipes/pluck-to-pad" }
+
+[[step]]
+title = "Ask what it does"
+text = """
+Open Perform and press ? on the Sustain card. Explain shows what Sustain \
+really changes: ADSR #6, which shapes the volume of every note."""
+done = [{ explain_open = { id = 6, key = "sustain" } }]
+
+[[step]]
+include = { lesson = "pluck-to-pad", step = 2 }
+
+[[step]]
+include = { lesson = "pluck-to-pad", step = 3 }
+
+[[step]]
+include = { lesson = "pluck-to-pad", step = 4 }
+
+[[step]]
+title = "Pin it and save"
+text = """
+Right-click Filter #3, choose Pin to Perform, then Cutoff: it now has a \
+card on Perform. Save As in the sound menu keeps your pad in Your Sounds."""
+show = { module = { id = 3, kind = "filter.svf" } }
+done = [{ pinned = { id = 3, param = "cutoff_hz" } }, "saved_as_user"]
+
+[end]
+unguided = """
+On your own: open a sound with macros, such as Sock Puppet, turn a macro, \
+and press its ? to see every control it moves."""
