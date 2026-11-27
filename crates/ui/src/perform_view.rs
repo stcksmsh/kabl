@@ -1472,6 +1472,9 @@ fn cc_chip(
     ui_state.record(format!("plearn:{key}"), r.rect);
     if r.clicked() {
         ui_state.learn = (!learning).then(|| (id, p.name.to_string()));
+        if !learning {
+            ui_state.knob_setup = None;
+        }
     }
     if map.is_some() {
         egui::Popup::context_menu(&r)
@@ -1687,6 +1690,9 @@ fn midi_row(
         ui_state.record(format!("plearn:{key}"), r.rect);
         if r.clicked() {
             ui_state.learn = (!learning).then(|| (id, p.name.to_string()));
+            if !learning {
+                ui_state.knob_setup = None;
+            }
         }
         if map.is_some() {
             let r = ui
@@ -2083,6 +2089,85 @@ fn bank_chip(ui: &mut egui::Ui, st: &Style, text: &str, state: PadState) -> egui
         ink,
     );
     resp
+}
+
+/// Settings "Macro knobs": the profile the connected input uses, with Forget, and "Set up
+/// macro knobs", which asks for knob 1..8 in turn.
+pub(crate) fn macro_knobs(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style) {
+    ui_state.finish_knob_setup();
+    kit::paragraph(ui, st, Role::Caption, Tone::Text2, "Macro knobs");
+    if let Some(setup) = &ui_state.knob_setup {
+        let text = format!("Turn knob {} on {}", setup.slot + 1, setup.key);
+        kit::paragraph(ui, st, Role::Label, Tone::Text, &text);
+        let mut skip = false;
+        let mut cancel = false;
+        ui.horizontal(|ui| {
+            let r = ui.add(kit::Button::new(st, "Skip").small());
+            ui_state.record("knobs:skip".into(), r.rect);
+            skip = r.clicked();
+            let r = ui.add(kit::Button::new(st, "Cancel").ghost().small());
+            ui_state.record("knobs:cancel".into(), r.rect);
+            cancel = r.clicked();
+        });
+        if cancel {
+            ui_state.knob_setup = None;
+        } else if skip {
+            if let Some(s) = &mut ui_state.knob_setup {
+                s.skip();
+            }
+            ui_state.finish_knob_setup();
+        }
+        return;
+    }
+    // The port's own profile, else the "any controller" one (`perform::knob_profile`).
+    let key = ui_state
+        .midi_input
+        .clone()
+        .filter(|m| ui_state.knob_profiles.contains_key(m))
+        .unwrap_or_else(|| perform::ANY_CONTROLLER.into());
+    let saved = ui_state
+        .knob_profiles
+        .get(&key)
+        .map(|p| (key, perform::profile_knobs(p)));
+    match &saved {
+        Some((key, knobs)) => {
+            kit::paragraph(ui, st, Role::Label, Tone::Text, key);
+            // One wrapped line: the menu has no room for a row per macro.
+            let line = if knobs.is_empty() {
+                "No knobs".to_string()
+            } else {
+                knobs
+                    .iter()
+                    .map(|(n, map)| format!("M{n} {}", perform::cc_text(*map)))
+                    .collect::<Vec<_>>()
+                    .join("   ")
+            };
+            kit::paragraph(ui, st, Role::Caption, Tone::Text2, &line);
+        }
+        None => {
+            kit::paragraph(
+                ui,
+                st,
+                Role::Caption,
+                Tone::Text2,
+                "No profile: macros follow only the patch's own MIDI mappings.",
+            );
+        }
+    }
+    ui.horizontal(|ui| {
+        let r = ui.add(kit::Button::new(st, "Set up macro knobs").small());
+        ui_state.record("knobs:setup".into(), r.rect);
+        if r.clicked() {
+            ui_state.start_knob_setup();
+        }
+        if let Some((key, _)) = saved {
+            let r = ui.add(kit::Button::new(st, "Forget").ghost().small());
+            ui_state.record("knobs:forget".into(), r.rect);
+            if r.clicked() {
+                ui_state.set_knob_profile(&key, None);
+            }
+        }
+    });
 }
 
 #[cfg(test)]
