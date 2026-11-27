@@ -220,8 +220,9 @@ pub const CONTROLLERS: &[Controller] = &[
         source: omni!("impact-lx49-mk3"),
     },
     Controller {
-        name: "Alesis V mkII",
-        ports: &[&["v25", "mkii"], &["v49", "mkii"], &["v61", "mkii"]],
+        // Only the V49's knobs are sourced.
+        name: "Alesis V49 mkII",
+        ports: &[&["v49", "mkii"]],
         ccs: &[74, 75, 76, 77],
         mode: "factory preset",
         source: omni!("v49-mk2"),
@@ -390,5 +391,12 @@ mod tests {
             Some("Arturia MiniLab mkII")
         );
         assert_eq!(name("Arturia MiniLab 20:3"), None);
+    }
+
+    #[test]
+    fn only_the_v49_of_the_alesis_v_mkii_has_a_map() {
+        assert_eq!(name("V49 MKII MIDI 1"), Some("Alesis V49 mkII"));
+        assert_eq!(name("V25 MKII MIDI 1"), None);
+        assert_eq!(name("V61 MKII MIDI 1"), None);
     }
 }
