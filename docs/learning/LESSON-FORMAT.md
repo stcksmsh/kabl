@@ -54,7 +54,8 @@ Only `text` is required. Each optional field changes what the step shows (a butt
 | field | button / effect |
 |---|---|
 | `title` | A short heading above the text (the Start card shows it). |
-| `plugin_text` | Optional string. In a plugin the Start card shows it instead of `text` (the host's transport decides whether the sound plays, and the host owns the devices). Absent: `text` is shown. Must not be empty or blank when present. |
+| `plugin_text` | Optional string. In a plugin the Start card and the Learn panel show it instead of `text` (the host's transport decides whether the sound plays, and the host owns the devices); both read it through `Step::text_for`. Absent: `text` is shown. Must not be empty or blank when present. |
+| `include` | `{ lesson, step }`: this step is step `step` (counted from 1) of the lesson with that `id`, as it is there. See "Reusing a step". The step has no other field. |
 | `show` | **Show** brings the target into view (and **Back** returns). Target is one of `{ control = { id, kind, param } }`, `{ route = { from, port, to, kind, param } }`, `{ module = { id, kind } }`. |
 | `inspect` | **Inspect #id port** selects that output in the signal inspector. |
 | `play_note` | **Play test note** plays middle C for this many seconds at a fixed velocity. |
@@ -81,13 +82,58 @@ undo position saved when the step was entered.
 | `{ any_param_moved = { id, kind, params, by } }` | any one of `params` moved by at least `by` since the step started |
 | `"sounds_open"` | the Sounds browser is open |
 | `"compare_restored"` | the Compare reference was restored during this step and not undone |
+| `"preview_played"` | a sound preview in Sounds is playing |
+| `"notes_played"` | a note sounds: computer keys, the key strip or MIDI |
+| `"favorited"` | the open document is a library sound that is in the favorites |
+| `"saved_as_user"` | the open document is a user sound with nothing unsaved |
+| `{ explain_open = { id, key } }` | Explain is open on control `key` of module `id` (from its Perform card's "?") |
+| `{ pinned = { id, param } }` | control `param` of module `id` is pinned to Perform |
+| `{ reaches_output = { id, kind } }` | module `id` (of `kind`) has a signal cable path to an output |
+| `{ cable_removed = { from, port, to, input } }` | both modules are in the patch and no cable runs from `from`'s `port` to `to`'s `input` |
 
 New conditions are new variants of `lessons::Cond`. They are not an expression language.
+
+## Reusing a step
+
+A step can point at a step of another lesson instead of repeating it. This is lesson 02
+(`lessons/02-change-sounds.toml`), which takes steps 2 to 4 of the lesson with id `pluck-to-pad`
+(`lessons/r1-pluck-to-pad.toml`):
+
+```toml
+[[step]]
+include = { lesson = "pluck-to-pad", step = 2 }
+```
+
+`lessons::all()` replaces each `include` with a copy of the named step before anything else sees
+the lesson, so the panel, the card and the runner never meet one. A lesson is rejected, left out of
+the list, with an error in the log, when:
+
+- `step` is 0 or past the last step of the named lesson;
+- `lesson` is not the `id` of a lesson that loaded;
+- the named step is itself an `include` (includes do not chain);
+- the `include` step has any other field (the parser rejects it with "a step with `include` has
+  no other field").
+
+A lesson is 3 to 5 steps. `crates/ui/tests/signal_inspection.rs` checks that range on every
+lesson, counting included steps; the parser does not.
+
+## Following the lesson's own sound
+
+Opening a different sound detaches an active lesson: its steps no longer apply. The exception is
+a sound that one of the lesson's own `opened` conditions names. Opening that sound follows it: the
+lesson stays attached and takes a fresh baseline from the new document.
+
+## Steps already met
+
+When a lesson starts, or follows into a sound, the runner records which steps' conditions already
+hold (`Active::met_at_start`). Those steps are not marked done early: only conditions that come to
+hold during the lesson count before the step is reached. So "plug the cable back" is not done by a
+cable that was never unplugged.
 
 ## Validation
 
 Unknown fields, unknown conditions, a missing `id`/`title`/`start`/`end`, no steps, empty `text`, an empty (or blank) `plugin_text`,
-an empty `anchor`, a `play_note` out of range, a `param_moved.by` or `any_param_moved.by` that is not above 0, an empty `any_param_moved.params`, and a
+an empty `anchor`, an `include` step with any other field, a `play_note` out of range, a `param_moved.by` or `any_param_moved.by` that is not above 0, an empty `any_param_moved.params`, and a
 `route.amount_below` that is not a number are all
 rejected. The error names the file and the reason. The unit tests parse every embedded file, so
 a bad file fails CI. `crates/ui/tests/signal_inspection.rs` also opens each lesson and checks
