@@ -20,8 +20,8 @@ use std::sync::Arc;
 
 /// (sequencer, step, playing bank, queued bank).
 pub(crate) type SeqReport = (ModuleId, usize, usize, Option<usize>);
-/// Macro module, output, value, target, progress of a macro a cue drives.
-pub(crate) type MorphReport = (ModuleId, u8, f32, f32, f32);
+/// Param, value, target, progress of a param a morph drives.
+pub(crate) type MorphReport = (kabl_engine::runtime::RuntimeTarget, f32, f32, f32);
 
 /// Owns everything audio-related: the swap queue's producer, the stream, the MIDI connection,
 /// and the `basedrop` collector that frees retired graphs. Lives inside `App`.
@@ -273,7 +273,7 @@ impl AudioHost {
         let (clocks_tx, clocks_rx) = rtrb::RingBuffer::<(ModuleId, bool, f64)>::new(64);
         let (delays_tx, delays_rx) = rtrb::RingBuffer::<(ModuleId, DelayLock, f32)>::new(64);
         let (lfos_tx, lfos_rx) = rtrb::RingBuffer::<(ModuleId, LfoSync)>::new(128);
-        let (morphs_tx, morphs_rx) = rtrb::RingBuffer::<MorphReport>::new(64);
+        let (morphs_tx, morphs_rx) = rtrb::RingBuffer::<MorphReport>::new(128);
 
         let mut input = if request.input {
             kabl_standalone::input::AudioInput::open(sample_rate as u32)
