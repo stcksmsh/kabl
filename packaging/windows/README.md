@@ -7,9 +7,9 @@
 
 ## Installer and zip
 
-CI builds both on `windows-latest` from the outputs of the `windows` job (`kabl-windows-bin`:
-release `kabl-ui.exe`, `kabl.exe`, `kabl_clap.dll`) and the `windows-vst3` job
-(`kabl-windows-vst3`), and uploads them as `kabl-windows-installer`
+CI job `windows-installer` builds both on `windows-latest` from its own release build
+(`kabl-ui.exe`, `kabl_clap.dll`, and `kabl.exe`, which only packs the factory sounds and is not
+shipped) and the `windows-vst3` job's bundle (`kabl-windows-vst3`), and uploads them as `kabl-windows-installer`
 (`kabl-<version>-windows-x64-setup.exe`) and `kabl-windows-zip` (`kabl-<version>-windows-x64.zip`).
 Neither is code-signed.
 
@@ -23,7 +23,7 @@ What the installer does (per machine, needs admin):
 
 | Installed to | From the package |
 | --- | --- |
-| `C:\Program Files\kabl` | `kabl-ui.exe`, `kabl.exe`, `share\kabl\patches`, `share\kabl\factory-composites`, licences, `README.txt` |
+| `C:\Program Files\kabl` | `kabl-ui.exe`, `share\kabl\patches`, `share\kabl\factory-composites`, licences, `README.txt` |
 | `%CommonProgramFiles%\VST3\kabl.vst3` | `VST3\kabl.vst3` (the bundle) |
 | `%CommonProgramFiles%\CLAP\kabl.clap` | `CLAP\kabl.clap` |
 | Start menu | `kabl`, starting `kabl-ui.exe` |
@@ -39,9 +39,11 @@ The `AppId` in `kabl.iss` must never change: Windows matches upgrades by it.
 `installer/test-install.ps1` runs on the runner after the build, one step per check:
 
 - `install`: silent install (`/VERYSILENT /SUPPRESSMSGBOXES`), then every file above exists.
-- `selftest`: the installed `kabl.exe` renders its self-test and exits 0, and reads an
-  installed factory sound with `kabl.exe cat`.
 - `zip`: the zip's file list equals the installed one.
+- `launch`: the installed `kabl-ui.exe` starts on Mesa's software OpenGL (its DLLs copied
+  beside the exe for the run, then removed), and within 120 s its log shows `start kabl-ui`
+  and `factory sounds:` at the installed `share\kabl\patches`; then it is stopped. A crash,
+  a timeout or "not found" fails the step.
 - `upgrade`: marker files in `%APPDATA%\kabl` and `%LOCALAPPDATA%\kabl`, install again,
   uninstall; the installed files are gone and the markers remain.
 

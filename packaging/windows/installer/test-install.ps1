@@ -2,13 +2,15 @@
 # machine: run it on a throwaway runner or VM, never on a workstation.
 #
 #   test-install.ps1 -Check install  -Setup <setup.exe>    silent install, then the files exist
-#   test-install.ps1 -Check selftest                        installed kabl.exe runs and exits 0
 #   test-install.ps1 -Check zip      -Zip <portable.zip>    zip holds exactly the installed files
+#   test-install.ps1 -Check launch   -Mesa <dir>           installed kabl-ui starts and finds the
+#                                                           factory sounds (Mesa's opengl32.dll from dir)
 #   test-install.ps1 -Check upgrade  -Setup <setup.exe>    reinstall over it, uninstall, user data kept
 param(
-    [Parameter(Mandatory)][ValidateSet('install', 'selftest', 'zip', 'upgrade')][string]$Check,
+    [Parameter(Mandatory)][ValidateSet('install', 'zip', 'launch', 'upgrade')][string]$Check,
     [string]$Setup,
-    [string]$Zip
+    [string]$Zip,
+    [string]$Mesa
 )
 $ErrorActionPreference = 'Stop'
 
@@ -18,7 +20,6 @@ $clap = Join-Path $env:CommonProgramFiles 'CLAP\kabl.clap'
 $lnk = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\kabl.lnk'
 $installed = @(
     (Join-Path $app 'kabl-ui.exe'),
-    (Join-Path $app 'kabl.exe'),
     (Join-Path $app 'LICENSE'),
     (Join-Path $app 'THIRD-PARTY-NOTICES.md'),
     (Join-Path $vst3 'Contents\x86_64-win\kabl.vst3'),
@@ -72,26 +73,46 @@ switch ($Check) {
         Invoke-Setup $Setup (Join-Path $env:RUNNER_TEMP 'install.log')
         Assert-Installed
     }
-    'selftest' {
-        $kabl = Join-Path $app 'kabl.exe'
-        $work = Join-Path $env:RUNNER_TEMP 'selftest'
+    'launch' {
+        # Mesa's DLLs sit beside the installed exe only while it runs (Windows loads
+        # opengl32.dll from the exe's folder first), so the zip and uninstall checks see the
+        # package as installed. Its own log dir keeps this run's lines apart.
+        $work = Join-Path $env:RUNNER_TEMP 'launch'
         New-Item -ItemType Directory -Force $work | Out-Null
-        Push-Location $work
-        & $kabl
-        $code = $LASTEXITCODE
-        Pop-Location
-        if ($code -ne 0) { Fail "kabl.exe self-test exited with $code" }
-        $log = Join-Path $env:LOCALAPPDATA 'kabl\logs\kabl.log'
-        if (-not (Select-String -LiteralPath $log -Pattern 'wrote a self-test render' -Quiet)) {
-            Get-Content $log
-            Fail "no self-test render line in $log"
+        $log = Join-Path $work 'kabl.log'
+        $dlls = @(Get-ChildItem -LiteralPath $Mesa -Filter *.dll)
+        $dlls | Copy-Item -Destination $app
+        $env:GALLIUM_DRIVER = 'llvmpipe'
+        $env:KABL_LOG_DIR = $work
+        $p = Start-Process -FilePath (Join-Path $app 'kabl-ui.exe') -WorkingDirectory $work -PassThru `
+            -RedirectStandardOutput (Join-Path $work 'stdout.txt') -RedirectStandardError (Join-Path $work 'stderr.txt')
+        $start = $null; $factory = $null
+        try {
+            for ($i = 0; $i -lt 120 -and -not ($start -and $factory); $i++) {
+                Start-Sleep -Seconds 1
+                if (Test-Path -LiteralPath $log) {
+                    $start = Select-String -LiteralPath $log -Pattern 'start kabl-ui' -SimpleMatch | Select-Object -First 1
+                    $factory = Select-String -LiteralPath $log -Pattern 'factory sounds: ' -SimpleMatch | Select-Object -First 1
+                }
+                if ($p.HasExited) { break }
+            }
+            $crashed = $p.HasExited
+        } finally {
+            if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; $p.WaitForExit() }
+            $dlls | ForEach-Object { Remove-Item -LiteralPath (Join-Path $app $_.Name) }
         }
-        Pass "kabl.exe self-test exited 0 and logged its render"
-        $patch = Get-ChildItem -LiteralPath (Join-Path $app 'share\kabl\patches') -Recurse -Filter *.kabl |
-            Select-Object -First 1
-        & $kabl cat $patch.FullName | Out-Null
-        if ($LASTEXITCODE -ne 0) { Fail "kabl.exe cat $($patch.FullName) exited with $LASTEXITCODE" }
-        Pass "installed factory sound reads: $($patch.FullName)"
+        foreach ($f in $log, (Join-Path $work 'stderr.txt')) {
+            if (Test-Path -LiteralPath $f) { Write-Host "--- $f"; Get-Content -LiteralPath $f -Tail 40 }
+        }
+        if ($crashed) { Fail "kabl-ui.exe exited by itself with $($p.ExitCode)" }
+        if (-not $start) { Fail "no 'start kabl-ui' line in $log within 120 s" }
+        if (-not $factory) { Fail "no 'factory sounds:' line in $log within 120 s" }
+        $patches = "$app\share\kabl\patches;"
+        if ($factory.Line -notlike "*factory sounds: *$patches*") {
+            Fail "factory sounds not found at $patches`: $($factory.Line)"
+        }
+        Pass "kabl-ui.exe started: $($start.Line)"
+        Pass "kabl-ui.exe found the installed factory sounds: $($factory.Line)"
     }
     'zip' {
         Add-Type -AssemblyName System.IO.Compression.FileSystem

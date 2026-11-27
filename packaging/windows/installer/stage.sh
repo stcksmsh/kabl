@@ -4,12 +4,12 @@
 #
 #   packaging/windows/installer/stage.sh BIN_DIR VST3_DIR [OUT]
 #
-# BIN_DIR holds kabl-ui.exe, kabl.exe and kabl_clap.dll (cargo --release); VST3_DIR holds the
-# kabl.vst3 bundle folder. Writes, in OUT (default target/dist):
+# BIN_DIR holds kabl-ui.exe, kabl_clap.dll and kabl.exe (cargo --release; kabl.exe packs the
+# factory sounds and is not shipped, as in the Linux package); VST3_DIR holds the kabl.vst3
+# bundle folder. Writes, in OUT (default target/dist):
 #
 #   kabl-<version>-windows-x64/
 #     kabl-ui.exe                          standalone
-#     kabl.exe                             command-line tool (.kabl file tools, render self-test)
 #     share/kabl/patches/...               factory sounds as .kabl files, packed from patches/
 #     share/kabl/factory-composites/...    factory composites, copied from composites/
 #     VST3/kabl.vst3/...                   VST3 bundle, for %CommonProgramFiles%\VST3
@@ -29,7 +29,7 @@ NAME="kabl-$VERSION-windows-x64"
 dir="$OUT/$NAME"
 rm -rf "$dir" "$OUT/$NAME.zip"
 mkdir -p "$dir/share/kabl" "$dir/VST3" "$dir/CLAP"
-cp "$bin/kabl-ui.exe" "$bin/kabl.exe" "$dir/"
+cp "$bin/kabl-ui.exe" "$dir/"
 cp "$bin/kabl_clap.dll" "$dir/CLAP/kabl.clap"
 cp -r "$vst3/kabl.vst3" "$dir/VST3/kabl.vst3"
 test -f "$dir/VST3/kabl.vst3/Contents/x86_64-win/kabl.vst3"
