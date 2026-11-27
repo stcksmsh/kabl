@@ -49,7 +49,7 @@ The plugin never starts it. `lessons/00-start-here.toml` is lesson 00.
 
 ## Step fields
 
-Only `text` is required. Each optional field changes what the step shows (a button, a ring, a strip or other text), in the order listed.
+Only `text` is required, except in an `include` step, which needs no `text` and has no other field. Each optional field changes what the step shows (a button, a ring, a strip or other text), in the order listed.
 
 | field | button / effect |
 |---|---|
@@ -109,7 +109,8 @@ the lesson, so the panel, the card and the runner never meet one. A lesson is re
 the list, with an error in the log, when:
 
 - `step` is 0 or past the last step of the named lesson;
-- `lesson` is not the `id` of a lesson that loaded;
+- `lesson` is not the `id` of a lesson that parsed (the target is looked up before includes are
+  resolved, so a target whose own includes fail is still found, and is dropped separately);
 - the named step is itself an `include` (includes do not chain);
 - the `include` step has any other field (the parser rejects it with "a step with `include` has
   no other field").
