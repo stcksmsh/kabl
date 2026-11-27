@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 85] = [
+const SCENES: [&str; 88] = [
     "rack",
     "perform",
     "sounds",
@@ -101,6 +101,19 @@ const SCENES: [&str; 85] = [
     "analog-voice-face",
     "analog-voice-design",
     "analog-voice-design-env",
+    "face-compact",
+    "face-compact-open",
+    "design-page-fold",
+];
+
+/// The scenes on the performance patch's "Top" face with whole blocks; "face-compact" folds it
+/// at 480 points, and "face-compact-open" opens the fold.
+const BLOCKS: [&str; 5] = [
+    "face-snapshots",
+    "face-blocks",
+    "perform-face-pin",
+    "face-compact",
+    "face-compact-open",
 ];
 
 struct Job {
@@ -331,10 +344,7 @@ impl App {
             }
             Err(_) if j.scene.starts_with("sequenced-part") => factory_patch("sequenced-part"),
             // The button scenes need a clock and sequencers: the performance patch.
-            Err(_)
-                if j.scene.contains("-buttons")
-                    || ["face-snapshots", "face-blocks", "perform-face-pin"].contains(&j.scene) =>
-            {
+            Err(_) if j.scene.contains("-buttons") || BLOCKS.contains(&j.scene) => {
                 PatchEditor::from_log(
                     kabl_core::load(&patches().join("performance")).expect("performance"),
                 )
@@ -782,9 +792,7 @@ impl App {
         // bass and "Deep", which holds the arp. Deep's face has the arp's bank B button; Top's has
         // the cue, the bass's bank B, Deep's button through Mid and the clock's Run. The bass
         // plays bank B, so its button is the one lit.
-        if j.scene.contains("-buttons")
-            || ["face-snapshots", "face-blocks", "perform-face-pin"].contains(&j.scene)
-        {
+        if j.scene.contains("-buttons") || BLOCKS.contains(&j.scene) {
             use kabl_core::panel::{Kind, Panel, Placement, Source};
             let (clock, bass, arp) = (1, 3, 4);
             let cues = self
@@ -909,7 +917,7 @@ impl App {
             // "Bass gate" knob and the clock's transport, the bass's banks and the cue pads as
             // whole blocks. "perform-face-pin": the same face with that knob pinned as its
             // "Pin to Perform" does, and the Perform panel open on the pin.
-            if j.scene == "face-blocks" || j.scene == "perform-face-pin" {
+            if j.scene != "face-snapshots" && BLOCKS.contains(&j.scene) {
                 let gate = kabl_core::PortRef::Param {
                     id: bass,
                     param: "gate_len".into(),
@@ -919,8 +927,10 @@ impl App {
                 let mut c = self.editor.state().composites[&top].clone();
                 let key = *c.controls.iter().find(|(_, e)| e.target == gate).unwrap().0;
                 c.controls.get_mut(&key).unwrap().label = "Bass gate".into();
+                // The compact scenes fold the face past the banks, leaving the cue pads beyond.
                 let mut panel = Panel {
                     width: 840.0,
+                    compact_width: j.scene.starts_with("face-compact").then_some(480.0),
                     ..Panel::default()
                 };
                 let block = |kind, id, x, y, width, height| Placement {
@@ -1657,17 +1667,35 @@ impl eframe::App for App {
             page.draft.panel.placements.remove(&key);
         }
         // The "Top" face, first in the rack, at zoom 1.
-        if self.f == 6
-            && [
-                "face-buttons",
-                "face-snapshots",
-                "face-blocks",
-                "perform-face-pin",
-            ]
-            .contains(&scene)
-        {
+        if self.f == 6 && (scene == "face-buttons" || BLOCKS.contains(&scene)) {
             self.ui.zoom = 1.0;
             self.ui.pan = egui::Vec2::ZERO;
+        }
+        // The fold open, as its chip opens it.
+        if self.f == 6 && scene == "face-compact-open" {
+            let state = self.editor.state();
+            let top = state
+                .composites
+                .iter()
+                .find(|(_, c)| c.panel.as_ref().is_some_and(|p| p.compact_width.is_some()));
+            self.ui.expanded_composites.insert(*top.unwrap().0);
+        }
+        // The Voice face widened to 360 points and folded at the first rack unit that lands
+        // inside a placed element, which is marked as crossing.
+        if self.f == 6 && scene == "design-page-fold" {
+            let state = self.editor.state();
+            let page = self.ui.panels.page.as_mut().unwrap();
+            page.set_width(state, 360.0).unwrap();
+            let inside = |f: f32| {
+                page.draft
+                    .panel
+                    .placements
+                    .values()
+                    .any(|p| p.x < f && f < p.x + p.width)
+            };
+            let fold = (6..12).map(|u| u as f32 * 30.0).find(|&f| inside(f));
+            page.set_compact(state, fold.or(Some(180.0))).unwrap();
+            assert!(!page.crossing().is_empty(), "no element crosses the fold");
         }
         // The display and factory composite scenes' audio, rendered offline: the engine is built
         // once the scene is set up, then each frame takes the taps the faces ask for, renders a

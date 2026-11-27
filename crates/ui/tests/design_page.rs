@@ -719,3 +719,66 @@ fn applied_snapshots_recall_from_the_list() {
     h.click(&format!("design:snap:recall:{id}"));
     assert_eq!(h.cutoff(), 3000.0);
 }
+
+#[test]
+fn the_fold_line_snaps_to_rack_units_and_each_change_is_one_step() {
+    let mut h = H::new();
+    h.open(h.plain);
+    let knob = h.keys(h.plain)[0];
+    h.click(&format!("design:palette:{knob}"));
+    h.click("design:width-up");
+    h.click("design:width-up");
+    assert_eq!(h.page().draft.panel.width, 360.0);
+    assert_eq!(h.page().draft.panel.compact_width, None);
+    // From the right edge to rack point 247, which snaps to 240.
+    let z = h.zoom(knob);
+    let fold = h.hit("design:fold").center();
+    h.drag(fold, egui::vec2(-113.0, 0.0) * z);
+    assert_eq!(h.page().draft.panel.compact_width, Some(240.0));
+    h.click("design:undo");
+    assert_eq!(h.page().draft.panel.compact_width, None);
+    assert_eq!(h.page().draft.panel.width, 360.0);
+    h.click("design:redo");
+    assert_eq!(h.page().draft.panel.compact_width, Some(240.0));
+    h.click("design:no-compact");
+    assert_eq!(h.page().draft.panel.compact_width, None);
+    h.click("design:undo");
+    assert_eq!(h.page().draft.panel.compact_width, Some(240.0));
+}
+
+#[test]
+fn elements_crossing_the_fold_are_marked_and_block_apply_until_moved() {
+    let mut h = H::new();
+    h.open(h.plain);
+    let knob = h.keys(h.plain)[0];
+    h.click(&format!("design:palette:{knob}"));
+    let page = h.ui.panels.page.as_mut().unwrap();
+    page.place(h.editor.state(), knob, [150.0, 72.0, 84.0, 110.0])
+        .unwrap();
+    h.frames(2);
+    // The fold may land on the knob: the knob is marked and Apply refuses.
+    let z = h.zoom(knob);
+    let fold = h.hit("design:fold").center();
+    h.drag(fold, egui::vec2(-120.0, 0.0) * z);
+    assert_eq!(h.page().draft.panel.compact_width, Some(180.0));
+    assert_eq!(
+        h.page().crossing(),
+        vec![(knob, "crosses the compact face's edge")]
+    );
+    h.click("design:apply");
+    assert!(h.editor.state().composites[&h.plain].panel.is_none());
+    let note = h.page().note.clone().unwrap_or_default();
+    assert!(note.contains("Move it before applying"), "{note}");
+    // A drop that still crosses is refused; one clear of the fold is taken, and Apply with it.
+    let before = h.page().draft.clone();
+    let from = h.hit(&format!("design:el:{knob}")).center();
+    h.drag(from, egui::vec2(-12.0, 0.0) * z);
+    assert_eq!(h.page().draft, before);
+    let from = h.hit(&format!("design:el:{knob}")).center();
+    h.drag(from, egui::vec2(-138.0, 0.0) * z);
+    assert_eq!(h.placed(knob)[0], 12.0);
+    assert!(h.page().crossing().is_empty());
+    h.click("design:apply");
+    let applied = h.editor.state().composites[&h.plain].panel.clone().unwrap();
+    assert_eq!(applied.compact_width, Some(180.0));
+}

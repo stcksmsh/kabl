@@ -5,6 +5,10 @@ use std::collections::BTreeMap;
 
 pub const HEIGHT: f32 = 340.0;
 pub const MAX_IMAGE_BYTES: usize = 128 * 1024;
+/// The expand chip's size; it sits `CHIP_X` left of the compact face's right edge, from `CHIP_Y`.
+pub const CHIP: (f32, f32) = (54.0, 22.0);
+pub const CHIP_X: f32 = 62.0;
+pub const CHIP_Y: f32 = 310.0;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
@@ -130,6 +134,31 @@ impl Artwork {
     }
 }
 impl Panel {
+    /// The face width the rack draws: the compact face unless `expanded` or there is none.
+    pub fn shown_width(&self, expanded: bool) -> f32 {
+        match self.compact_width {
+            Some(w) if !expanded => w,
+            _ => self.width,
+        }
+    }
+    /// Whether `p` is in the expanded part: it starts at or right of the fold.
+    pub fn folded(&self, p: &Placement) -> bool {
+        self.compact_width.is_some_and(|w| p.x >= w)
+    }
+    /// Why `p` does not fit the fold: it crosses it, it is a jack past it, or it covers the
+    /// expand chip. Jacks stay on the compact face so a cable always has an anchor.
+    pub fn fold_error(&self, p: &Placement) -> Option<&'static str> {
+        let w = self.compact_width?;
+        if p.x < w && p.x + p.width > w {
+            return Some("crosses the compact face's edge");
+        }
+        if p.x >= w {
+            return (p.kind == Kind::Jack).then_some("a jack must be on the compact face");
+        }
+        let chip = (w - CHIP_X, CHIP_Y, w - CHIP_X + CHIP.0, CHIP_Y + CHIP.1);
+        (p.x < chip.2 && p.x + p.width > chip.0 && p.y < chip.3 && p.y + p.height > chip.1)
+            .then_some("covers the expand chip")
+    }
     pub fn validate(&self, c: &Composite) -> Result<(), String> {
         if !self.width.is_finite()
             || !(180.0..=840.0).contains(&self.width)
@@ -192,6 +221,10 @@ impl Panel {
             }
             for art in &p.icons {
                 art.validate()?;
+            }
+            // Ahead of the footprint check: the chip sits in the footer band, and this names it.
+            if let Some(why) = self.fold_error(p) {
+                return Err(format!("Panel binding {id}: {why}"));
             }
             // Provisional sizes for the new kinds; the drawing slices set them from captures.
             let min = match p.kind {
