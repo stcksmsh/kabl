@@ -1,0 +1,425 @@
+{
+  "schema": 3,
+  "root": 1,
+  "patch": {
+    "composites": {
+      "1": {
+        "name": "Glue Bus",
+        "help": "Open internals to inspect the real modules and routes. Editing affects this instance only.",
+        "definition": {
+          "id": "kabl.glue-bus",
+          "version": 1
+        },
+        "parent": null,
+        "members": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "pos": {
+          "x": 24.0,
+          "y": 20.0
+        },
+        "ports": {
+          "1": {
+            "label": "In",
+            "target": {
+              "Module": {
+                "id": 1,
+                "port": "in"
+              }
+            }
+          },
+          "2": {
+            "label": "Duck In",
+            "target": {
+              "Module": {
+                "id": 5,
+                "port": "in"
+              }
+            }
+          },
+          "3": {
+            "label": "Out",
+            "target": {
+              "Module": {
+                "id": 6,
+                "port": "out"
+              }
+            }
+          }
+        },
+        "controls": {
+          "4": {
+            "label": "Drive",
+            "target": {
+              "Param": {
+                "id": 1,
+                "param": "drive_db"
+              }
+            }
+          },
+          "5": {
+            "label": "Tone",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "cutoff_hz"
+              }
+            }
+          },
+          "6": {
+            "label": "Resonance",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "resonance"
+              }
+            }
+          },
+          "7": {
+            "label": "Trim",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "gain_db"
+              }
+            }
+          },
+          "8": {
+            "label": "Threshold",
+            "target": {
+              "Param": {
+                "id": 4,
+                "param": "threshold_db"
+              }
+            }
+          },
+          "9": {
+            "label": "Ratio",
+            "target": {
+              "Param": {
+                "id": 4,
+                "param": "ratio"
+              }
+            }
+          },
+          "10": {
+            "label": "Attack",
+            "target": {
+              "Param": {
+                "id": 4,
+                "param": "attack_ms"
+              }
+            }
+          },
+          "11": {
+            "label": "Release",
+            "target": {
+              "Param": {
+                "id": 4,
+                "param": "release_ms"
+              }
+            }
+          },
+          "12": {
+            "label": "Duck",
+            "target": {
+              "Param": {
+                "id": 6,
+                "param": "threshold_db"
+              }
+            }
+          }
+        },
+        "next_interface": 16,
+        "panel": {
+          "width": 720.0,
+          "placements": {
+            "1": {
+              "kind": "jack",
+              "x": 164.0,
+              "y": 64.0,
+              "width": 78.0,
+              "height": 58.0
+            },
+            "2": {
+              "kind": "jack",
+              "x": 242.0,
+              "y": 64.0,
+              "width": 78.0,
+              "height": 58.0
+            },
+            "3": {
+              "kind": "jack",
+              "x": 634.0,
+              "y": 64.0,
+              "width": 78.0,
+              "height": 58.0
+            },
+            "4": {
+              "kind": "knob",
+              "x": 8.0,
+              "y": 194.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "5": {
+              "kind": "knob",
+              "x": 80.0,
+              "y": 194.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "7": {
+              "kind": "knob",
+              "x": 168.0,
+              "y": 194.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "8": {
+              "kind": "knob",
+              "x": 256.0,
+              "y": 194.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "9": {
+              "kind": "knob",
+              "x": 328.0,
+              "y": 194.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "10": {
+              "kind": "knob",
+              "x": 400.0,
+              "y": 194.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "11": {
+              "kind": "knob",
+              "x": 472.0,
+              "y": 194.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "12": {
+              "kind": "knob",
+              "x": 560.0,
+              "y": 194.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "13": {
+              "kind": "display",
+              "x": 8.0,
+              "y": 128.0,
+              "width": 142.0,
+              "height": 60.0,
+              "source": {
+                "module": {
+                  "id": 2,
+                  "action": null
+                }
+              },
+              "label": "Tone"
+            },
+            "14": {
+              "kind": "display",
+              "x": 256.0,
+              "y": 128.0,
+              "width": 286.0,
+              "height": 60.0,
+              "source": {
+                "module": {
+                  "id": 4,
+                  "action": null
+                }
+              },
+              "label": "Compressor"
+            },
+            "15": {
+              "kind": "display",
+              "x": 570.0,
+              "y": 128.0,
+              "width": 120.0,
+              "height": 60.0,
+              "source": {
+                "module": {
+                  "id": 6,
+                  "action": null
+                }
+              },
+              "label": "Duck"
+            }
+          },
+          "light": null,
+          "dark": null
+        }
+      }
+    },
+    "modules": {
+      "1": {
+        "kind": "drive",
+        "pos": {
+          "x": 24.0,
+          "y": 20.0
+        },
+        "params": {
+          "drive_db": 4.0,
+          "trim_db": -2.0
+        }
+      },
+      "2": {
+        "kind": "filter.ladder",
+        "pos": {
+          "x": 214.0,
+          "y": 20.0
+        },
+        "params": {
+          "cutoff_hz": 1600.0,
+          "drive_db": 2.0,
+          "resonance": 0.2
+        }
+      },
+      "3": {
+        "kind": "gain",
+        "pos": {
+          "x": 404.0,
+          "y": 20.0
+        },
+        "params": {
+          "gain_db": -2.0
+        }
+      },
+      "4": {
+        "kind": "compressor",
+        "pos": {
+          "x": 594.0,
+          "y": 20.0
+        },
+        "params": {
+          "attack_ms": 4.0,
+          "knee_db": 4.0,
+          "makeup_db": 4.0,
+          "ratio": 4.0,
+          "release_ms": 110.0,
+          "threshold_db": -24.0
+        }
+      },
+      "5": {
+        "kind": "gain",
+        "pos": {
+          "x": 594.0,
+          "y": 420.0
+        },
+        "params": {
+          "gain_db": 0.0
+        }
+      },
+      "6": {
+        "kind": "compressor",
+        "pos": {
+          "x": 784.0,
+          "y": 20.0
+        },
+        "params": {
+          "attack_ms": 1.0,
+          "knee_db": 3.0,
+          "makeup_db": 0.0,
+          "ratio": 4.0,
+          "release_ms": 180.0,
+          "threshold_db": -34.0
+        }
+      }
+    },
+    "cables": {
+      "1": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 2,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "2": {
+        "from": {
+          "Module": {
+            "id": 2,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 3,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "3": {
+        "from": {
+          "Module": {
+            "id": 3,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 4,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "4": {
+        "from": {
+          "Module": {
+            "id": 4,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 6,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "5": {
+        "from": {
+          "Module": {
+            "id": 5,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 6,
+            "port": "sc"
+          }
+        },
+        "params": {},
+        "steps": []
+      }
+    }
+  }
+}

@@ -1,6 +1,8 @@
-//! What the factory composite generators (`drum_kit_composite`, `sequenced_part_composite`)
-//! share: exposure helpers, and the clocked standalone patch they render to a WAV. Included
-//! with `#[path]`, so the tests that include a generator compile only the helpers.
+//! What the factory composite generators (`drum_kit_composite`, `sequenced_part_composite`,
+//! `glue_bus_composite`, `analog_voice_composite`) share: exposure helpers, inserting a
+//! definition from the bank, and the offline WAV render. Included with `#[path]`, so the tests
+//! that include a generator compile only the helpers. `scene.rs` beside it is `chrome_capture`'s
+//! rack of each card.
 use kabl_core::{Exposure, ModuleId, PortRef};
 
 pub(crate) fn jack(id: ModuleId, port: &str) -> PortRef {
@@ -25,15 +27,10 @@ pub(crate) fn expose(label: &str, target: PortRef) -> Exposure {
     }
 }
 
-/// A clock at 120 BPM into `kabl.<name>` v1 from the bank, into the output.
+/// `kabl.<name>` v1 from the bank, inserted into `e`.
 #[cfg(not(test))]
-fn standalone(name: &str) -> kabl_ui::PatchEditor {
-    use kabl_core::Vec2;
-    use kabl_ui::{composites, PatchEditor};
-    let mut e = PatchEditor::new();
-    let clock = e.add_module("clock", Vec2 { x: 24.0, y: 20.0 });
-    e.set_param(clock, "bpm", 120.0);
-    let out = e.add_module("out", Vec2 { x: 1100.0, y: 20.0 });
+pub(crate) fn insert(e: &mut kabl_ui::PatchEditor, name: &str) -> kabl_core::CompositeId {
+    use kabl_ui::composites;
     let bank = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../composites");
     let def = format!("kabl.{name}");
     let entry = composites::factory_entries(&bank)
@@ -41,19 +38,45 @@ fn standalone(name: &str) -> kabl_ui::PatchEditor {
         .find(|f| f.definition.id == def && f.definition.version == 1)
         .unwrap_or_else(|| panic!("{def} v1 is not in the bank; run its generator's `write`"));
     let pkg = composites::read_factory(&entry).expect("read the definition");
-    let id = composites::insert(&mut e, &pkg).expect("insert the composite");
-    let port = |e: &PatchEditor, label: &str| {
-        e.state().composites[&id]
-            .ports
-            .values()
-            .find(|x| x.label == label)
-            .unwrap_or_else(|| panic!("{def} has no port {label}"))
-            .target
-            .clone()
-    };
-    let (c, r, o) = (port(&e, "Clock"), port(&e, "Reset"), port(&e, "Out"));
-    e.connect(jack(clock, "gate"), c);
-    e.connect(jack(clock, "reset"), r);
+    composites::insert(e, &pkg).expect("insert the composite")
+}
+
+/// The inner end of composite `id`'s port `label`.
+#[cfg(not(test))]
+pub(crate) fn port(e: &kabl_ui::PatchEditor, id: kabl_core::CompositeId, label: &str) -> PortRef {
+    e.state().composites[&id]
+        .ports
+        .values()
+        .find(|x| x.label == label)
+        .unwrap_or_else(|| panic!("composite {id:?} has no port {label}"))
+        .target
+        .clone()
+}
+
+/// A clock at 120 BPM into `kabl.<name>` v1 from the bank, into the output. A card with no
+/// Clock port (a voice) takes the clock's gate on Gate, every target of it, and plays its
+/// unpatched pitch.
+#[cfg(not(test))]
+fn standalone(name: &str) -> kabl_ui::PatchEditor {
+    use kabl_core::Vec2;
+    let mut e = kabl_ui::PatchEditor::new();
+    let clock = e.add_module("clock", Vec2 { x: 24.0, y: 20.0 });
+    e.set_param(clock, "bpm", 120.0);
+    let out = e.add_module("out", Vec2 { x: 1100.0, y: 20.0 });
+    let id = insert(&mut e, name);
+    let clocked = e.state().composites[&id]
+        .ports
+        .values()
+        .any(|x| x.label == "Clock");
+    if clocked {
+        let (c, r) = (port(&e, id, "Clock"), port(&e, id, "Reset"));
+        e.connect(jack(clock, "gate"), c);
+        e.connect(jack(clock, "reset"), r);
+    } else {
+        let g = port(&e, id, "Gate");
+        kabl_ui::composites::connect(&mut e, &Default::default(), jack(clock, "gate"), g);
+    }
+    let o = port(&e, id, "Out");
     e.connect(o, jack(out, "in"));
     e
 }
@@ -62,21 +85,37 @@ fn standalone(name: &str) -> kabl_ui::PatchEditor {
 /// RMS.
 #[cfg(not(test))]
 pub(crate) fn wav(dir: &std::path::Path, name: &str) {
+    render(standalone(name).state(), &dir.join(format!("{name}.wav")));
+}
+
+/// Eight seconds of `patch`, rendered offline to `path`; prints peak and RMS.
+#[cfg(not(test))]
+pub(crate) fn render(patch: &kabl_core::PatchState, path: &std::path::Path) {
+    render_with(patch, path, |_, _| {});
+}
+
+/// `render`, calling `before` with the engine and the block's first frame before each block
+/// (to play notes).
+#[cfg(not(test))]
+pub(crate) fn render_with(
+    patch: &kabl_core::PatchState,
+    path: &std::path::Path,
+    mut before: impl FnMut(&mut kabl_engine::compile::CompiledPatch, usize),
+) {
     const SR: usize = 48000;
-    std::fs::create_dir_all(dir).expect("out folder");
-    let mut engine =
-        kabl_engine::compile::compile(standalone(name).state(), SR as f32, 8).expect("compile");
+    std::fs::create_dir_all(path.parent().expect("a folder")).expect("out folder");
+    let mut engine = kabl_engine::compile::compile(patch, SR as f32, 8).expect("compile");
     let mut audio = Vec::with_capacity(8 * SR * 2);
     while audio.len() < 8 * SR * 2 {
+        before(&mut engine, audio.len() / 2);
         engine.process_block();
         for (l, r) in engine.left().iter().zip(engine.right()) {
             audio.push(*l);
             audio.push(*r);
         }
     }
-    let path = dir.join(format!("{name}.wav"));
     let mut w = hound::WavWriter::create(
-        &path,
+        path,
         hound::WavSpec {
             channels: 2,
             sample_rate: SR as u32,
