@@ -20,7 +20,7 @@ use kabl_core::{ModuleId, ParamTarget, PatchState};
 use kabl_modules::builtins::{Transport, MACROS, MACRO_INFO};
 use kabl_modules::{registry, ParamInfo, Taper};
 
-use crate::{routing, PatchEditor, UiState};
+use crate::{knob_maps, routing, PatchEditor, UiState};
 
 pub const PIN_PREFIX: &str = "pin.";
 pub const CC_PREFIX: &str = "cc.";
@@ -164,13 +164,23 @@ pub const ANY_CONTROLLER: &str = "any controller";
 /// a `cc.<param>` mapping.
 pub type KnobProfile = BTreeMap<String, u32>;
 
-/// The knob profile for an input: the port's own, else the "any controller" one.
-pub fn knob_profile<'a>(
+/// The knobs that drive the macros: a saved profile, or a controller's built-in map.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Knobs<'a> {
+    Profile(&'a KnobProfile),
+    BuiltIn(&'static knob_maps::Controller),
+}
+
+/// The knobs for an input: the port's own profile, else the built-in map of the port's
+/// controller, else the "any controller" profile.
+pub fn knobs<'a>(
     profiles: &'a BTreeMap<String, KnobProfile>,
     port: Option<&str>,
-) -> Option<&'a KnobProfile> {
+) -> Option<Knobs<'a>> {
     port.and_then(|p| profiles.get(p))
-        .or_else(|| profiles.get(ANY_CONTROLLER))
+        .map(Knobs::Profile)
+        .or_else(|| port.and_then(knob_maps::find).map(Knobs::BuiltIn))
+        .or_else(|| profiles.get(ANY_CONTROLLER).map(Knobs::Profile))
 }
 
 /// Lowest id wins when a patch has several, as in the sound browser and cues.
@@ -182,13 +192,14 @@ fn first_macro(state: &PatchState) -> Option<ModuleId> {
         .map(|(&id, _)| id)
 }
 
-/// The macro params the knob profile drives, with their codes: none that the patch maps.
+/// The macro params the knobs drive, with their channel (`None`: any) and CC: none that the
+/// patch maps.
 fn profile_macros(
     state: &PatchState,
     ui_state: &UiState,
-) -> Vec<(ModuleId, &'static ParamInfo, u32)> {
-    let (Some(profile), Some(id)) = (
-        knob_profile(&ui_state.knob_profiles, ui_state.midi_input.as_deref()),
+) -> Vec<(ModuleId, &'static ParamInfo, Option<u32>, u32)> {
+    let (Some(knobs), Some(id)) = (
+        knobs(&ui_state.knob_profiles, ui_state.midi_input.as_deref()),
         first_macro(state),
     ) else {
         return Vec::new();
@@ -196,8 +207,19 @@ fn profile_macros(
     MACRO_INFO
         .params
         .iter()
-        .filter_map(|p| Some((id, p, *profile.get(p.name)?)))
-        .filter(|&(_, p, _)| mapping(state, id, p.name).is_none())
+        .enumerate()
+        .filter_map(|(i, p)| {
+            let (ch, cc) = match knobs {
+                Knobs::Profile(profile) => {
+                    let code = *profile.get(p.name)?;
+                    (Some(code / 128), code % 128)
+                }
+                // Makers rarely document the channel.
+                Knobs::BuiltIn(c) => (None, *c.ccs.get(i)? as u32),
+            };
+            Some((id, p, ch, cc))
+        })
+        .filter(|&(_, p, _, _)| mapping(state, id, p.name).is_none())
         .collect()
 }
 
@@ -211,11 +233,10 @@ fn profile_target(
     if !mapped(state, ch, cc).is_empty() || !mapped_buttons(state, ch, cc).is_empty() {
         return None;
     }
-    let code = ch as u32 * 128 + cc as u32;
     profile_macros(state, ui_state)
         .into_iter()
-        .find(|&(_, _, c)| c == code)
-        .map(|(id, p, _)| (id, p))
+        .find(|&(_, _, c, n)| c.is_none_or(|c| c == ch as u32) && n == cc as u32)
+        .map(|(id, p, _, _)| (id, p))
 }
 
 /// "Set up macro knobs" in progress: the knobs turned so far, for one profile key.
@@ -341,7 +362,7 @@ pub fn sync_takeover(editor: &PatchEditor, ui_state: &mut UiState) {
         };
         let by_profile = profiled
             .iter()
-            .any(|&(pid, pp, _)| pid == *id && pp.name == param);
+            .any(|&(pid, pp, ..)| pid == *id && pp.name == param);
         if mapping(state, *id, param).is_none() && !by_profile {
             return false;
         }

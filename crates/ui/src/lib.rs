@@ -39,6 +39,7 @@ pub mod help;
 pub mod inspect;
 pub mod keys;
 pub mod kit;
+pub mod knob_maps;
 mod label_dim;
 pub mod lessons;
 pub mod library;
