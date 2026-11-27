@@ -14,6 +14,7 @@ use keyboard_types::Modifiers;
 use raw_window_handle::HasWindowHandle;
 
 use crate::App;
+use crate::win32_dpi;
 use crate::{GraphicsConfig, renderer::Renderer};
 
 #[cfg(all(feature = "log", not(feature = "tracing")))]
@@ -336,7 +337,8 @@ impl<A: App> EguiWindow<A> {
 
         let size = window.size();
 
-        let system_scale_factor = size.scale_factor;
+        let system_scale_factor =
+            win32_dpi::effective_scale(win32_dpi::window_dpi(&window), size.scale_factor);
         let total_scale_factor = system_scale_factor * zoom_factor as f64;
 
         let logical_size: LogicalSize<f64> = size.physical.to_logical(total_scale_factor);
@@ -366,6 +368,15 @@ impl<A: App> EguiWindow<A> {
         let mut frame = Frame::new(renderer, window.clone());
 
         user_app.build(egui_ctx.clone(), &mut frame)?;
+
+        // baseview sizes a new Windows window for its DPI without a `resized` call, so the app
+        // (and through it the size the plugin reports to the host) would keep the 100 % size.
+        #[cfg(windows)]
+        user_app.resized(WindowSize {
+            physical: size.physical,
+            logical: logical_size,
+            scale_factor: total_scale_factor,
+        });
 
         let clipboard_ctx = match copypasta::ClipboardContext::new() {
             Ok(clipboard_ctx) => Some(clipboard_ctx),
@@ -455,6 +466,37 @@ impl<A: App> EguiWindow<A> {
         )
     }
 
+    /// The scale to lay out and render with, given the one baseview reports.
+    fn scale_factor(&self, reported: f64) -> f64 {
+        win32_dpi::effective_scale(win32_dpi::window_dpi(&self.window), reported)
+    }
+
+    /// Rescales the window when its DPI changed without baseview telling us, which is what
+    /// happens to a child window when the host's window moves to another monitor: the logical
+    /// size stays and the physical size follows the DPI. The host is not asked to resize its
+    /// frame (`WindowContext::resize` never calls `HostCallbacks::request_resize`), so the
+    /// frame keeps its old size until the host calls `getSize` again.
+    #[cfg(windows)]
+    fn follow_window_dpi(&self) {
+        let size = self.window.size();
+        let scale = self.scale_factor(size.scale_factor);
+        let Some(physical) =
+            win32_dpi::rescaled(size.physical, self.system_scale_factor.get(), scale)
+        else {
+            return;
+        };
+        if let Err(e) = self.window.resize(Size::Physical(physical)) {
+            error!("Failed to resize window for its new DPI: {}", e);
+        }
+        // No WM_SIZE came (the size did not change), so update the scale here.
+        if self.system_scale_factor.get() != scale {
+            let _ = self.resized(WindowSize::from_physical(
+                self.window.size().physical,
+                scale,
+            ));
+        }
+    }
+
     /// Update the pressed key modifiers when a mouse event has sent a new set of modifiers.
     fn update_modifiers(&self, modifiers: &Modifiers) {
         let mut egui_input = self.egui_input.borrow_mut();
@@ -466,6 +508,9 @@ impl<A: App> EguiWindow<A> {
 
 impl<A: App> WindowHandler for EguiWindow<A> {
     fn on_frame(&self) -> Result<(), HandlerError> {
+        #[cfg(windows)]
+        self.follow_window_dpi();
+
         let mut do_repaint_now = if let Some(repaint_notifier) = &self.repaint_notifier {
             repaint_notifier.repaint_requested()
         } else {
@@ -497,7 +542,7 @@ impl<A: App> WindowHandler for EguiWindow<A> {
             let size = self.window.size();
             let logical_size: LogicalSize<f32> = size
                 .physical
-                .to_logical(size.scale_factor * zoom_factor as f64);
+                .to_logical(self.scale_factor(size.scale_factor) * zoom_factor as f64);
 
             let screen_rect = Rect::from_min_size(
                 Pos2::new(0f32, 0f32),
@@ -562,6 +607,15 @@ impl<A: App> WindowHandler for EguiWindow<A> {
         }
 
         if let Some(new_size) = new_size {
+            // baseview converts a logical size with its own scale, which is stale on Windows
+            // after a DPI change it did not see.
+            #[cfg(windows)]
+            let new_size = match new_size {
+                Size::Logical(logical) => Size::Physical(
+                    logical.to_physical(self.scale_factor(self.window.scale_factor())),
+                ),
+                physical => physical,
+            };
             if let Err(e) = self.window.resize(new_size) {
                 error!("Failed to resize window: {}", e);
             }
@@ -581,7 +635,7 @@ impl<A: App> WindowHandler for EguiWindow<A> {
                 &self.window,
                 frame.clear_color,
                 size.physical,
-                size.scale_factor as f32 * egui_ctx.zoom_factor(),
+                self.scale_factor(size.scale_factor) as f32 * egui_ctx.zoom_factor(),
                 egui_ctx,
                 &mut full_output,
             );
@@ -641,7 +695,8 @@ impl<A: App> WindowHandler for EguiWindow<A> {
     fn resized(&self, new_size: WindowSize) -> Result<(), HandlerError> {
         let zoom_factor = self.inner.borrow().egui_ctx.zoom_factor();
 
-        let total_scale_factor = new_size.scale_factor * zoom_factor as f64;
+        let system_scale_factor = self.scale_factor(new_size.scale_factor);
+        let total_scale_factor = system_scale_factor * zoom_factor as f64;
         let logical_size: LogicalSize<f64> = new_size.physical.to_logical(total_scale_factor);
 
         let screen_rect = Rect::from_min_size(
@@ -654,10 +709,10 @@ impl<A: App> WindowHandler for EguiWindow<A> {
         egui_input.screen_rect = Some(screen_rect);
 
         let viewport_info = egui_input.viewports.get_mut(&self.viewport_id).unwrap();
-        viewport_info.native_pixels_per_point = Some(new_size.scale_factor as f32);
+        viewport_info.native_pixels_per_point = Some(system_scale_factor as f32);
         viewport_info.inner_rect = Some(screen_rect);
 
-        self.system_scale_factor.set(new_size.scale_factor);
+        self.system_scale_factor.set(system_scale_factor);
 
         let mut inner = self.inner.borrow_mut();
 

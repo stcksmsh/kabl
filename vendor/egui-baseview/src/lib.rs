@@ -1,5 +1,6 @@
 mod renderer;
 mod translate;
+pub mod win32_dpi;
 mod window;
 
 pub use baseview;
