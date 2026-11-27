@@ -281,6 +281,22 @@ pub enum KeyCapture {
     IgnoreKeys(Vec<keyboard_types::Key>),
 }
 
+impl KeyCapture {
+    /// Whether the window keeps `key` from the host: only while egui has a text field focused,
+    /// and then only the keys this setting captures. Every key reaches egui either way; an
+    /// ignored one also goes to the host (macOS passes it to the next responder, the Windows
+    /// keyboard hook to the parent window), so the host's shortcuts keep working.
+    pub fn status(&self, key: &keyboard_types::Key, text_focus: bool) -> EventStatus {
+        let captured = match self {
+            KeyCapture::CaptureAll => true,
+            KeyCapture::IgnoreAll => false,
+            KeyCapture::CaptureKeys(keys) => keys.contains(key),
+            KeyCapture::IgnoreKeys(keys) => !keys.contains(key),
+        };
+        if captured && text_focus { EventStatus::Captured } else { EventStatus::Ignored }
+    }
+}
+
 struct EguiWindowInner<A: App> {
     user_app: A,
     egui_ctx: egui::Context,
@@ -295,6 +311,8 @@ pub struct EguiWindow<A: App> {
     viewport_id: egui::ViewportId,
     start_time: Instant,
     system_scale_factor: Cell<f64>,
+    #[cfg(windows)]
+    host_frame: Cell<win32_dpi::HostFrame>,
     zoom_factor: Cell<f32>,
     pointer_logical_pos: Cell<Option<egui::Pos2>>,
     current_cursor_icon: Cell<baseview::MouseCursor>,
@@ -406,6 +424,8 @@ impl<A: App> EguiWindow<A> {
             pointer_logical_pos: None.into(),
             current_cursor_icon: baseview::MouseCursor::Default.into(),
             system_scale_factor: system_scale_factor.into(),
+            #[cfg(windows)]
+            host_frame: Default::default(),
             zoom_factor: zoom_factor.into(),
             repaint_after,
             window,
@@ -473,19 +493,22 @@ impl<A: App> EguiWindow<A> {
 
     /// Rescales the window when its DPI changed without baseview telling us, which is what
     /// happens to a child window when the host's window moves to another monitor: the logical
-    /// size stays and the physical size follows the DPI. The host is not asked to resize its
-    /// frame (`WindowContext::resize` never calls `HostCallbacks::request_resize`), so the
-    /// frame keeps its old size until the host calls `getSize` again.
+    /// size stays and the physical size follows the DPI. The host is then asked to fit its frame
+    /// to the new size, as it is on the first frame when the window opened at a scale other than
+    /// 1.0 (see [`win32_dpi::HostFrame`]).
     #[cfg(windows)]
     fn follow_window_dpi(&self) {
         let size = self.window.size();
         let scale = self.scale_factor(size.scale_factor);
-        let Some(physical) =
-            win32_dpi::rescaled(size.physical, self.system_scale_factor.get(), scale)
-        else {
+        let rescaled = win32_dpi::rescaled(size.physical, self.system_scale_factor.get(), scale);
+        let mut host_frame = self.host_frame.get();
+        let ask = host_frame.should_ask(scale);
+        self.host_frame.set(host_frame);
+        if rescaled.is_none() && !ask {
             return;
-        };
-        if let Err(e) = self.window.resize(Size::Physical(physical)) {
+        }
+        let physical = rescaled.unwrap_or(size.physical);
+        if let Err(e) = self.window.resize_then_ask_host(Size::Physical(physical)) {
             error!("Failed to resize window for its new DPI: {}", e);
         }
         // No WM_SIZE came (the size did not change), so update the scale here.
@@ -910,20 +933,11 @@ impl<A: App> WindowHandler for EguiWindow<A> {
                     }
                 }
 
-                match &self.inner.borrow().frame.key_capture {
-                    KeyCapture::CaptureAll => {}
-                    KeyCapture::IgnoreAll => return_status = EventStatus::Ignored,
-                    KeyCapture::CaptureKeys(keys) => {
-                        if !keys.contains(&event.key) {
-                            return_status = EventStatus::Ignored
-                        }
-                    }
-                    KeyCapture::IgnoreKeys(keys) => {
-                        if keys.contains(&event.key) {
-                            return_status = EventStatus::Ignored
-                        }
-                    }
-                }
+                let inner = self.inner.borrow();
+                return_status = inner
+                    .frame
+                    .key_capture
+                    .status(&event.key, inner.egui_ctx.egui_wants_keyboard_input());
             }
             baseview::Event::Window(event) => match event {
                 baseview::WindowEvent::Focused => {
@@ -956,17 +970,8 @@ impl<A: App> WindowHandler for EguiWindow<A> {
             self.inner.borrow().egui_ctx.request_repaint();
         }
 
-        // For keyboard events, also check if egui actually wants keyboard input
-        // This allows DAW shortcuts (spacebar, etc.) to pass through when no text field is focused
         match &event {
-            baseview::Event::Keyboard(_) => {
-                let egui_ctx = &self.inner.borrow().egui_ctx;
-                if return_status == EventStatus::Captured && !egui_ctx.egui_wants_keyboard_input() {
-                    EventStatus::Ignored
-                } else {
-                    return_status
-                }
-            }
+            baseview::Event::Keyboard(_) => return_status,
             baseview::Event::Mouse(_) => {
                 let egui_ctx = &self.inner.borrow().egui_ctx;
                 if egui_ctx.egui_is_using_pointer() || egui_ctx.egui_wants_pointer_input() {

@@ -54,6 +54,18 @@ impl WindowContext {
         Ok(())
     }
 
+    /// Resizes this window to the given `size` without the host taking part in the resize, then
+    /// asks the host, from the window's message loop, to fit its frame to the window's size.
+    ///
+    /// The host is asked at most once per message loop turn, for the size the window has by then.
+    /// If it refuses, the window keeps the new size and the request is not repeated. Passing the
+    /// current size only asks the host.
+    #[cfg(target_os = "windows")]
+    pub fn resize_then_ask_host(&self, size: impl Into<Size>) -> Result<(), Error> {
+        self.inner.resize_then_ask_host(size.into())?;
+        Ok(())
+    }
+
     /// Returns the current scale factor of this window.
     pub fn scale_factor(&self) -> f64 {
         self.inner.scale_factor()

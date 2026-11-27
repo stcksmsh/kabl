@@ -4,6 +4,7 @@ mod error;
 mod event;
 mod handler;
 pub mod host;
+pub mod key_route;
 mod keyboard;
 mod mouse_cursor;
 mod settings;

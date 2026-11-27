@@ -37,6 +37,32 @@ pub fn rescaled(physical: PhysicalSize<u32>, from: f64, to: f64) -> Option<Physi
     ))
 }
 
+/// Decides when the editor asks the host to fit its frame to the window. The host sizes its frame
+/// before the window exists, from the editor's size at scale 1.0, and the window then follows its
+/// DPI on its own, so the host has to be told whenever the window's scale moves away from the
+/// one it last heard of.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HostFrame {
+    asked_scale: f64,
+}
+
+impl Default for HostFrame {
+    fn default() -> Self {
+        Self { asked_scale: 1.0 }
+    }
+}
+
+impl HostFrame {
+    /// Whether to ask the host now, given the scale the window has this frame: when it differs
+    /// from the scale the host was last asked for (at first, the 1.0 it sized its frame for). The
+    /// scale counts as asked whatever the host answers, so a refusal is never asked again.
+    pub fn should_ask(&mut self, scale: f64) -> bool {
+        let ask = scale != self.asked_scale;
+        self.asked_scale = scale;
+        ask
+    }
+}
+
 /// The DPI of the editor window, or `None` before Windows 10 1607 (no `GetDpiForWindow`) or
 /// when the window has no Win32 handle.
 #[cfg(windows)]
