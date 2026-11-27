@@ -21,3 +21,5 @@ Install dependencies, e.g.,
 ```sh
 sudo apt-get install libx11-dev libxcursor-dev libxcb-dri2-0-dev libxcb-icccm4-dev libx11-xcb-dev mesa-common-dev libgl1-mesa-dev libglu1-mesa-dev
 ```
+
+Vendored for kabl from https://codeberg.org/RustAudio/egui-baseview rev 07c89cdb1eca83d65c470e1fd8dd252f53f41097. Changes: on Windows the window follows its own DPI (`src/win32_dpi.rs`, `follow_window_dpi`) and asks the host once per scale change to fit its frame to it (`win32_dpi::HostFrame`); `KeyCapture::status` holds the existing key status rule (a key is captured only while egui has a text field focused) so it can be tested.

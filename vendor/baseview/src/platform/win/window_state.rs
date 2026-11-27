@@ -21,6 +21,8 @@ pub(crate) struct WindowState {
     pub mouse_button_counter: Cell<usize>,
     pub mouse_was_outside_window: Cell<bool>,
     pub cursor_icon: Cell<MouseCursor>,
+    /// A `BV_ASK_HOST_RESIZE` message is posted and not yet handled.
+    pub host_resize_pending: Cell<bool>,
     // Initialized late so the `Window` can hold a reference to this `WindowState`
     pub handler: OnceCell<Box<dyn WindowHandler>>,
 
@@ -39,6 +41,7 @@ impl WindowState {
             mouse_button_counter: Cell::new(0),
             mouse_was_outside_window: true.into(),
             cursor_icon: Cell::new(MouseCursor::Default),
+            host_resize_pending: Cell::new(false),
             handler: OnceCell::new(),
             user32,
             shared,
@@ -106,6 +109,31 @@ impl WindowState {
         let new_size = size.to_physical(self.shared.scale_factor());
 
         self.hwnd.resize_and_activate(new_size, dpi, &self.user32)?;
+        Ok(())
+    }
+
+    pub fn resize_then_ask_host(&self, size: Size) -> Result<(), super::Error> {
+        {
+            // Keeps the `WM_SIZE` handler from asking the host, and from reverting the size
+            // when the host refuses.
+            let _guard = self.shared.originate_host_resize();
+            self.resize(size)?;
+        }
+        // The message handler asks for the size the window has then, so requests made before it
+        // runs collapse into one for the last size.
+        if !self.host_resize_pending.replace(true) {
+            let posted = unsafe {
+                PostMessageW(
+                    self.hwnd.as_raw(),
+                    crate::platform::win::window::BV_ASK_HOST_RESIZE,
+                    0,
+                    0,
+                )
+            };
+            if posted == 0 {
+                self.host_resize_pending.set(false);
+            }
+        }
         Ok(())
     }
 

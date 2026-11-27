@@ -26,4 +26,4 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in Baseview by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
 
-Vendored for kabl from https://github.com/RustAudio/baseview rev f106a5190f3a5861cacba7cab9ceb4f9532ebdfe. Only change: `with_dummy_window` in `src/wrappers/win32/window.rs` destroys its dummy window.
+Vendored for kabl from https://github.com/RustAudio/baseview rev f106a5190f3a5861cacba7cab9ceb4f9532ebdfe. Changes, all Windows only: `with_dummy_window` in `src/wrappers/win32/window.rs` destroys its dummy window; `WindowContext::resize_then_ask_host` resizes the window and then asks the host, from a posted message, to fit its frame to it, once and without reverting on a refusal; the keyboard hook (`src/platform/win/hook.rs`) passes keys the handler ignores on to the parent window, with key-ups following their key-downs (`src/key_route.rs`).

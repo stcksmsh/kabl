@@ -51,3 +51,70 @@ fn host_resize_is_constrained_to_the_fixed_editor_size() {
     assert_eq!(hint.adjust_size(asked, default, 1.0), default);
     assert_eq!(editor.size(), default);
 }
+
+#[test]
+fn host_is_asked_once_per_scale_change_and_never_again_after_a_refusal() {
+    // First open at 100 %: the host already sized its frame for this.
+    let mut frame = win32_dpi::HostFrame::default();
+    assert!(!frame.should_ask(1.0));
+    assert!(!frame.should_ask(1.0));
+
+    // First open at 150 %: asked on the first frame only, whatever the host answers.
+    let mut frame = win32_dpi::HostFrame::default();
+    assert!(frame.should_ask(1.5));
+    for _ in 0..10 {
+        assert!(!frame.should_ask(1.5), "a refused size is not asked again");
+    }
+
+    // Moves to 200 % and back: one request per change.
+    assert!(frame.should_ask(2.0));
+    assert!(!frame.should_ask(2.0));
+    assert!(frame.should_ask(1.0));
+    assert!(!frame.should_ask(1.0));
+}
+
+#[test]
+fn kabl_keeps_keys_only_while_a_text_field_has_focus() {
+    use nice_plug_egui::baseview::EventStatus;
+    use nice_plug_egui::{Key, KeyCapture};
+
+    let space = Key::Character(" ".into());
+    let note = Key::Character("a".into());
+    // kabl leaves the capture at its default: every key reaches kabl, and the host also gets the
+    // ones typed outside a text field.
+    let capture = KeyCapture::default();
+    assert_eq!(capture.status(&space, true), EventStatus::Captured);
+    assert_eq!(capture.status(&note, true), EventStatus::Captured);
+    assert_eq!(capture.status(&space, false), EventStatus::Ignored);
+    assert_eq!(capture.status(&note, false), EventStatus::Ignored);
+}
+
+#[test]
+fn ignored_keys_go_to_the_host_and_key_ups_follow_their_key_downs() {
+    use nice_plug_egui::baseview::key_route::{KeyMessage::*, KeyRoute};
+    use nice_plug_egui::baseview::EventStatus::{Captured, Ignored};
+
+    const SPACE: u8 = 0x20;
+    const A: u8 = 0x41;
+    let mut route = KeyRoute::default();
+
+    // An ignored key goes to the host, and so does its key-up.
+    assert!(route.to_host(Down, SPACE, Some(Ignored)));
+    assert!(route.to_host(Down, SPACE, Some(Ignored)), "auto-repeat");
+    assert!(route.to_host(Up, SPACE, None));
+    // A used key stays with kabl, and so does its key-up.
+    assert!(!route.to_host(Down, A, Some(Captured)));
+    assert!(!route.to_host(Up, A, None));
+    // Characters, and keys the window made no event of, stay with kabl.
+    assert!(!route.to_host(Char, A, None));
+    assert!(!route.to_host(Down, A, None));
+
+    // A text field gains focus while Space is held: its key-up still goes where the down went.
+    assert!(route.to_host(Down, SPACE, Some(Ignored)));
+    assert!(route.to_host(Up, SPACE, Some(Captured)));
+    // It loses focus while A is held: A's key-up stays with kabl.
+    assert!(!route.to_host(Down, A, Some(Captured)));
+    assert!(!route.to_host(Up, A, Some(Ignored)));
+    // A key-up whose key-down was never seen stays with kabl.
+    assert!(!route.to_host(Up, SPACE, Some(Ignored)));
+}

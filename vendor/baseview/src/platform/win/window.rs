@@ -19,6 +19,13 @@ use std::cell::Cell;
 use std::num::NonZeroUsize;
 
 pub(crate) const BV_WINDOW_MUST_CLOSE: u32 = WM_USER + 1;
+/// Asks the host to fit its frame to the window's size (see `WindowState::resize_then_ask_host`).
+pub(crate) const BV_ASK_HOST_RESIZE: u32 = WM_USER + 2;
+
+thread_local! {
+    /// What the handler made of the last keyboard event, read by the keyboard hook.
+    pub(crate) static KEY_EVENT_STATUS: Cell<Option<crate::EventStatus>> = const { Cell::new(None) };
+}
 
 use super::drop_target::DropTarget;
 use super::*;
@@ -495,9 +502,8 @@ unsafe fn wnd_proc_inner(
                 lparam,
             );
 
-            if let Some(event) = opt_event {
-                window_state.handle_event(Event::Keyboard(event));
-            }
+            let status = opt_event.map(|event| window_state.handle_event(Event::Keyboard(event)));
+            KEY_EVENT_STATUS.set(status);
 
             if msg != WM_SYSKEYDOWN {
                 Some(0)
@@ -631,6 +637,13 @@ unsafe fn wnd_proc_inner(
         //        state
         BV_WINDOW_MUST_CLOSE => {
             let _ = window.destroy();
+            Some(0)
+        }
+        BV_ASK_HOST_RESIZE => {
+            window_state.host_resize_pending.set(false);
+            if let Err(e) = window_bv.host.request_resize(window_state.size()) {
+                warn!("The host did not resize its frame to the window: {}", e);
+            }
             Some(0)
         }
         _ => None,

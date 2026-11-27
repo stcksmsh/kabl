@@ -11,8 +11,11 @@
 //
 // The editor checks (Windows only) open and close kabl's editor 20 times in a parent window, as
 // Live does, and check its size against the window's DPI, that a host resize is held to the
-// editor's fixed size, and that GDI and USER handles do not grow. They need an OpenGL 3.2
-// context for the editor's renderer; without one they stop before attached() and say so.
+// editor's fixed size, and that GDI and USER handles do not grow. On a CI runner they then
+// change the display's scale and check that the editor asks the host (IPlugFrame::resizeView)
+// to fit its frame, once per change, and does not repeat a refused request. They need an
+// OpenGL 3.2 context for the editor's renderer; without one they stop before attached() and
+// say so.
 //
 // Prints one PASS or FAIL line per check; the exit code is the number of failed checks
 // (a setup failure exits with 100).
@@ -217,13 +220,22 @@ std::string fmt(const char* format, double a, double b = 0)
 }
 
 #if SMTG_OS_WINDOWS
-// What a host's IPlugFrame does with a resize request: resize the parent, then the view.
+// What a host's IPlugFrame does with a resize request: resize the parent, then the view. It
+// counts the requests and keeps the last one; with `refuse` set it turns them down, as a host
+// that cannot resize its frame does.
 struct Frame : IPlugFrame
 {
     HWND parent = nullptr;
+    bool refuse = false;
+    int requests = 0;
+    ViewRect last {};
 
     tresult PLUGIN_API resizeView(IPlugView* view, ViewRect* rect) override
     {
+        ++requests;
+        last = *rect;
+        if (refuse)
+            return kResultFalse;
         SetWindowPos(parent, nullptr, 0, 0, rect->getWidth(), rect->getHeight(), SWP_NOMOVE | SWP_NOZORDER);
         return view->onSize(rect) == kResultOk ? kResultOk : kResultFalse;
     }
@@ -315,6 +327,224 @@ SIZE clientSize(HWND window)
 std::string sizes(const char* what, double width, double height)
 {
     return fmt((std::string(what) + " %.0f x %.0f").c_str(), width, height);
+}
+
+// The primary display's scale, as steps relative to the one Windows recommends for it (0), through
+// the undocumented DisplayConfig calls the Settings app uses: they apply at once and send
+// per-monitor-aware windows WM_DPICHANGED, as a move to another monitor does.
+struct DisplayScale
+{
+    DISPLAYCONFIG_PATH_INFO path {};
+    bool found = false;
+    int32_t min = 0, current = 0, max = 0;
+
+    bool read()
+    {
+        UINT32 paths = 0, modes = 0;
+        if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &paths, &modes) != ERROR_SUCCESS || paths == 0)
+            return found = false;
+        std::vector<DISPLAYCONFIG_PATH_INFO> pathInfo(paths);
+        std::vector<DISPLAYCONFIG_MODE_INFO> modeInfo(modes);
+        if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &paths, pathInfo.data(), &modes, modeInfo.data(), nullptr) !=
+            ERROR_SUCCESS)
+            return found = false;
+        path = pathInfo[0];
+        struct
+        {
+            DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+            int32_t min, current, max;
+        } get {};
+        get.header.type = static_cast<DISPLAYCONFIG_DEVICE_INFO_TYPE>(-3);
+        get.header.size = sizeof get;
+        get.header.adapterId = path.sourceInfo.adapterId;
+        get.header.id = path.sourceInfo.id;
+        if (DisplayConfigGetDeviceInfo(&get.header) != ERROR_SUCCESS)
+            return found = false;
+        min = get.min;
+        current = get.current;
+        max = get.max;
+        return found = true;
+    }
+
+    bool set(int32_t step)
+    {
+        struct
+        {
+            DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+            int32_t step;
+        } put {};
+        put.header.type = static_cast<DISPLAYCONFIG_DEVICE_INFO_TYPE>(-4);
+        put.header.size = sizeof put;
+        put.header.adapterId = path.sourceInfo.adapterId;
+        put.header.id = path.sourceInfo.id;
+        put.step = step;
+        return DisplayConfigSetDeviceInfo(&put.header) == ERROR_SUCCESS;
+    }
+};
+
+// Pumps messages until the window's DPI is no longer `from`, for up to five seconds.
+UINT waitForDpiChange(HWND window, UINT from)
+{
+    for (int i = 0; i < 100 && GetDpiForWindow(window) == from; ++i)
+        pump(50);
+    return GetDpiForWindow(window);
+}
+
+// A DPI change with the editor open (the host window moving to another monitor) and a first open
+// at a scale other than 100 % must each ask the host, once, to fit its frame to the editor's new
+// size; a host that refuses is not asked again and the editor keeps its size. Changes the
+// display's scale, so it runs on CI runners only, and puts the scale back.
+void dpiChecks(IEditController* controller, int32 kWidth, int32 kHeight)
+{
+    if (!std::getenv("GITHUB_ACTIONS"))
+    {
+        std::printf("editor: SKIPPED the DPI change checks, which change the display's scale (CI only)\n");
+        return;
+    }
+    DisplayScale display;
+    bool raisedResolution = false;
+    if (display.read() && display.max <= display.current)
+    {
+        // Windows offers no larger scale on a small display; take its largest mode.
+        DEVMODEW best {}, mode {};
+        best.dmSize = mode.dmSize = sizeof(DEVMODEW);
+        for (DWORD i = 0; EnumDisplaySettingsW(nullptr, i, &mode); ++i)
+            if (mode.dmPelsWidth * mode.dmPelsHeight > best.dmPelsWidth * best.dmPelsHeight)
+                best = mode;
+        best.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT;
+        raisedResolution = best.dmPelsWidth && ChangeDisplaySettingsW(&best, 0) == DISP_CHANGE_SUCCESSFUL;
+        std::printf("editor: display resolution raised to %lu x %lu: %s\n", best.dmPelsWidth, best.dmPelsHeight,
+                    raisedResolution ? "yes" : "no");
+        pump(500);
+        display.read();
+    }
+    std::printf("editor: display scale steps %s: min %d, current %d, max %d\n", display.found ? "read" : "unreadable",
+                display.min, display.current, display.max);
+    const int32_t original = display.current;
+    const int32_t raised = std::min(display.max, original + 2);
+    auto restore = [&] {
+        display.set(original);
+        if (raisedResolution)
+            ChangeDisplaySettingsW(nullptr, 0);
+        pump(500);
+    };
+
+    WNDCLASSW wc {};
+    wc.lpfnWndProc = DefWindowProcW;
+    wc.hInstance = GetModuleHandleW(nullptr);
+    wc.lpszClassName = L"kabl-vst3-host-dpi";
+    RegisterClassW(&wc);
+    HWND parent = CreateWindowExW(0, wc.lpszClassName, L"kabl-vst3-host", WS_POPUP | WS_VISIBLE, 0, 0, kWidth,
+                                  kHeight, nullptr, nullptr, wc.hInstance, nullptr);
+    require(parent != nullptr, "create the parent window");
+    Frame frame;
+    frame.parent = parent;
+    auto child = [&] { return GetWindow(parent, GW_CHILD); };
+
+    // Opens the editor in `parent` at the parent's current scale, as a host does.
+    auto open = [&]() -> IPtr<IPlugView> {
+        IPtr<IPlugView> view = owned(controller->createView(ViewType::kEditor));
+        if (!view)
+            return view;
+        view->setFrame(&frame);
+        const double scale = GetDpiForWindow(parent) / 96.0;
+        if (FUnknownPtr<IPlugViewContentScaleSupport> scaling(view); scaling)
+            scaling->setContentScaleFactor(static_cast<float>(scale));
+        ViewRect rect {};
+        view->getSize(&rect);
+        SetWindowPos(parent, nullptr, 0, 0, rect.getWidth(), rect.getHeight(), SWP_NOMOVE | SWP_NOZORDER);
+        if (view->attached(parent, kPlatformTypeHWND) != kResultOk)
+        {
+            view->setFrame(nullptr);
+            return nullptr;
+        }
+        pump(300);
+        return view;
+    };
+    auto close = [&](IPtr<IPlugView>& view) {
+        if (view)
+        {
+            view->removed();
+            view->setFrame(nullptr);
+        }
+        view = nullptr;
+        pump(100);
+    };
+    auto report = [&](IPlugView* view) {
+        ViewRect now {};
+        if (view)
+            view->getSize(&now);
+        const SIZE window = clientSize(child());
+        char buffer[200];
+        std::snprintf(buffer, sizeof buffer, "%d request(s), last %d x %d; getSize %d x %d; window %ld x %ld",
+                      frame.requests, frame.last.getWidth(), frame.last.getHeight(), now.getWidth(), now.getHeight(),
+                      window.cx, window.cy);
+        return std::string(buffer);
+    };
+    // One request, and it equals getSize, the editor window and the editor's size at `dpi`.
+    auto askedOnce = [&](IPlugView* view, UINT dpi) {
+        ViewRect now {};
+        view->getSize(&now);
+        const SIZE window = clientSize(child());
+        const LONG width = std::lround(kWidth * dpi / 96.0), height = std::lround(kHeight * dpi / 96.0);
+        return frame.requests == 1 && frame.last.getWidth() == width && frame.last.getHeight() == height &&
+               now.getWidth() == width && now.getHeight() == height && window.cx == width && window.cy == height;
+    };
+
+    // The editor is open when the scale goes up.
+    IPtr<IPlugView> view = open();
+    check(view != nullptr, "the editor opens for the DPI change checks");
+    if (!view)
+    {
+        DestroyWindow(parent);
+        restore();
+        return;
+    }
+    const UINT before = GetDpiForWindow(child());
+    frame.requests = 0;
+    const bool set = display.found && raised > original && display.set(raised);
+    const UINT after = waitForDpiChange(child(), before);
+    std::printf("editor: display scale step %d -> %d: %s; editor window %u -> %u DPI\n", original, raised,
+                set ? "set" : "not set", before, after);
+    check(after != before, "the display scale change reaches the editor window's DPI");
+    if (after == before)
+    {
+        close(view);
+        DestroyWindow(parent);
+        restore();
+        return;
+    }
+    pump(500);
+    check(askedOnce(view, after), "a DPI change with the editor open asks the host once to fit its frame to getSize "
+                                  "and the editor window: " +
+                                      report(view));
+
+    // A first open at the raised scale.
+    close(view);
+    frame.requests = 0;
+    view = open();
+    pump(300);
+    check(view && askedOnce(view, after),
+          "opening the editor at the raised scale asks the host once to fit its frame: " + report(view));
+
+    // The host refuses, and the scale goes back down.
+    if (view)
+    {
+        frame.refuse = true;
+        frame.requests = 0;
+        display.set(original);
+        const UINT back = waitForDpiChange(child(), after);
+        pump(1000);
+        const SIZE kept = clientSize(child());
+        const LONG width = std::lround(kWidth * back / 96.0), height = std::lround(kHeight * back / 96.0);
+        check(back != after && frame.requests == 1 && kept.cx == width && kept.cy == height,
+              fmt("a refused request is not repeated and the editor keeps its rescaled size at %.0f DPI: ", back) +
+                  report(view));
+    }
+
+    close(view);
+    DestroyWindow(parent);
+    restore();
 }
 
 void editorChecks(IEditController* controller)
@@ -474,6 +704,14 @@ void editorChecks(IEditController* controller)
           fmt("GDI objects grow by at most 10 from cycle 1 to cycle 20: %+.0f", double(gdiEnd) - double(gdiFirst)));
     check(userEnd <= userFirst + kTolerance,
           fmt("USER objects grow by at most 10 from cycle 1 to cycle 20: %+.0f", double(userEnd) - double(userFirst)));
+    if (gl)
+    {
+        // At 100 % the host sized its frame for the editor already; at any other scale each open asks once.
+        const int expected = scale == 1.0 ? 0 : attached;
+        check(frame.requests == expected,
+              fmt("the editor asks the host to resize %.0f times (expected %.0f)", frame.requests, expected));
+        dpiChecks(controller, kWidth, kHeight);
+    }
 }
 #endif
 
@@ -481,6 +719,10 @@ void editorChecks(IEditController* controller)
 
 int main(int argc, char* argv[])
 {
+#if SMTG_OS_WINDOWS
+    // As DAWs are: windows get the DPI of the monitor they are on and hear when it changes.
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+#endif
     if (argc != 3)
     {
         std::printf("usage: kabl-vst3-host <kabl.vst3> <midi-fixture.json>\n");
