@@ -31,6 +31,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 LicenseFile={#StageDir}\LICENSE
 OutputDir={#OutputDir}
 OutputBaseFilename=kabl-{#AppVersion}-windows-x64-setup
+SetupIconFile=..\..\..\crates\ui\assets\windows\kabl.ico
 UninstallDisplayIcon={app}\kabl-ui.exe
 UninstallDisplayName=kabl {#AppVersion}
 WizardStyle=modern

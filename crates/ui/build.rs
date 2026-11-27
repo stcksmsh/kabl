@@ -1,6 +1,11 @@
 //! Records the git commit for the About box (`about::version_line`). Outside a git checkout
 //! (a source tarball) the commit is "unavailable".
 fn main() {
+    // Windows icon for kabl-ui.exe (Explorer, taskbar, Start menu); a no-op on other targets.
+    embed_resource::compile("assets/windows/kabl.rc", embed_resource::NONE)
+        .manifest_optional()
+        .unwrap();
+    println!("cargo:rerun-if-changed=assets/windows");
     let out = std::process::Command::new("git")
         .args(["rev-parse", "--short=12", "HEAD"])
         .output();

@@ -19,6 +19,9 @@ Neither is code-signed.
 2. `iscc /DAppVersion=<version> /DStageDir=<that folder> /DOutputDir=<dir> installer\kabl.iss`
    builds the installer from the same folder, so both hold the same files.
 
+The kabl icon (`crates/ui/assets/windows/kabl.ico`) is embedded in `kabl-ui.exe` by `crates/ui/build.rs`; the
+setup program uses it (`SetupIconFile`), and the Start menu entry and uninstall entry show the exe's icon.
+
 What the installer does (per machine, needs admin):
 
 | Installed to | From the package |
