@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use baseview::dpi::{LogicalPosition, LogicalSize, Size};
+use baseview::key_route::{KeyMessage, KeyRoute};
 use baseview::{
     Event, EventStatus, HandlerError, ParentWindowHandle, Window, WindowContext, WindowHandler,
     WindowSettings, WindowSize,
@@ -221,7 +222,12 @@ pub struct Frame {
     window: WindowContext,
     clear_color: Rgba,
     key_capture: KeyCapture,
+    key_owner: Option<Box<KeyOwner>>,
 }
+
+/// Whether the app uses a key now, given the key (`None`: one egui has no name for) and the
+/// modifiers held. See [`Frame::set_key_owner`].
+pub type KeyOwner = dyn Fn(Option<egui::Key>, egui::Modifiers) -> bool;
 
 impl Frame {
     fn new(renderer: Renderer, window: WindowContext) -> Self {
@@ -230,6 +236,7 @@ impl Frame {
             window,
             clear_color: Rgba::BLACK,
             key_capture: Default::default(),
+            key_owner: None,
         }
     }
 
@@ -241,6 +248,19 @@ impl Frame {
     /// Set how to handle capturing key events from the host.
     pub fn set_key_capture(&mut self, key_capture: KeyCapture) {
         self.key_capture = key_capture;
+    }
+
+    /// Split keys between the app and the host by what the app uses: a key the app uses reaches
+    /// egui and is kept from the host; any other reaches only the host (macOS passes it to the
+    /// next responder, the Windows keyboard hook to the parent window). `owner` is asked on the
+    /// first key-down of a press, as the key arrives and before the next frame; repeats and the
+    /// key-up follow that answer. Set it again each frame to answer from the newest state.
+    /// Without an owner, [`KeyCapture`] decides and every key reaches egui.
+    pub fn set_key_owner(
+        &mut self,
+        owner: impl Fn(Option<egui::Key>, egui::Modifiers) -> bool + 'static,
+    ) {
+        self.key_owner = Some(Box::new(owner));
     }
 
     /// Access the internal baseview window.
@@ -281,9 +301,28 @@ pub enum KeyCapture {
     IgnoreKeys(Vec<keyboard_types::Key>),
 }
 
+/// Whether a key event goes to the host instead of the app, given `owner` (see
+/// [`Frame::set_key_owner`]) and the egui modifiers held. The first key-down of a press asks
+/// `owner`; its repeats and key-up go where it went (`route`).
+pub fn key_to_host(
+    route: &mut KeyRoute<keyboard_types::Code>,
+    event: &keyboard_types::KeyboardEvent,
+    modifiers: egui::Modifiers,
+    owner: &KeyOwner,
+) -> bool {
+    let message = match (event.state, event.repeat) {
+        (keyboard_types::KeyState::Up, _) => KeyMessage::Up,
+        (keyboard_types::KeyState::Down, true) => KeyMessage::Repeat,
+        (keyboard_types::KeyState::Down, false) => KeyMessage::Down,
+    };
+    let key = crate::translate::translate_virtual_key(&event.key);
+    route.to_host(message, event.code, || !owner(key, modifiers))
+}
+
 impl KeyCapture {
-    /// Whether the window keeps `key` from the host: only while egui has a text field focused,
-    /// and then only the keys this setting captures. Every key reaches egui either way; an
+    /// Whether the window keeps `key` from the host, when the app set no key owner
+    /// ([`Frame::set_key_owner`]): only while egui has a text field focused, and then only the
+    /// keys this setting captures. Every key reaches egui either way; an
     /// ignored one also goes to the host (macOS passes it to the next responder, the Windows
     /// keyboard hook to the parent window), so the host's shortcuts keep working.
     pub fn status(&self, key: &keyboard_types::Key, text_focus: bool) -> EventStatus {
@@ -315,6 +354,8 @@ pub struct EguiWindow<A: App> {
     host_frame: Cell<win32_dpi::HostFrame>,
     zoom_factor: Cell<f32>,
     pointer_logical_pos: Cell<Option<egui::Pos2>>,
+    /// Where each held key went, when the app set a key owner.
+    key_route: RefCell<KeyRoute<keyboard_types::Code>>,
     current_cursor_icon: Cell<baseview::MouseCursor>,
     repaint_after: Arc<Mutex<Option<Instant>>>,
     repaint_notifier: Option<RepaintNotifier>,
@@ -422,6 +463,7 @@ impl<A: App> EguiWindow<A> {
             start_time,
             egui_input: egui_input.into(),
             pointer_logical_pos: None.into(),
+            key_route: Default::default(),
             current_cursor_icon: baseview::MouseCursor::Default.into(),
             system_scale_factor: system_scale_factor.into(),
             #[cfg(windows)]
@@ -891,6 +933,25 @@ impl<A: App> WindowHandler for EguiWindow<A> {
                     _ => (),
                 }
 
+                // With a key owner, a key for the host never reaches egui. Modifiers above
+                // are tracked either way, so egui's stay true.
+                let modifiers = egui_input.modifiers;
+                let to_host = {
+                    let inner = self.inner.borrow();
+                    match &inner.frame.key_owner {
+                        Some(owner) => Some(key_to_host(
+                            &mut self.key_route.borrow_mut(),
+                            event,
+                            modifiers,
+                            owner,
+                        )),
+                        None => None,
+                    }
+                };
+                if to_host == Some(true) {
+                    return EventStatus::Ignored;
+                }
+
                 if let Some(key) = crate::translate::translate_virtual_key(&event.key) {
                     let modifiers = egui_input.modifiers;
                     egui_input.events.push(egui::Event::Key {
@@ -933,11 +994,15 @@ impl<A: App> WindowHandler for EguiWindow<A> {
                     }
                 }
 
-                let inner = self.inner.borrow();
-                return_status = inner
-                    .frame
-                    .key_capture
-                    .status(&event.key, inner.egui_ctx.egui_wants_keyboard_input());
+                return_status = if to_host.is_some() {
+                    EventStatus::Captured
+                } else {
+                    let inner = self.inner.borrow();
+                    inner
+                        .frame
+                        .key_capture
+                        .status(&event.key, inner.egui_ctx.egui_wants_keyboard_input())
+                };
             }
             baseview::Event::Window(event) => match event {
                 baseview::WindowEvent::Focused => {
@@ -952,6 +1017,7 @@ impl<A: App> WindowHandler for EguiWindow<A> {
                     self.inner.borrow().egui_ctx.request_repaint();
                 }
                 baseview::WindowEvent::Unfocused => {
+                    self.key_route.borrow_mut().clear();
                     let mut egui_input = self.egui_input.borrow_mut();
                     egui_input.events.push(egui::Event::WindowFocused(false));
                     egui_input

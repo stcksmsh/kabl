@@ -517,6 +517,7 @@ unsafe fn wnd_proc_inner(
             None
         }
         WM_KILLFOCUS => {
+            super::hook::clear_key_route();
             window_state.handle_event(Event::Window(WindowEvent::Unfocused));
 
             None

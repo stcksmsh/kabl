@@ -18,6 +18,7 @@ use windows_sys::Win32::{
 
 use super::*;
 use crate::key_route::{KeyMessage, KeyRoute};
+use crate::EventStatus;
 use crate::platform::win::window::KEY_EVENT_STATUS;
 use crate::wrappers::win32::window::wnd_proc;
 
@@ -27,8 +28,15 @@ use crate::wrappers::win32::window::wnd_proc;
 static HOOK_STATE: LazyLock<RwLock<KeyboardHookState>> = LazyLock::new(RwLock::default);
 
 thread_local! {
-    // The hook runs on the thread that installed it, so the routing is per thread too.
-    static KEY_ROUTE: RefCell<KeyRoute> = RefCell::new(KeyRoute::default());
+    // The hook runs on the thread that installed it, so the routing is per thread too. Keyed by
+    // virtual-key code.
+    static KEY_ROUTE: RefCell<KeyRoute<u8>> = RefCell::new(KeyRoute::default());
+}
+
+/// Forgets where held keys went, when a baseview window loses focus: their key-ups go to the
+/// window that has focus now, so one arriving later is not for the host.
+pub(crate) fn clear_key_route() {
+    KEY_ROUTE.with_borrow_mut(KeyRoute::clear);
 }
 
 pub(crate) struct KeyboardHookHandle(HWNDWrapper);
@@ -131,8 +139,11 @@ unsafe extern "system" fn keyboard_hook_callback(
 unsafe fn offer_message_to_baseview(msg: *mut MSG) -> bool {
     let msg = &mut *msg;
 
+    // Bit 30 of a key-down's lParam: the key was already down, so this is an auto-repeat.
+    let repeat = msg.lParam & 0x4000_0000 != 0;
     // if this isn't a keyboard message, ignore it
     let kind = match msg.message {
+        WM_KEYDOWN | WM_SYSKEYDOWN if repeat => KeyMessage::Repeat,
         WM_KEYDOWN | WM_SYSKEYDOWN => KeyMessage::Down,
         WM_KEYUP | WM_SYSKEYUP => KeyMessage::Up,
         WM_CHAR | WM_SYSCHAR => KeyMessage::Char,
@@ -147,7 +158,8 @@ unsafe fn offer_message_to_baseview(msg: *mut MSG) -> bool {
     let _ = wnd_proc::<BaseviewWindow>(msg.hwnd, msg.message, msg.wParam, msg.lParam);
     let status = KEY_EVENT_STATUS.take();
 
-    if KEY_ROUTE.with_borrow_mut(|route| route.to_host(kind, msg.wParam as u8, status)) {
+    let ignored = || status == Some(EventStatus::Ignored);
+    if KEY_ROUTE.with_borrow_mut(|route| route.to_host(kind, msg.wParam as u8, ignored)) {
         // A window without a parent has no host to pass to.
         let parent = GetParent(msg.hwnd);
         if !parent.is_null() {

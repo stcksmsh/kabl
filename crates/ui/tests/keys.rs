@@ -362,3 +362,150 @@ fn an_unfocused_window_never_retriggers_the_strip() {
     }
     assert_eq!(h.out(), [off(60)], "one note-off, no retrigger");
 }
+
+/// The plugin's key split (`keys::Owner`): which keys kabl keeps from the host, per view, as
+/// a key arrives after a frame. Every row names its state, key and modifiers; a row that flips
+/// fails with its name.
+#[test]
+fn kabl_keeps_its_keys_and_the_host_gets_the_rest() {
+    use kabl_ui::keys::Owner;
+    const NONE: Modifiers = Modifiers::NONE;
+    const SHIFT: Modifiers = Modifiers::SHIFT;
+    const CMD: Modifiers = Modifiers::COMMAND;
+    const KABL: bool = true;
+    const HOST: bool = false;
+    type Row = (&'static str, Option<Key>, Modifiers, bool);
+    let check = |state: &str, owner: Owner, rows: &[Row]| {
+        for &(name, key, modifiers, kabl) in rows {
+            assert_eq!(
+                owner.keeps(key, modifiers),
+                kabl,
+                "{state}: {name} should go to {}",
+                if kabl { "kabl" } else { "the host" }
+            );
+        }
+    };
+
+    // Computer keys on, rack, nothing focused.
+    let mut h = H::new();
+    check(
+        "computer keys on",
+        Owner::of(&h.ui, &h.ctx),
+        &[
+            ("A (note)", Some(Key::A), NONE, KABL),
+            ("W (note)", Some(Key::W), NONE, KABL),
+            ("' (top note)", Some(Key::Quote), NONE, KABL),
+            ("Z (octave down)", Some(Key::Z), NONE, KABL),
+            ("X (octave up)", Some(Key::X), NONE, KABL),
+            ("Shift+A", Some(Key::A), SHIFT, HOST),
+            ("Ctrl+A", Some(Key::A), CMD, HOST),
+            ("Space", Some(Key::Space), NONE, HOST),
+            ("Q (not a note)", Some(Key::Q), NONE, HOST),
+            ("Escape", Some(Key::Escape), NONE, KABL),
+        ],
+    );
+
+    // Computer keys off (the plugin's default): the note keys are the host's, A is add-module.
+    h.ui.keys.computer = false;
+    h.frame();
+    check(
+        "computer keys off, rack",
+        Owner::of(&h.ui, &h.ctx),
+        &[
+            ("A (add-module menu)", Some(Key::A), NONE, KABL),
+            ("W", Some(Key::W), NONE, HOST),
+            ("Z", Some(Key::Z), NONE, HOST),
+            ("X", Some(Key::X), NONE, HOST),
+            ("Space (browser closed)", Some(Key::Space), NONE, HOST),
+            ("Enter (browser closed)", Some(Key::Enter), NONE, HOST),
+            ("Down (browser closed)", Some(Key::ArrowDown), NONE, HOST),
+            ("Left", Some(Key::ArrowLeft), NONE, HOST),
+            ("Delete", Some(Key::Delete), NONE, HOST),
+            ("Tab", Some(Key::Tab), NONE, HOST),
+            ("Ctrl+Z (rack undo)", Some(Key::Z), CMD, KABL),
+            ("Ctrl+Shift+Z (rack redo)", Some(Key::Z), CMD | SHIFT, KABL),
+            ("Ctrl+Y (rack redo)", Some(Key::Y), CMD, KABL),
+            ("Ctrl+S (save)", Some(Key::S), CMD, KABL),
+            ("Ctrl+Q", Some(Key::Q), CMD, HOST),
+            ("Ctrl+Space", Some(Key::Space), CMD, HOST),
+            ("F5", Some(Key::F5), NONE, HOST),
+            ("a key egui cannot name", None, NONE, HOST),
+        ],
+    );
+
+    // A focused knob takes the arrows; Space stays the host's.
+    h.focus_a_knob();
+    check(
+        "knob focused",
+        Owner::of(&h.ui, &h.ctx),
+        &[
+            ("Up", Some(Key::ArrowUp), NONE, KABL),
+            ("Shift+Left (fine)", Some(Key::ArrowLeft), SHIFT, KABL),
+            ("Space", Some(Key::Space), NONE, HOST),
+            ("Ctrl+Z", Some(Key::Z), CMD, KABL),
+        ],
+    );
+
+    // The browser with a row selected: Space previews, Enter loads, Up and Down move.
+    let mut h = H::new();
+    h.ui.keys.computer = false;
+    h.ui.browser_open = true;
+    h.frame();
+    h.ui.browser.selected = Some("factory:init-keyboard".into());
+    h.frame();
+    assert!(h.ui.browser.selected.is_some());
+    check(
+        "browser, a row selected",
+        Owner::of(&h.ui, &h.ctx),
+        &[
+            ("Space (preview)", Some(Key::Space), NONE, KABL),
+            ("Enter (load)", Some(Key::Enter), NONE, KABL),
+            ("Down", Some(Key::ArrowDown), NONE, KABL),
+            ("Up", Some(Key::ArrowUp), NONE, KABL),
+            ("Shift+Space", Some(Key::Space), SHIFT, HOST),
+            ("W", Some(Key::W), NONE, HOST),
+        ],
+    );
+
+    // A text field has focus: every key is kabl's, shortcuts and note keys included.
+    h.click("search");
+    assert!(
+        h.ctx.egui_wants_keyboard_input(),
+        "the search field has focus"
+    );
+    check(
+        "text field focused",
+        Owner::of(&h.ui, &h.ctx),
+        &[
+            ("Space", Some(Key::Space), NONE, KABL),
+            ("W", Some(Key::W), NONE, KABL),
+            ("Ctrl+A", Some(Key::A), CMD, KABL),
+            ("Tab", Some(Key::Tab), NONE, KABL),
+            ("a key egui cannot name", None, NONE, KABL),
+        ],
+    );
+
+    // The design page: its own undo, the arrows nudge, Delete removes.
+    let mut h = H::new();
+    h.ui.keys.computer = false;
+    let id =
+        kabl_ui::composites::encapsulate(&mut h.editor, [3].into(), Default::default(), "Voice")
+            .unwrap();
+    let c = h.editor.state().composites[&id].clone();
+    kabl_ui::panels::open(&mut h.ui, id, &c);
+    h.frame();
+    h.frame();
+    assert!(h.ui.panels.page.is_some(), "the design page is open");
+    check(
+        "design page",
+        Owner::of(&h.ui, &h.ctx),
+        &[
+            ("Ctrl+Z (page undo)", Some(Key::Z), CMD, KABL),
+            ("Left (nudge)", Some(Key::ArrowLeft), NONE, KABL),
+            ("Down (nudge)", Some(Key::ArrowDown), NONE, KABL),
+            ("Delete", Some(Key::Delete), NONE, KABL),
+            ("Escape", Some(Key::Escape), NONE, KABL),
+            ("Space", Some(Key::Space), NONE, HOST),
+        ],
+    );
+}
