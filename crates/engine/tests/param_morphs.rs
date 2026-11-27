@@ -589,7 +589,7 @@ fn a_load_does_not_write_a_finished_recall_into_the_new_patch() {
 }
 
 #[test]
-fn a_recall_behind_a_fresh_load_is_dropped_like_cue_macros() {
+fn a_recall_behind_a_fresh_load_lands_and_cue_macros_are_dropped() {
     let mut r = Rig::new();
     // An edit fading in, then a Load waiting behind it.
     let edit = r.graph(true, 5);
@@ -603,8 +603,8 @@ fn a_recall_behind_a_fresh_load_is_dropped_like_cue_macros() {
     assert!(r.report().is_empty(), "nothing is scheduled");
     r.run(BAR_BLOCKS + 300);
     assert!(
-        close(r.value(att(1)), 0.0),
-        "the loaded graph keeps its value"
+        close(r.value(att(1)), mt(1).to),
+        "the recall lands in the new song"
     );
     assert!(close(r.value(mac(0)), 0.2));
     assert!(r.report().is_empty());

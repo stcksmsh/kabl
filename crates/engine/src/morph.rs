@@ -189,11 +189,13 @@ impl Morphs {
         self.staged_seq = None;
     }
 
-    /// Drops a recall part and the staged set, unlanded: behind a fresh Load the new graph is
-    /// compiled from the document and needs no land (FACES section 3.3).
-    pub fn drop_part(&mut self) {
-        self.staged.fill(None);
-        self.staged_seq = None;
+    /// Lands a recall part and the staged set instead of morphing them: behind a fresh Load
+    /// the recall was made on the new document, which holds `to`, and a recall always lands.
+    pub fn land_part(&mut self, p: &MorphPart) {
+        self.drop_staged();
+        for t in &p.targets[..(p.count as usize).min(PART_TARGETS)] {
+            self.land(t.target, t.to);
+        }
     }
 
     /// Stages a recall part; the `last` one schedules every staged target to start in the next

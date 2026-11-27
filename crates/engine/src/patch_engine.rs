@@ -789,9 +789,10 @@ impl PatchEngine {
     pub fn command(&mut self, c: &Command) {
         match c {
             Command::Launch(l) => self.launch(l),
-            // Like a cue's macros, a recall waiting behind a fresh Load does not morph.
-            Command::Morph(_) if self.pending.as_ref().is_some_and(|g| g.fresh) => {
-                self.morphs.drop_part()
+            // Like a cue's macros, a recall waiting behind a fresh Load does not morph; unlike
+            // them it edited the document, so it lands in every graph, the Load's too.
+            Command::Morph(p) if self.pending.as_ref().is_some_and(|g| g.fresh) => {
+                self.morphs.land_part(p)
             }
             Command::Morph(p) => self.morphs.part(p),
             Command::Cancel(s) => self.cancel(*s),
