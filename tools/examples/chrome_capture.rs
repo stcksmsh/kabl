@@ -15,7 +15,7 @@ use kabl_ui::{show, PatchEditor, UiState};
 use std::path::PathBuf;
 
 const SIZES: [(u32, u32); 3] = [(1440, 900), (1280, 800), (1180, 680)];
-const SCENES: [&str; 65] = [
+const SCENES: [&str; 68] = [
     "rack",
     "perform",
     "sounds",
@@ -81,6 +81,9 @@ const SCENES: [&str; 65] = [
     "design-page-displays",
     "face-buttons",
     "design-page-buttons",
+    "drum-kit-rack",
+    "drum-kit-face",
+    "drum-kit-design",
 ];
 
 struct Job {
@@ -125,6 +128,44 @@ use mockup::mockup_patch;
 
 fn patches() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../patches")
+}
+
+/// A clock at 120 BPM into the factory `kabl.drum-kit` v1 into the output, the card below the
+/// clock.
+fn drum_kit_patch() -> PatchEditor {
+    use kabl_ui::composites;
+    let mut e = PatchEditor::new();
+    let clock = e.add_module("clock", kabl_core::Vec2 { x: 24.0, y: 20.0 });
+    e.set_param(clock, "bpm", 120.0);
+    let out = e.add_module("out", kabl_core::Vec2 { x: 904.0, y: 20.0 });
+    let bank = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../composites");
+    let entry = composites::factory_entries(&bank)
+        .into_iter()
+        .find(|f| f.definition.id == "kabl.drum-kit" && f.definition.version == 1)
+        .expect("kabl.drum-kit v1 in the bank");
+    let pkg = composites::read_factory(&entry).expect("read kabl.drum-kit v1");
+    let id = composites::insert(&mut e, &pkg).expect("insert Drum Kit");
+    let mut c = e.state().composites[&id].clone();
+    c.pos = kabl_core::Vec2 { x: 24.0, y: 200.0 };
+    composites::set(&mut e, id, c).expect("move Drum Kit");
+    let port = |e: &PatchEditor, label: &str| {
+        e.state().composites[&id]
+            .ports
+            .values()
+            .find(|x| x.label == label)
+            .expect("Drum Kit port")
+            .target
+            .clone()
+    };
+    let jack = |id, port: &str| kabl_core::PortRef::Module {
+        id,
+        port: port.into(),
+    };
+    let (gate, reset, mix) = (port(&e, "Clock"), port(&e, "Reset"), port(&e, "Out"));
+    e.connect(jack(clock, "gate"), gate);
+    e.connect(jack(clock, "reset"), reset);
+    e.connect(mix, jack(out, "in"));
+    e
 }
 
 /// The Perform mockup as a patch: a clock, four macros (Bite, Wash, Drive, Space on CC 20 to 23,
@@ -300,6 +341,7 @@ impl App {
                 }
                 e
             }
+            Err(_) if j.scene.starts_with("drum-kit") => drum_kit_patch(),
             // The button scenes need a clock and sequencers: the performance patch.
             Err(_) if j.scene.contains("-buttons") => PatchEditor::from_log(
                 kabl_core::load(&patches().join("performance")).expect("performance"),
@@ -1437,15 +1479,25 @@ impl eframe::App for App {
             };
             self.ui.pan = egui::vec2(-860.0, -240.0) * self.ui.zoom;
         }
+        // The Drum Kit face at zoom 1, near the top left; its design page.
+        if self.f == 6 && scene == "drum-kit-face" {
+            self.ui.zoom = 1.0;
+            self.ui.drawer_open = false;
+            self.ui.pan = egui::vec2(0.0, -160.0);
+        }
+        if self.f == 6 && scene == "drum-kit-design" {
+            let (&id, c) = self.editor.state().composites.iter().next().unwrap();
+            kabl_ui::panels::open(&mut self.ui, id, c);
+        }
         // The "Top" face, first in the rack, at zoom 1.
         if self.f == 6 && scene == "face-buttons" {
             self.ui.zoom = 1.0;
             self.ui.pan = egui::Vec2::ZERO;
         }
-        // The display scenes' audio, rendered offline: the engine is built once the scene is set
-        // up, then each frame takes the taps the faces ask for, renders a frame's worth of blocks
-        // with a held note and hands the face reports back.
-        if self.f >= 6 && scene.contains("-display") {
+        // The display and Drum Kit scenes' audio, rendered offline: the engine is built once the
+        // scene is set up, then each frame takes the taps the faces ask for, renders a frame's
+        // worth of blocks with a held note and hands the face reports back.
+        if self.f >= 6 && (scene.contains("-display") || scene.starts_with("drum-kit")) {
             use kabl_engine::{graph::BLOCK, keyboard::KeyEvent, patch_engine::PatchEngine};
             const SR: f32 = 48000.0;
             let state = self.editor.state();

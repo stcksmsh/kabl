@@ -1,0 +1,783 @@
+{
+  "schema": 3,
+  "root": 1,
+  "patch": {
+    "composites": {
+      "1": {
+        "name": "Drum Kit",
+        "help": "Open internals to inspect the real modules and routes. Editing affects this instance only.",
+        "definition": {
+          "id": "kabl.drum-kit",
+          "version": 1
+        },
+        "parent": null,
+        "members": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "pos": {
+          "x": 24.0,
+          "y": 20.0
+        },
+        "ports": {
+          "1": {
+            "label": "Clock",
+            "target": {
+              "Module": {
+                "id": 1,
+                "port": "clock"
+              }
+            }
+          },
+          "2": {
+            "label": "Reset",
+            "target": {
+              "Module": {
+                "id": 1,
+                "port": "reset"
+              }
+            }
+          },
+          "3": {
+            "label": "Out",
+            "target": {
+              "Module": {
+                "id": 10,
+                "port": "out"
+              }
+            }
+          },
+          "4": {
+            "label": "Kick",
+            "target": {
+              "Module": {
+                "id": 2,
+                "port": "out"
+              }
+            }
+          },
+          "5": {
+            "label": "Hats/Bus",
+            "target": {
+              "Module": {
+                "id": 9,
+                "port": "out"
+              }
+            }
+          },
+          "6": {
+            "label": "Kick mod",
+            "target": {
+              "Param": {
+                "id": 10,
+                "param": "level1"
+              }
+            }
+          },
+          "7": {
+            "label": "Clap mod",
+            "target": {
+              "Param": {
+                "id": 8,
+                "param": "level1"
+              }
+            }
+          },
+          "8": {
+            "label": "Hat mod",
+            "target": {
+              "Param": {
+                "id": 8,
+                "param": "level2"
+              }
+            }
+          },
+          "9": {
+            "label": "Tom mod",
+            "target": {
+              "Param": {
+                "id": 10,
+                "param": "level2"
+              }
+            }
+          },
+          "10": {
+            "label": "Tone mod",
+            "target": {
+              "Param": {
+                "id": 9,
+                "param": "cutoff_hz"
+              }
+            }
+          }
+        },
+        "controls": {
+          "11": {
+            "label": "Kick Tune",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "tune_hz"
+              }
+            }
+          },
+          "12": {
+            "label": "Kick Decay",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "decay_ms"
+              }
+            }
+          },
+          "13": {
+            "label": "Kick Drive",
+            "target": {
+              "Param": {
+                "id": 2,
+                "param": "drive_db"
+              }
+            }
+          },
+          "14": {
+            "label": "Snare Decay",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "decay_ms"
+              }
+            }
+          },
+          "15": {
+            "label": "Snare Level",
+            "target": {
+              "Param": {
+                "id": 3,
+                "param": "level_db"
+              }
+            }
+          },
+          "16": {
+            "label": "Clap Level",
+            "target": {
+              "Param": {
+                "id": 4,
+                "param": "level_db"
+              }
+            }
+          },
+          "17": {
+            "label": "Hat Level",
+            "target": {
+              "Param": {
+                "id": 5,
+                "param": "level_db"
+              }
+            }
+          },
+          "18": {
+            "label": "Tom Tune",
+            "target": {
+              "Param": {
+                "id": 6,
+                "param": "tune_hz"
+              }
+            }
+          },
+          "19": {
+            "label": "Tom Level",
+            "target": {
+              "Param": {
+                "id": 6,
+                "param": "level_db"
+              }
+            }
+          },
+          "20": {
+            "label": "Bus Tone",
+            "target": {
+              "Param": {
+                "id": 9,
+                "param": "cutoff_hz"
+              }
+            }
+          }
+        },
+        "next_interface": 25,
+        "panel": {
+          "width": 840.0,
+          "placements": {
+            "1": {
+              "kind": "jack",
+              "x": 8.0,
+              "y": 250.0,
+              "width": 76.0,
+              "height": 58.0
+            },
+            "2": {
+              "kind": "jack",
+              "x": 90.0,
+              "y": 250.0,
+              "width": 76.0,
+              "height": 58.0
+            },
+            "3": {
+              "kind": "jack",
+              "x": 172.0,
+              "y": 250.0,
+              "width": 76.0,
+              "height": 58.0
+            },
+            "4": {
+              "kind": "jack",
+              "x": 254.0,
+              "y": 250.0,
+              "width": 76.0,
+              "height": 58.0
+            },
+            "5": {
+              "kind": "jack",
+              "x": 336.0,
+              "y": 250.0,
+              "width": 76.0,
+              "height": 58.0
+            },
+            "6": {
+              "kind": "jack",
+              "x": 418.0,
+              "y": 250.0,
+              "width": 76.0,
+              "height": 58.0
+            },
+            "7": {
+              "kind": "jack",
+              "x": 500.0,
+              "y": 250.0,
+              "width": 76.0,
+              "height": 58.0
+            },
+            "8": {
+              "kind": "jack",
+              "x": 582.0,
+              "y": 250.0,
+              "width": 76.0,
+              "height": 58.0
+            },
+            "9": {
+              "kind": "jack",
+              "x": 664.0,
+              "y": 250.0,
+              "width": 76.0,
+              "height": 58.0
+            },
+            "10": {
+              "kind": "jack",
+              "x": 746.0,
+              "y": 250.0,
+              "width": 76.0,
+              "height": 58.0
+            },
+            "11": {
+              "kind": "knob",
+              "x": 8.0,
+              "y": 132.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "12": {
+              "kind": "knob",
+              "x": 86.0,
+              "y": 132.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "13": {
+              "kind": "knob",
+              "x": 164.0,
+              "y": 132.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "14": {
+              "kind": "knob",
+              "x": 250.0,
+              "y": 132.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "15": {
+              "kind": "knob",
+              "x": 328.0,
+              "y": 132.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "16": {
+              "kind": "knob",
+              "x": 414.0,
+              "y": 132.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "17": {
+              "kind": "knob",
+              "x": 492.0,
+              "y": 132.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "18": {
+              "kind": "knob",
+              "x": 578.0,
+              "y": 132.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "19": {
+              "kind": "knob",
+              "x": 656.0,
+              "y": 132.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "20": {
+              "kind": "knob",
+              "x": 742.0,
+              "y": 132.0,
+              "width": 70.0,
+              "height": 110.0
+            },
+            "21": {
+              "kind": "display",
+              "x": 8.0,
+              "y": 64.0,
+              "width": 226.0,
+              "height": 60.0,
+              "source": {
+                "module": {
+                  "id": 2,
+                  "action": null
+                }
+              },
+              "label": "Kick"
+            },
+            "22": {
+              "kind": "display",
+              "x": 250.0,
+              "y": 64.0,
+              "width": 148.0,
+              "height": 60.0,
+              "source": {
+                "module": {
+                  "id": 3,
+                  "action": null
+                }
+              },
+              "label": "Snare"
+            },
+            "23": {
+              "kind": "display",
+              "x": 414.0,
+              "y": 64.0,
+              "width": 148.0,
+              "height": 60.0,
+              "source": {
+                "module": {
+                  "id": 5,
+                  "action": null
+                }
+              },
+              "label": "Clap · Hats"
+            },
+            "24": {
+              "kind": "display",
+              "x": 578.0,
+              "y": 64.0,
+              "width": 148.0,
+              "height": 60.0,
+              "source": {
+                "module": {
+                  "id": 6,
+                  "action": null
+                }
+              },
+              "label": "Tom"
+            }
+          },
+          "light": null,
+          "dark": null
+        }
+      }
+    },
+    "modules": {
+      "1": {
+        "kind": "drum.grid",
+        "pos": {
+          "x": 24.0,
+          "y": 20.0
+        },
+        "params": {
+          "a11": 4.0,
+          "a12": 4.0,
+          "a13": 4.0,
+          "a14": 4.0,
+          "a21": 0.0,
+          "a22": 4.0,
+          "a23": 0.0,
+          "a24": 4.0,
+          "a31": 0.0,
+          "a32": 4.0,
+          "a33": 0.0,
+          "a34": 65540.0,
+          "a41": 3075.0,
+          "a42": 3075.0,
+          "a43": 3075.0,
+          "a44": 3075.0,
+          "a51": 2048.0,
+          "a52": 2048.0,
+          "a53": 2048.0,
+          "a54": 2048.0,
+          "a61": 0.0,
+          "a62": 0.0,
+          "a63": 0.0,
+          "a64": 3072.0
+        }
+      },
+      "2": {
+        "kind": "drum.kick",
+        "pos": {
+          "x": 24.0,
+          "y": 420.0
+        },
+        "params": {
+          "decay_ms": 250.0,
+          "drive_db": 8.0,
+          "level_db": -8.0,
+          "tune_hz": 55.0
+        }
+      },
+      "3": {
+        "kind": "drum.snare",
+        "pos": {
+          "x": 214.0,
+          "y": 420.0
+        },
+        "params": {
+          "decay_ms": 200.0,
+          "level_db": -8.0
+        }
+      },
+      "4": {
+        "kind": "drum.clap",
+        "pos": {
+          "x": 404.0,
+          "y": 420.0
+        },
+        "params": {
+          "level_db": -10.0
+        }
+      },
+      "5": {
+        "kind": "drum.hat",
+        "pos": {
+          "x": 594.0,
+          "y": 420.0
+        },
+        "params": {
+          "level_db": -16.0
+        }
+      },
+      "6": {
+        "kind": "drum.tom",
+        "pos": {
+          "x": 784.0,
+          "y": 420.0
+        },
+        "params": {
+          "decay_ms": 300.0,
+          "level_db": -10.0,
+          "tune_hz": 120.0
+        }
+      },
+      "7": {
+        "kind": "mixer",
+        "pos": {
+          "x": 24.0,
+          "y": 820.0
+        },
+        "params": {
+          "level1": 0.7
+        }
+      },
+      "8": {
+        "kind": "mixer",
+        "pos": {
+          "x": 214.0,
+          "y": 820.0
+        },
+        "params": {
+          "level1": 0.5,
+          "level2": 0.3,
+          "level3": 0.5
+        }
+      },
+      "9": {
+        "kind": "filter.ladder",
+        "pos": {
+          "x": 404.0,
+          "y": 820.0
+        },
+        "params": {
+          "cutoff_hz": 20000.0,
+          "resonance": 0.2
+        }
+      },
+      "10": {
+        "kind": "mixer",
+        "pos": {
+          "x": 594.0,
+          "y": 820.0
+        },
+        "params": {
+          "level1": 1.0,
+          "level2": 0.3,
+          "level3": 1.0
+        }
+      }
+    },
+    "cables": {
+      "1": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "kick"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 2,
+            "port": "gate"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "2": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "snare"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 3,
+            "port": "gate"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "3": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "clap"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 4,
+            "port": "gate"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "4": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "chat"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 5,
+            "port": "closed"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "5": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "ohat"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 5,
+            "port": "open"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "6": {
+        "from": {
+          "Module": {
+            "id": 1,
+            "port": "tom"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 6,
+            "port": "gate"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "7": {
+        "from": {
+          "Module": {
+            "id": 2,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 7,
+            "port": "in1"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "8": {
+        "from": {
+          "Module": {
+            "id": 4,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 8,
+            "port": "in1"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "9": {
+        "from": {
+          "Module": {
+            "id": 5,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 8,
+            "port": "in2"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "10": {
+        "from": {
+          "Module": {
+            "id": 3,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 8,
+            "port": "in3"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "11": {
+        "from": {
+          "Module": {
+            "id": 8,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 9,
+            "port": "in"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "12": {
+        "from": {
+          "Module": {
+            "id": 7,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 10,
+            "port": "in1"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "13": {
+        "from": {
+          "Module": {
+            "id": 6,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 10,
+            "port": "in2"
+          }
+        },
+        "params": {},
+        "steps": []
+      },
+      "14": {
+        "from": {
+          "Module": {
+            "id": 9,
+            "port": "out"
+          }
+        },
+        "to": {
+          "Module": {
+            "id": 10,
+            "port": "in3"
+          }
+        },
+        "params": {},
+        "steps": []
+      }
+    }
+  }
+}
