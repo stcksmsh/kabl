@@ -1,9 +1,10 @@
 //! Macro knob profiles on `patches/echo`: a profile saved per controller drives the patch's
 //! first macro module through soft takeover and gesture grouping, the patch's own mappings win,
 //! lookup falls back to "any controller", and Settings sets up, lists and forgets a profile.
+//! A known controller's built-in map stands in when its port has no profile of its own.
 
 use egui::{Event, Pos2, RawInput, Rect};
-use kabl_ui::perform::{self, KnobProfile, ANY_CONTROLLER};
+use kabl_ui::perform::{self, KnobProfile, Knobs, ANY_CONTROLLER};
 use kabl_ui::{routing, show, PatchEditor, UiState};
 
 const CLOCK: u64 = 1;
@@ -18,6 +19,16 @@ struct H {
     events: Vec<Event>,
     t: f64,
     pointer: Pos2,
+    /// Every string painted by the last frame.
+    texts: Vec<String>,
+}
+
+fn texts(shape: &egui::Shape, out: &mut Vec<String>) {
+    match shape {
+        egui::Shape::Text(t) => out.push(t.galley.text().to_string()),
+        egui::Shape::Vec(v) => v.iter().for_each(|s| texts(s, out)),
+        _ => {}
+    }
 }
 
 impl H {
@@ -57,6 +68,7 @@ impl H {
             events: Vec::new(),
             t: 0.0,
             pointer: Pos2::ZERO,
+            texts: Vec::new(),
         };
         h.ui.perform_open = perform;
         for _ in 0..30 {
@@ -82,8 +94,10 @@ impl H {
         );
         show(&mut self.editor, &mut self.ui, &mut root);
         perform::rearm(&mut self.ui, self.t);
-        // Headless: the frame output (shapes, platform requests) has nowhere to go.
-        let _ = self.ctx.end_pass();
+        self.texts.clear();
+        for s in self.ctx.end_pass().shapes {
+            texts(&s.shape, &mut self.texts);
+        }
     }
 
     fn has(&self, key: &str) -> bool {
@@ -248,16 +262,25 @@ fn without_a_macro_module_the_profile_does_nothing() {
 #[test]
 fn lookup_falls_back_to_any_controller() {
     let mut profiles = std::collections::BTreeMap::new();
-    assert_eq!(perform::knob_profile(&profiles, Some(PORT)), None);
-    assert_eq!(perform::knob_profile(&profiles, None), None);
+    assert_eq!(perform::knobs(&profiles, Some(PORT)), None);
+    assert_eq!(perform::knobs(&profiles, None), None);
     let any: KnobProfile = [("m1".to_string(), 1)].into();
     let own: KnobProfile = [("m1".to_string(), 2)].into();
     profiles.insert(ANY_CONTROLLER.to_string(), any.clone());
-    assert_eq!(perform::knob_profile(&profiles, Some(PORT)), Some(&any));
-    assert_eq!(perform::knob_profile(&profiles, None), Some(&any));
+    assert_eq!(
+        perform::knobs(&profiles, Some(PORT)),
+        Some(Knobs::Profile(&any))
+    );
+    assert_eq!(perform::knobs(&profiles, None), Some(Knobs::Profile(&any)));
     profiles.insert(PORT.to_string(), own.clone());
-    assert_eq!(perform::knob_profile(&profiles, Some(PORT)), Some(&own));
-    assert_eq!(perform::knob_profile(&profiles, Some("Other")), Some(&any));
+    assert_eq!(
+        perform::knobs(&profiles, Some(PORT)),
+        Some(Knobs::Profile(&own))
+    );
+    assert_eq!(
+        perform::knobs(&profiles, Some("Other")),
+        Some(Knobs::Profile(&any))
+    );
 
     // The plugin has no port name: its CCs use the "any controller" profile.
     let mut h = H::new();
@@ -536,4 +559,130 @@ fn an_out_of_range_code_in_settings_loads_and_maps_nothing() {
     // Settings lists it without panicking.
     h.click("view-menu");
     assert!(h.has("knobs:forget"));
+}
+
+/// The owner's controller; its built-in map has knob 3 on CC 76 and knob 1 on CC 74.
+const KEYLAB: &str = "KL Essential 61 mk3 MIDI";
+
+#[test]
+fn a_built_in_map_drives_the_macro_on_any_channel_with_pickup_and_one_undo_step() {
+    let mut h = H::new();
+    h.ui.midi_input = Some(KEYLAB.into());
+    assert!(h.ui.knob_profiles.is_empty());
+    let base = h.value(MACROS, "m3");
+    let at = h.at(MACROS, "m3");
+    assert!(at < 90, "room to turn up from {at}");
+    // Far from the value: soft takeover holds it.
+    h.cc(5, 76, if at > 40 { 0 } else { 127 });
+    assert_eq!(h.value(MACROS, "m3"), base);
+    let entries = h.entries();
+    h.turn(5, 76, at, 10);
+    assert!(h.value(MACROS, "m3") > base, "the turn moves m3");
+    assert_eq!(h.entries(), entries + 1, "one turn is one undo step");
+    // Another channel drives it too.
+    let now = h.value(MACROS, "m3");
+    h.t += 1.5;
+    h.cc(11, 76, h.at(MACROS, "m3") + 6);
+    assert!(h.value(MACROS, "m3") > now);
+    assert_eq!(h.entries(), entries + 2);
+}
+
+#[test]
+fn the_patch_mapping_of_a_cc_wins_over_the_built_in_map() {
+    let mut h = H::new();
+    h.ui.midi_input = Some(KEYLAB.into());
+    h.editor
+        .set_presentation(&[(FILTER, "cc.cutoff_hz".into(), Some(74.0))]);
+    let m1 = h.value(MACROS, "m1");
+    let cutoff = h.value(FILTER, "cutoff_hz");
+    let at = h.at(FILTER, "cutoff_hz");
+    for v in (at.saturating_sub(3)..=127).step_by(3) {
+        h.cc(0, 74, v);
+    }
+    assert_ne!(
+        h.value(FILTER, "cutoff_hz"),
+        cutoff,
+        "the patch mapping moves"
+    );
+    assert_eq!(h.value(MACROS, "m1"), m1, "the built-in map does not");
+}
+
+#[test]
+fn the_ports_own_profile_beats_the_built_in_map() {
+    let mut h = H::new();
+    h.ui.midi_input = Some(KEYLAB.into());
+    h.profile(KEYLAB, &[("m1", 30)]);
+    let base = h.value(MACROS, "m1");
+    let at = h.at(MACROS, "m1");
+    h.turn(0, 74, at, 10);
+    assert_eq!(h.value(MACROS, "m1"), base, "the built-in CC is not used");
+    h.turn(0, 30, at, 10);
+    assert!(h.value(MACROS, "m1") > base);
+}
+
+#[test]
+fn the_built_in_map_beats_any_controller() {
+    let mut h = H::new();
+    h.ui.midi_input = Some(KEYLAB.into());
+    h.profile(ANY_CONTROLLER, &[("m2", 30)]);
+    assert!(matches!(
+        perform::knobs(&h.ui.knob_profiles, Some(KEYLAB)),
+        Some(Knobs::BuiltIn(c)) if c.name == "Arturia KeyLab Essential mk3"
+    ));
+    let base = h.value(MACROS, "m2");
+    let at = h.at(MACROS, "m2");
+    h.turn(0, 30, at, 10);
+    assert_eq!(h.value(MACROS, "m2"), base, "the fallback is not used");
+    h.turn(3, 71, at, 10);
+    assert!(h.value(MACROS, "m2") > base);
+    // An unknown port still falls back.
+    assert_eq!(
+        perform::knobs(&h.ui.knob_profiles, Some(PORT)),
+        Some(Knobs::Profile(&h.ui.knob_profiles[ANY_CONTROLLER]))
+    );
+}
+
+#[test]
+fn forgetting_the_ports_profile_returns_to_the_built_in_map() {
+    let mut h = H::new();
+    let dir = tempfile::tempdir().unwrap();
+    h.ui.prefs_dir = Some(dir.path().to_owned());
+    h.ui.midi_input = Some(KEYLAB.into());
+    h.ui.set_knob_profile(KEYLAB, Some([("m1".to_string(), 30)].into()));
+    h.click("view-menu");
+    assert!(h.texts.iter().any(|t| t == KEYLAB), "{:?}", h.texts);
+    h.click("knobs:forget");
+    assert!(h.ui.knob_profiles.is_empty());
+    assert!(matches!(
+        perform::knobs(&h.ui.knob_profiles, Some(KEYLAB)),
+        Some(Knobs::BuiltIn(_))
+    ));
+    let base = h.value(MACROS, "m1");
+    let at = h.at(MACROS, "m1");
+    h.turn(0, 74, at, 10);
+    assert!(h.value(MACROS, "m1") > base);
+}
+
+#[test]
+fn settings_shows_the_built_in_map_with_its_mode_and_knobs() {
+    let mut h = H::new();
+    h.ui.midi_input = Some(KEYLAB.into());
+    h.click("view-menu");
+    h.frame();
+    let has = |s: &str| h.texts.iter().any(|t| t == s);
+    assert!(
+        has("Arturia KeyLab Essential mk3 \u{b7} press Prog until User 1"),
+        "{:?}",
+        h.texts
+    );
+    assert!(has("M1  CC 74 \u{b7} any ch"));
+    assert!(has("M8  CC 16 \u{b7} any ch"));
+    assert!(!h.has("knobs:forget"), "nothing saved to forget");
+    assert!(h.has("knobs:setup"));
+    // A controller with fewer knobs leaves the rest empty.
+    h.ui.midi_input = Some("MPD226 MIDI 1".into());
+    h.frame();
+    let has = |s: &str| h.texts.iter().any(|t| t == s);
+    assert!(has("M4  CC 15 \u{b7} any ch"), "{:?}", h.texts);
+    assert!(has("M5  \u{2014}"));
 }

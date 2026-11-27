@@ -15,7 +15,7 @@ use crate::perform::{
 };
 use crate::style::{Role, Style};
 use crate::wheel::OwnedScroll;
-use crate::{routing, PatchEditor, UiState};
+use crate::{knob_maps, routing, PatchEditor, UiState};
 
 const TRANSPORT_W: f32 = 290.0;
 /// Narrowest a macro tile and a bank card get before the row wraps.
@@ -2119,16 +2119,40 @@ pub(crate) fn macro_knobs(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style)
         }
         return;
     }
-    // The port's own profile, else the "any controller" one (`perform::knob_profile`).
-    let key = ui_state
+    // The port's own profile, else its controller's built-in map, else the "any controller"
+    // profile (`perform::knobs`).
+    let own = ui_state
         .midi_input
         .clone()
-        .filter(|m| ui_state.knob_profiles.contains_key(m))
-        .unwrap_or_else(|| perform::ANY_CONTROLLER.into());
+        .filter(|m| ui_state.knob_profiles.contains_key(m));
+    let built_in = match &own {
+        Some(_) => None,
+        None => ui_state.midi_input.as_deref().and_then(knob_maps::find),
+    };
+    let key = own.unwrap_or_else(|| perform::ANY_CONTROLLER.into());
     let saved = ui_state
         .knob_profiles
         .get(&key)
+        .filter(|_| built_in.is_none())
         .map(|p| (key, perform::profile_knobs(p)));
+    let shown: Option<(String, Vec<(usize, String)>)> = match (built_in, &saved) {
+        (Some(c), _) => Some((
+            format!("{} \u{b7} {}", c.name, c.mode),
+            c.ccs
+                .iter()
+                .enumerate()
+                .map(|(i, cc)| (i + 1, format!("CC {cc} \u{b7} any ch")))
+                .collect(),
+        )),
+        (None, Some((key, knobs))) => Some((
+            key.clone(),
+            knobs
+                .iter()
+                .map(|&(n, map)| (n, perform::cc_text(map)))
+                .collect(),
+        )),
+        (None, None) => None,
+    };
     if ui_state.knob_nothing_saved {
         kit::paragraph(
             ui,
@@ -2138,9 +2162,9 @@ pub(crate) fn macro_knobs(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style)
             "No knobs set: nothing saved",
         );
     }
-    match &saved {
-        Some((key, knobs)) => {
-            kit::paragraph(ui, st, Role::Label, Tone::Text, key);
+    match &shown {
+        Some((title, knobs)) => {
+            kit::paragraph(ui, st, Role::Label, Tone::Text, title);
             // A fixed grid of all eight, two per row, so each macro keeps its place.
             egui::Grid::new("knobs:grid")
                 .num_columns(2)
@@ -2148,7 +2172,7 @@ pub(crate) fn macro_knobs(ui_state: &mut UiState, ui: &mut egui::Ui, st: &Style)
                 .show(ui, |ui| {
                     for n in 1..=kabl_modules::builtins::MACROS {
                         let text = match knobs.iter().find(|(m, _)| *m == n) {
-                            Some((_, map)) => format!("M{n}  {}", perform::cc_text(*map)),
+                            Some((_, map)) => format!("M{n}  {map}"),
                             None => format!("M{n}  \u{2014}"),
                         };
                         ui.label(kit::rich(st, Role::Caption, Tone::Text2, text));
