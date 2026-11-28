@@ -26,6 +26,7 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 - R4 acceptance pass on rc.2; rc.3 re-check before v1.0.0 (proposed).
 
 ## Decisions (Kosta)
+- 11-28: composite breadth is IN 1.0: first understand which blocks recur across many patches (breadth audit, `claude/composite-breadth`, brief .claude/tmp/coord1127/brief-breadth.md, dispatched), then build those composites, make the library searchable/saveable (rename, delete, search; placement insert-only vs browser section: asked), then migrate factory patches per generator with golden hashes unchanged.
 - 11-27: plugin key policy: kabl keeps its keys (note keys, Z/X, its shortcuts in the current view, text fields) while focused; every other key goes to the host only (W8c). Merge #289 first.
 - 11-27: MIDI built-in maps only from sourced research (P maker / S Spectrasonics); unsourced models excluded.
 - 11-27: MIDI auto-mapping after faces. Setup = turn knobs 1-8. Before a user profile exists: built-in per-device maps (M2).
