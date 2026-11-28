@@ -10,7 +10,7 @@ Make kabl easy to start, learn, understand and reuse, and bring it to Windows th
 ## In flight (builders die on restart: resume from the pushed branch, never redispatch from scratch)
 - PAUSED by Kosta 11-28. Resume only when he says so.
 - #291 composite breadth audit (`claude/composite-breadth`, head 255885a9): verify OK, review clean at head; CI was running at pause. On resume: check CI green at head, merge, close slice. Then put to Kosta: which of Tone Stage / Amp Env / Stereo Sum / Dual Osc to build (rec: all four), schedule CI5 (rec: yes, Stereo Sum's single L+R knobs need it), composite search placement browser vs insert-only (rec: browser).
-- W8c key policy (`claude/w8c-keys`; told to push WIP and stop at pause, check `nonslop status` for its head; resume the branch, never redispatch from scratch; opus builder dispatched 11-27, brief .claude/tmp/coord1127/brief-w8c.md incl. item 3a = #289 review minors: repeat re-decides KEY_ROUTE, KEY_ROUTE not cleared on focus loss). Then verify, review, CI, merge.
+- W8c key policy #290 (`claude/w8c-keys`, head f9a470a7): builder DONE before pause, all CI green at f9a470a7. On resume: `nonslop slice verify`, opus review (brief .claude/tmp/coord1127/brief-w8c.md), merge. Builder decisions to surface to Kosta: Escape always kabl; plugin has computer keys off by default so A-row goes to host; egui-baseview gains public API set_key_owner/key_to_host/KeyOwner; X11 unchanged. (Opus builder dispatched 11-27, brief .claude/tmp/coord1127/brief-w8c.md incl. item 3a = #289 review minors: repeat re-decides KEY_ROUTE, KEY_ROUTE not cleared on focus loss). Then verify, review, CI, merge.
 - #203 promo v2: parked.
 - Every merge moves master: update-branch the other open PRs, re-verify, delta re-review, CI.
 
