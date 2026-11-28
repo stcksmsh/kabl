@@ -17,9 +17,14 @@ The first pass's method, rebuilt as scratch scripts (deleted, as before):
 
 1. **Replay.** Every `log.jsonl` replayed the way `format::replay` does and compared with
    `checkpoint.json`: all 158 folders match (modules, params, cables).
-2. **Mining.** ESU enumeration of connected induced subgraphs, WL hash (3 rounds) over module
-   kinds and edge labels `from_port>to_port` / `from_port>@param`, hubs `macro`, `cues`,
-   `clock`, `out` removed, closed patterns only.
+2. **Mining.** List every connected group of modules in every patch, then give groups with the
+   same shape the same fingerprint, so identical blocks can be counted across patches. Hubs
+   `macro`, `cues`, `clock` and `out` are removed first.
+   - *ESU* is the standard algorithm that lists every connected group of N modules exactly once.
+   - *WL hash* is the fingerprint: it combines each module's kind with its cable labels
+     (`from_port>to_port` / `from_port>@param`) over 3 rounds of neighbours.
+   - *Closed patterns* only: a shape is dropped when a shape one module bigger occurs in exactly
+     the same patches, so only the largest form of each block is listed.
 3. **Role matchers** for each candidate, run over every browser patch. They return members,
    parameter values per role, the cables that cross the boundary and the hub routes that land
    on members.
@@ -60,7 +65,7 @@ Ranked by total reach. "Inside" means inside one of the six.
 | 1 | **Amp Env** | `env.adsr → vca.cv` · 2 · 1 | 106 / 188 · 74 / 129 · 45 / 59 | subset of Analog Voice, Sequenced Part, Sequenced Part + Sub | 2 | Attack, Decay, Sustain, Release (macro routes: release 26, decay 16, attack 12, sustain 7). Ports: In, Gate, Out, Env Out (the envelope also drives something outside in 19 instances) |
 | 2 | **Dual Osc** | `osc.va → mixer.in1`, `osc.va → mixer.in2` · 3 · 2 | 81 / 94 · 59 / 68 · 23 / 26 | subset of Analog Voice and Sequenced Part + Sub | 2 | Wave 1/2, Unison, Detune (macro 27), Osc 2 tune (`base_hz`, `fine`), Level 1/2 (macro 27). Ports: Pitch (one source feeds both oscillators in 88 of 94), Fine mod 1/2 (vibrato, 26 + 22 crossings; 40 macro routes on those cables' amounts become ports, as `ENCAPSULATE-WITH.md` § Cable parameters describes), Extra In (`mixer.in3`, 26), Out |
 | 3 | **Tone Stage** | `[drive] → filter.ladder → gain` · 2–3 · 1–2 | 48 / 48 · 12 / 12 · 36 / 36 | subset of Glue Bus (its first three stages); independent elsewhere | 3 | Drive, Drive trim, Tone (Hz), Resonance, Trim (macro: trim 30, tone 23, drive 13, resonance 9). Ports: In, Out, Cutoff mod (17), Trim mod (3) |
-| 4 | **Stereo Sum** | `split.left/right → mixer.in1 ×2 → join.left/right` · 4 · 4 | 26 / 26 · 0 / 0 · 26 / 26 | independent; sits right after Space's reverb in 22 patches (it is the extra half of the first pass's C6 Space Return) | 2 | Return level, Dry level (L and R are equal in all 26, so one knob each needs a two-target control, CI5). Ports: In (stereo return), Dry In (`mixer.in2` both sides, one source in 23 of 25), Out |
+| 4 | **Stereo Sum** | `split.left/right → mixer.in1 ×2 → join.left/right` · 4 · 4 | 26 / 26 · 0 / 0 · 26 / 26 | independent; sits right after Space's reverb in 22 patches (it is the extra half of the first pass's C6, Space Return: Space plus a stereo return mixed with dry drums) | 2 | Return level, Dry level (L and R are equal in all 26, so one knob each needs a two-target control, CI5: the planned presentation mapping that lets one control drive several targets with a display range and unit). Ports: In (stereo return), Dry In (`mixer.in2` both sides, one source in 23 of 25), Out |
 | 5 | Keys Voice | Dual Osc + Amp Env · 5 · 4 | 23 / 33 · 13 / 22 · 11 / 11 | the Sequenced Part + Sub core without its sequencer | — | assembly of #1 and #2, see §4 |
 | 6 | Post-VCA Voice | Amp Env + Tone Stage (`vca(env) → [drive] → ladder → gain`) · 4–5 | 18 / 18 · 0 · 16 / 16 (+2 partial) | independent (the filter sits after the amp, so Analog Voice cannot host it) | — | assembly of #1 and #3, see §4 |
 | 7 | FM Voice | `osc.fm6` + Tone Stage · 4 · 3 | 16 / 16 · 0 · 15 / 15 (+1 partial) | independent | — | one module plus #3, see §4 |
@@ -108,7 +113,7 @@ Use in the existing patches (outside the six, factory generators only; the lesso
 `crates/ui/tests/*`, `cable_capture.rs` and `chrome_capture.rs` stay flat, as the first pass
 said):
 
-| composite | patches / instances | per generator file |
+| composite | patches / instances | patches per generator file |
 |---|---|---|
 | Tone Stage | 36 / 36 | `presets_keys_pluck/group2.rs` 14, `presets_piece.rs` 9, `presets_keys_pluck/bank.rs` 6, `presets_groove.rs` 5, `presets_pilot.rs` 2 |
 | Stereo Sum | 24 / 24 | `presets_groove.rs` 14, `presets_piece.rs` 9, `presets_pilot.rs` 1 |
@@ -133,6 +138,13 @@ Patches, for spot checks (`×n` = instances in that patch):
   gantry gumdrop laundromat lichen×3 loading-dock×3 matinee pawn-shop progression rivet-gun
   roller-rink rope-walk scaffold slab-city spark-plug spillway spinet split×2 turnstile. The
   other 27 outside instances are in lessons; 129 are inside the six.
+
+The "outside" reach in §2 also counts lesson patches, which stay flat. By generator file
+(patches): Stereo Sum `explain.rs` 1, `sound_palette.rs` 1. Dual Osc `sound_palette.rs` 3,
+`library.rs` 3, `expressive.rs` 2, `explain.rs` 1, `performance.rs` 1, `composition.rs` 1. Amp
+Env `library.rs` 7, `cable_capture.rs` 2, `expressive.rs` 2, `sound_palette.rs` 2, `explain.rs`
+1, `interlocking.rs` 1, `chrome_capture.rs` 1, `performance.rs` 1, `composition.rs` 1,
+`sound_engines.rs` 1. Tone Stage has none.
 
 Example checks against the graphs: balcony #73 split → #74/#75 mixers → #76 join (Stereo Sum);
 boxwood #4 drive → #5 ladder → #6 gain (Tone Stage); corduroy #3/#4 `osc.va` → #5 mixer (Dual
